@@ -1,8 +1,24 @@
 [tool.poetry]
-name = "snaky_bucket"
+name = "pyrate_limiter"
 version = "0.1.0"
-description = ""
+description = "Python Rate-Limiter using Leaky-Bucket Algorimth Family"
 authors = ["vutr <me@vutr.io>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/vutran1710/PyrateLimiter"
+repository = "https://github.com/vutran1710/PyrateLimiter"
+keywords = ["rate", "rate-limiter", "rate_limiter", "ratelimiter", "leaky-bucket"]
+classifiers = [
+    "Environment :: Console",
+    "Framework :: Flake8",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
+]
+include = [
+    "LICENSE",
+]
 
 [tool.poetry.dependencies]
 python = "^3.7"

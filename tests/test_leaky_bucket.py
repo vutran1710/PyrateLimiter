@@ -1,7 +1,7 @@
 from logzero import logger  # noqa
 from time import sleep
-from snaky_bucket.basic_algorimth import LeakyBucket
-from snaky_bucket.exceptions import BucketFullException
+from pyrate_limiter.basic_algorimth import LeakyBucket
+from pyrate_limiter.exceptions import BucketFullException
 import pytest
 
 bucket = None

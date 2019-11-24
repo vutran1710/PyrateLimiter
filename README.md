@@ -16,7 +16,7 @@ $ pip install snaky-bucket
 # Usage
 
 ``` python
-from snaky_bucket import Bucket, Bites
+from rate_limiter import Bucket, Bites
 
 # Init bucket singleton
 Bucket(redis_url='redis-url', prefix='redis-prefix')

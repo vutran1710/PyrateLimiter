@@ -1,2 +1,3 @@
 .coverage
+pyrate_limiter.egg-info/
 __pycache__/
