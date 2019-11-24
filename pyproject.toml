@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pyrate_limiter"
+name = "pyrate-limiter"
 version = "0.1.0"
 description = "Python Rate-Limiter using Leaky-Bucket Algorimth Family"
 authors = ["vutr <me@vutr.io>"]
@@ -9,8 +9,6 @@ homepage = "https://github.com/vutran1710/PyrateLimiter"
 repository = "https://github.com/vutran1710/PyrateLimiter"
 keywords = ["rate", "rate-limiter", "rate_limiter", "ratelimiter", "leaky-bucket"]
 classifiers = [
-    "Environment :: Console",
-    "Framework :: Flake8",
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Documentation",
     "Topic :: Software Development :: Libraries :: Python Modules",

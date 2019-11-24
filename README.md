@@ -10,26 +10,26 @@ Currently this package requires `Redis` to work with.
 ## Installation
 
 ``` shell
-$ pip install snaky-bucket
+$ pip install pyrate-limiter
 ```
 
 # Usage
 
 ``` python
-from rate_limiter import Bucket, Bites
+from pyrate_limiter.core import RedisBucket as Bucket, HitRate
 
 # Init bucket singleton
-Bucket(redis_url='redis-url', prefix='redis-prefix')
+bucket = Bucket('redis-url', prefix='redis-prefix')
 
 # Init rate_limiter
-rate_limiter = Bites(
+limiter = HitRate(
+    bucket,
     capacity=10,
     interval=60,
-    suffix=lambda *args, **kwargs: 'some-key-parsed-from-function-argument',
 )
 
 # Use as decorator
-@rate_limiter
+@limiter('redis-key')
 def call(*args, **kwargs):
     pass
 ```
