@@ -1,9 +1,8 @@
-from logzero import logger
 from time import time
 from .exceptions import BucketFullException
 
 
-class Bucket(object):
+class Bucket:
 
     queue = []
     capacity = None
