@@ -32,7 +32,6 @@ redis = "^3.3"
 
 [tool.poetry.scripts]
 test = 'scripts:test'
-et = 'scripts:engine_test'
 lint = 'scripts:lint'
 
 [build-system]
