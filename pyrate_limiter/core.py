@@ -62,30 +62,30 @@ class LeakyBucketLimiter:
         self.queue.update(new_queue)
 
 
-# class TokenBucketLimiter:
-#     queue = None
-#     capacity = None
-#     window = None
+class TokenBucketLimiter:
+    queue = None
+    capacity = None
+    window = None
 
-#     def __init__(self, bucket, capacity=10, window=3600):
-#         self.queue = bucket
-#         self.capacity = capacity
-#         self.window = window
+    def __init__(self, bucket, capacity=10, window=3600):
+        self.queue = bucket
+        self.capacity = capacity
+        self.window = window
 
-#     def process(self, item):
-#         self.refill()
+    def process(self, item):
+        self.refill()
 
-#         if self.queue.getlen() >= self.capacity:
-#             raise BucketFullException('No more tokens')
+        if self.queue.getlen() >= self.capacity:
+            raise BucketFullException('No more tokens')
 
-#         self.queue.append({'timestamp': time(), 'item': item})
+        self.queue.append({'timestamp': time(), 'item': item})
 
-#     def refill(self):
-#         if not self.queue.getlen():
-#             return
+    def refill(self):
+        if not self.queue.getlen():
+            return
 
-#         last_item = self.queue.values()[-1]
-#         now = time()
+        last_item = self.queue.values()[-1]
+        now = time()
 
-#         if now - last_item['timestamp'] >= self.window:
-#             self.queue.update([])
+        if now - last_item['timestamp'] >= self.window:
+            self.queue.update([])

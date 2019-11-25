@@ -2,7 +2,7 @@ from json import loads, dumps
 from pyrate_limiter.core import AbstractBucket
 
 
-class LeakyRedis(AbstractBucket):
+class RedisBucket(AbstractBucket):
     conn = None
     hash = None
     key = None
