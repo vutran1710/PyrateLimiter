@@ -9,3 +9,10 @@ def lint() -> None:
 
 def test() -> None:
     check_call(["pytest", "tests/", "--verbose", "-s", "--cov=pyrate_limiter"])
+
+
+def engine_test() -> None:
+    check_call([
+        "pytest", "tests/test_redis_bucket.py", "--verbose", "-s", "-x",
+        "--cov=pyrate_limiter"
+    ])

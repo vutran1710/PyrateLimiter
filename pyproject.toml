@@ -28,9 +28,11 @@ flake8 = "^3.7"
 pylint = "^2.4"
 logzero = "^1.5"
 pytest-cov = "^2.8"
+redis = "^3.3"
 
 [tool.poetry.scripts]
 test = 'scripts:test'
+et = 'scripts:engine_test'
 lint = 'scripts:lint'
 
 [build-system]
