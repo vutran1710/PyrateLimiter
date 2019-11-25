@@ -20,4 +20,3 @@ class LocalBucket(AbstractBucket):
 
     def update(self, new_list):
         self.__values__ = new_list
-
