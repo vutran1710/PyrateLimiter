@@ -23,7 +23,7 @@ class LeakyBucket:
         self.queue.append({'timestamp': timestamp, 'item': item})
 
     def leak(self):
-        if not len(self.queue):
+        if not self.queue:
             return
 
         now = time()

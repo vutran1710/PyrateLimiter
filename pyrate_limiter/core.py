@@ -9,19 +9,25 @@ from .exceptions import BucketFullException
 
 
 class AbstractBucket(ABC):
+    """An abstract class for Bucket as Queue"""
+
+    __values__ = []
+
     @abstractmethod
     def append(self, item) -> None:
-        pass
-
+        """A method to append one single item to the value queue
+        """
     @abstractmethod
     def values(self) -> List:
-        pass
-
+        """Return queue vlaues
+        """
     @abstractmethod
     def update(self, new_list: List) -> None:
-        pass
-
+        """Completely replace the existing queue with a new one
+        """
     def getlen(self) -> int:
+        """Return current queue's length
+        """
         return len(self.__values__)
 
 
