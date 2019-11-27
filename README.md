@@ -1,4 +1,4 @@
-<img align="left" width="90" height="100" src="https://github.com/vutran1710/PyrateLimiter/blob/master/img/log.png">
+<img align="left" width="95" height="120" src="https://github.com/vutran1710/PyrateLimiter/blob/master/img/log.png">
 
 # PyrateLimiter
 The request rate limiter using Leaky-bucket algorimth
@@ -115,7 +115,7 @@ bucket = LocalBucket(initial_values=some_list_type_value)
 
 
 ## Understanding the Algorimths
-View `tests/test_leaky_bucket.py` and `tests/test_token_bucket.py` for explaination. Documents are on the way.
+
 #### LeakyBucket with Sliding-Window Algorimth
 LeakyBucket with Sliding-Window Algorimth is a capped bucket of items. Every item expires after {window} time, making room for later items to go in.
 
@@ -173,12 +173,3 @@ pyrate_limiter/exceptions.py            5      0   100%
 -------------------------------------------------------
 TOTAL                                 161      4    98%
 ```
-
-## License
-Copyright *2019* **vutr**
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
