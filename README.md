@@ -1,6 +1,11 @@
-# Request Rate Limiter using Leaky-bucket algorimth
+<img align="left" width="90" height="100" src="https://github.com/vutran1710/PyrateLimiter/blob/master/img/log.png">
+
+# PyrateLimiter
+The request rate limiter using Leaky-bucket algorimth
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
+
+<br>
 
 ## Introduction
 This module can be used to apply rate-limit for API request, using `leaky-bucket` algorimth. User defines `window`
