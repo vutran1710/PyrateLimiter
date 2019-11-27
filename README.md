@@ -4,6 +4,9 @@
 The request rate limiter using Leaky-bucket algorimth
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
+[![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/vutran1710/PyrateLimiter/graphs/commit-activity)
+[![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/pyrate-limiter/)
 
 <br>
 
@@ -35,16 +38,31 @@ from pyrate_limiter.core import AbstractBucket
 ```
 AbstractBucket is a python abstract class that provide the Interface for, well, a `queue`. The algorimths provided in
 `pyrate_limiter.core` all make use of this data-structure. A solid implementation of this abstract class must includes 4
-methods of the *bucket* instance:
+methods of the *bucket* instance.
 
-1. **append**:  `(self, item) -> None`
-an instance method that allows a single item to be added to the queue
-2. **values**: `(self) -> List[item]`
-an instance method that returns the latest list of item in the queue
-3. **update**: `(self, list) -> None`
-an instance method that completely replace the current queue with another list of values
-4. **getlen**: `(self) -> int`
-an instance method that returns the queue's length
+``` python
+class AbstractBucket(ABC):
+    """An abstract class for Bucket as Queue"""
+
+    __values__ = []
+
+    @abstractmethod
+    def append(self, item) -> None:
+        """Add single item to the queue
+        """
+    @abstractmethod
+    def values(self) -> List:
+        """Return queue values
+        """
+    @abstractmethod
+    def update(self, new_list: List) -> None:
+        """Completely replace the existing queue with a new one
+        """
+    def getlen(self) -> int:
+        """Return the current queue's length
+        """
+        return len(self.__values__)
+```
 
 Due to personal needs, 2 ready-use implementations with [Redis](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/engines/redis.py) and [Application Local State](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/engines/local.py) are provided.
 
