@@ -1,6 +1,7 @@
 from logzero import logger  # noqa
 from time import sleep
-from pyrate_limiter.basic_algorimth import TokenBucket
+from pyrate_limiter.engines.local import LocalBucket
+from pyrate_limiter.core import TokenBucketLimiter
 from pyrate_limiter.exceptions import BucketFullException
 import pytest
 
@@ -22,32 +23,33 @@ eg:     3reqs/3s              <5sec>               2reqs/1s              <5sec> 
 def test_bucket_overloaded():
     global bucket
     # Window is 4 seconds, capacity is 2-items
-    bucket = TokenBucket(capacity=2, window=4)
+    bucket_instance = LocalBucket()
+    bucket = TokenBucketLimiter(bucket_instance, capacity=2, window=4)
 
     # Continuous hit to bucket should fail at maximum-capacity overloading
     with pytest.raises(BucketFullException):
         for _ in range(4):
             bucket.process(_)
 
-    assert len(bucket.queue) == 2
-    assert bucket.queue[0]['item'] == 0
-    assert bucket.queue[1]['item'] == 1
+    assert bucket.queue.getlen() == 2
+    assert bucket.queue.values()[0]['item'] == 0
+    assert bucket.queue.values()[1]['item'] == 1
 
 
 def test_bucket_cooldown():
     global bucket
     sleep(4)
     bucket.refill()
-    assert len(bucket.queue) == 0
+    assert bucket.queue.getlen() == 0
 
     # Start of Window
     bucket.process(1)
-    assert bucket.queue[0]['item'] == 1
+    assert bucket.queue.values()[0]['item'] == 1
 
     # End of Window
     sleep(3.9)
     bucket.process(2)
-    assert bucket.queue[1]['item'] == 2
+    assert bucket.queue.values()[1]['item'] == 2
 
     sleep(0.2)
     with pytest.raises(BucketFullException):
@@ -57,6 +59,6 @@ def test_bucket_cooldown():
     bucket.process(4)
     bucket.process(5)
 
-    assert bucket.queue[0]['item'] == 4
-    assert bucket.queue[1]['item'] == 5
-    assert len(bucket.queue) == 2
+    assert bucket.queue.values()[0]['item'] == 4
+    assert bucket.queue.values()[1]['item'] == 5
+    assert bucket.queue.getlen() == 2
