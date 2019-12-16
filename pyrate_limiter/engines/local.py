@@ -6,7 +6,8 @@ class LocalBucket(AbstractBucket):
 
     __values__ = []
 
-    def __init__(self, initial_values=[]):
+    def __init__(self, initial_values=None):
+        initial_values = initial_values or []
         if initial_values and type(initial_values) != list:
             raise InvalidInitialValues
 
