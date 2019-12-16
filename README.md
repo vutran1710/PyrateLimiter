@@ -1,7 +1,7 @@
 <img align="left" width="95" height="120" src="https://github.com/vutran1710/PyrateLimiter/blob/master/img/log.png">
 
 # PyrateLimiter
-The request rate limiter using Leaky-bucket algorimth
+The request rate limiter using Leaky-bucket algorithm
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
 [![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
@@ -12,7 +12,7 @@ The request rate limiter using Leaky-bucket algorimth
 <br>
 
 ## Introduction
-This module can be used to apply rate-limit for API request, using `leaky-bucket` algorimth. User defines `window`
+This module can be used to apply rate-limit for API request, using `leaky-bucket` algorithm. User defines `window`
 duration and the limit of function calls within such interval.
 
 - To hold the state of the Bucket, you can use `LocalBucket` as internal bucket.
@@ -29,16 +29,16 @@ $ pip install pyrate-limiter
 
 
 ## API
-One of the most pleasing features of this lib is that it is meant to be very extensible. People's efforts to solve rate-limiting
-problem has so far led to the introductions of few variations of the **leaky-bucket** algorimth. The idea behind this is
-you can extend the main core data-structure that power every member of this algorimth family.
+One of the most pleasing features of this lib is that it is meant to be very extensible. People's efforts to solve the rate-limiting
+problem have so far led to the introduction of a few variations of the **leaky-bucket** algorithm. The idea behind this is project is that
+you can extend the main core data-structure that powers every member of this algorithm family.
 
 #### AbstractBucket
 ```python
 from pyrate_limiter.core import AbstractBucket
 ```
-AbstractBucket is a python abstract class that provide the Interface for, well, a `queue`. The algorimths provided in
-`pyrate_limiter.core` all make use of this data-structure. A solid implementation of this abstract class must includes 4
+AbstractBucket is a python abstract class that provides the Interface for, well, a `queue`. The algorithms provided in
+`pyrate_limiter.core` all make use of this data-structure. A concrete implementation of this abstract class must includes 4
 methods of the *bucket* instance.
 
 ``` python
@@ -67,8 +67,8 @@ class AbstractBucket(ABC):
 
 Due to personal needs, 2 ready-use implementations with [Redis](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/engines/redis.py) and [Application Local State](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/engines/local.py) are provided.
 
-When designing a rate-limiting service that depends on different type of data-store, like `Postgres` or `Mysql`,
-user can write his own AbstractBucket implementation that fits their needs.
+When designing a rate-limiting service that depends on a different type of data-store, like `Postgres` or `Mysql`,
+the user can write their own AbstractBucket implementation that fits their needs.
 
 ## Usage
 
@@ -81,7 +81,7 @@ from pyrate_limiter.exceptions import BucketFullException
 # Init redis bucket
 bucket = RedisBucket('redis-url', hash='some-hash', key='some-key')
 
-# Create Limiter using Token-Bucket Algorimth
+# Create Limiter using Token-Bucket Algorithm
 # Maximum 10 items over 60 seconds
 limiter = TokenBucketLimiter(bucket, capacity=10, window=60)
 limiter.queue.config(key='change-key')
@@ -95,7 +95,7 @@ except BucketFullException:
 
 
 
-# Similarly, using Leaky-Bucket Algorimth
+# Similarly, using Leaky-Bucket Algorithm
 limiter = LeakyBucketLimiter(bucket, capacity=5, window=6)
 limiter.queue.config(key='change-key')
 # Process an item
@@ -114,10 +114,10 @@ bucket = LocalBucket(initial_values=some_list_type_value)
 ```
 
 
-## Understanding the Algorimths
+## Understanding the Algorithms
 
-#### LeakyBucket with Sliding-Window Algorimth
-LeakyBucket with Sliding-Window Algorimth is a capped bucket of items. Every item expires after {window} time, making room for later items to go in.
+#### LeakyBucket with Sliding-Window Algorithm
+LeakyBucket with Sliding-Window Algorithm is a capped bucket of items. Every item expires after {window} time, making room for later items to go in.
 
 Item's expiring-rate is {window} time.
 Using a simple timeline model, we can describe it as follow
@@ -127,9 +127,9 @@ REQS >>--- <req> ---- <req> ---- <req> ---- <req> ---- <req> ---- <req> ------->
 ```
 
 #### TokenBucket
-TokenBucket with Fixed-Window Algorimth can be described as multiple groups of Going-In-Items that does not exceed the Bucket Capacity running into the Bucket at fixed-interval between groups.
+TokenBucket with Fixed-Window Algorithm can be described as multiple groups of Going-In-Items that do not exceed the Bucket Capacity running into the Bucket with fixed-intervals between groups.
 
-Bucket's queue reset if interval between 2 items is larger or equal {window} time.
+The bucket's queue resets if the interval between 2 items is larger or equal to {window} time.
 
 ```
 >>-- [x items] ----- (window) ------ [y items] ------ (window) ------ [z items] --->>
@@ -143,7 +143,7 @@ Simple as it should be, given you have [poetry](https://poetry.eustace.io/) inst
 $ poetry run test
 ```
 
-CICD flow is not currently setup since I dont have much time, but FYI, the `coverage` is decent enought IMO...
+CICD flow is not currently set up since I dont have much time, but FYI, the `coverage` is decent enought IMO...
 
 ``` shell
 tests/test_leaky_bucket.py::test_bucket_overloaded PASSED
@@ -165,7 +165,7 @@ tests/test_token_bucket.py::test_bucket_cooldown PASSED
 Name                                Stmts   Miss  Cover
 -------------------------------------------------------
 pyrate_limiter/__init__.py              1      0   100%
-pyrate_limiter/basic_algorimth.py      45      0   100%
+pyrate_limiter/basic_algorithm.py      45      0   100%
 pyrate_limiter/core.py                 63      3    95%
 pyrate_limiter/engines/local.py        14      0   100%
 pyrate_limiter/engines/redis.py        33      1    97%

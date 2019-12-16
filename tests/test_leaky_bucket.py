@@ -5,7 +5,7 @@ from pyrate_limiter.exceptions import BucketFullException
 import pytest
 
 bucket = None
-"""LeakyBucket with Sliding-Window Algorimth is a capped bucket
+"""LeakyBucket with Sliding-Window Algorithm is a capped bucket
 of items. Every item expires after {window} time, making room for later items
 to go in.
 
