@@ -1,6 +1,7 @@
 """Ref:
 - https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
 """
+from threading import RLock
 from time import time
 from typing import List
 from abc import ABC, abstractmethod
@@ -35,63 +36,71 @@ class LeakyBucketLimiter:
     queue = None
     capacity = None
     window = None
+    _lock = None
 
     def __init__(self, bucket: AbstractBucket, capacity=10, window=3600):
         self.queue = bucket
         self.capacity = capacity
         self.window = window
+        self._lock = RLock()
 
     def append(self, item):
-        self.leak()
+        with self._lock:
+            self.leak()
 
-        if self.queue.getlen() >= self.capacity:
-            raise BucketFullException('Bucket full')
+            if self.queue.getlen() >= self.capacity:
+                raise BucketFullException('Bucket full')
 
-        timestamp = time()
-        self.queue.append({'timestamp': timestamp, 'item': item})
+            timestamp = time()
+            self.queue.append({'timestamp': timestamp, 'item': item})
 
     def leak(self):
-        if not self.queue.getlen():
-            return
+        with self._lock:
+            if not self.queue.getlen():
+                return
 
-        now = time()
-        value_list = self.queue.values()
-        new_queue = deepcopy(value_list)
+            now = time()
+            value_list = self.queue.values()
+            new_queue = deepcopy(value_list)
 
-        for idx, item in enumerate(value_list):
-            interval = now - item.get('timestamp')
-            if interval > self.window:
-                new_queue = value_list[idx + 1:]
-            else:
-                break
+            for idx, item in enumerate(value_list):
+                interval = now - item.get('timestamp')
+                if interval > self.window:
+                    new_queue = value_list[idx + 1:]
+                else:
+                    break
 
-        self.queue.update(new_queue)
+            self.queue.update(new_queue)
 
 
 class TokenBucketLimiter:
     queue = None
     capacity = None
     window = None
+    _lock = None
 
     def __init__(self, bucket, capacity=10, window=3600):
         self.queue = bucket
         self.capacity = capacity
         self.window = window
+        self._lock = RLock()
 
     def process(self, item):
-        self.refill()
+        with self._lock:
+            self.refill()
 
-        if self.queue.getlen() >= self.capacity:
-            raise BucketFullException('No more tokens')
+            if self.queue.getlen() >= self.capacity:
+                raise BucketFullException('No more tokens')
 
-        self.queue.append({'timestamp': time(), 'item': item})
+            self.queue.append({'timestamp': time(), 'item': item})
 
     def refill(self):
-        if not self.queue.getlen():
-            return
+        with self._lock:
+            if not self.queue.getlen():
+                return
 
-        last_item = self.queue.values()[-1]
-        now = time()
+            last_item = self.queue.values()[-1]
+            now = time()
 
-        if now - last_item['timestamp'] >= self.window:
-            self.queue.update([])
+            if now - last_item['timestamp'] >= self.window:
+                self.queue.update([])
