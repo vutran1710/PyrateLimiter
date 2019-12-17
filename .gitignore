@@ -2,3 +2,5 @@
 pyrate_limiter.egg-info/
 __pycache__/
 dist/
+env/
+.vscode/
