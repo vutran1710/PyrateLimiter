@@ -1,4 +1,4 @@
-<img align="left" width="95" height="120" src="https://github.com/vutran1710/PyrateLimiter/blob/master/img/log.png">
+<img align="left" width="95" height="120" src="https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/img/log.png">
 
 # PyrateLimiter
 The request rate limiter using Leaky-bucket algorithm
