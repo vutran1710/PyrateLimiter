@@ -5,7 +5,7 @@ from pyrate_limiter.exceptions import BucketFullException
 import pytest
 
 bucket = None
-"""TokenBucket with Fixed-Window Algorimth can be described as
+"""TokenBucket with Fixed-Window Algorithm can be described as
 multiple groups of Going-In-Items that does not exceed the Bucket Capacity
 running into the Bucket at fixed-interval between groups
 
