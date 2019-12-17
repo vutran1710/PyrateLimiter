@@ -1,6 +1,7 @@
 from logzero import logger  # noqa
 from time import sleep
-from pyrate_limiter.basic_algorimth import LeakyBucket
+from pyrate_limiter.engines.local import LocalBucket
+from pyrate_limiter.core import LeakyBucketLimiter
 from pyrate_limiter.exceptions import BucketFullException
 import pytest
 
@@ -22,16 +23,17 @@ REQS >>--- <req> ---- <req> ---- <req> ---- <req> ---- <req> ---- <req> ---- <re
 def test_bucket_overloaded():
     global bucket
     # Leaking rate is 3 seconds, capacity is 3-items
-    bucket = LeakyBucket(capacity=3, window=3)
+    bucket_instance = LocalBucket()
+    bucket = LeakyBucketLimiter(bucket_instance, capacity=3, window=3)
 
     # Continuous hit to bucket should fail at maximum-capacity overloading
     with pytest.raises(BucketFullException):
         for _ in range(4):
             bucket.append(_)
 
-    assert len(bucket.queue) == 3
-    assert bucket.queue[0]['item'] == 0
-    assert bucket.queue[2]['item'] == 2
+    assert bucket.queue.getlen() == 3
+    assert bucket.queue.values()[0]['item'] == 0
+    assert bucket.queue.values()[2]['item'] == 2
 
 
 def test_bucket_cooldown():
@@ -39,7 +41,7 @@ def test_bucket_cooldown():
     global bucket
     sleep(3)
     bucket.leak()
-    assert len(bucket.queue) == 0
+    assert bucket.queue.getlen() == 0
 
     # After window time, bucket queue should be empty, because
     # the first items in buckets were sent almost simultanously
@@ -58,9 +60,9 @@ def test_bucket_cooldown():
         # Instant addition to queue should fail
         bucket.append('fail')
 
-    assert len(bucket.queue) == 3
-    assert bucket.queue[2]['item'] == 6
-    assert bucket.queue[0]['item'] == 4
+    assert bucket.queue.getlen() == 3
+    assert bucket.queue.values()[2]['item'] == 6
+    assert bucket.queue.values()[0]['item'] == 4
 
     sleep(2)
     bucket.append(7)
@@ -69,6 +71,6 @@ def test_bucket_cooldown():
     with pytest.raises(BucketFullException):
         bucket.append('fail')
 
-    assert len(bucket.queue) == 3
-    assert bucket.queue[2]['item'] == 8
-    assert bucket.queue[0]['item'] == 6
+    assert bucket.queue.getlen() == 3
+    assert bucket.queue.values()[2]['item'] == 8
+    assert bucket.queue.values()[0]['item'] == 6

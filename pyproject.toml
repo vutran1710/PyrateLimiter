@@ -28,6 +28,7 @@ pylint = "^2.4"
 logzero = "^1.5"
 pytest-cov = "^2.8"
 redis = "^3.3"
+fakeredis = "^1.1.0"
 
 [tool.poetry.scripts]
 test = 'scripts:test'
