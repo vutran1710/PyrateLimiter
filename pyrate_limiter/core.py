@@ -1,52 +1,40 @@
 """Ref:
 - https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
 """
-from threading import RLock
+import Math
+from typing import Any, Callable, List, NamedTuple
 from time import time
-from typing import List
 from abc import ABC, abstractmethod
-from copy import deepcopy
-from .exceptions import BucketFullException
+
+
+class LoggedItem(NamedTuple):
+    item: Any
+    timestamp: int
 
 
 class AbstractBucket(ABC):
     """An abstract class for Bucket as Queue
     """
-
-    __values__ = []
-
     @abstractmethod
-    def sync(self) -> None:
+    def sync(self) -> List[LoggedItem]:
         """Synchronizing the local class values with remote queue value
+        :return: remote queue
+        :rtype: list
         """
 
     @abstractmethod
-    def append(self, item) -> bool:
+    def append(self, item: LoggedItem) -> int:
         """A method to append one single item to the queue
-        :return: True for successful appending, False otherwise
-        :rtype: bool
-        """
-
-    @abstractmethod
-    def values(self) -> List:
-        """Return queue vlaues
-        :return: list of values
-        :rtype: List
-        """
-
-    @abstractmethod
-    def replace(self, new_list: List) -> bool:
-        """Completely replace the existing queue with a new one
-        :return: True if successful, False otherwise
-        :rtype: bool
-        """
-
-    def length(self) -> int:
-        """Return current queue's length
-        :return: queue's length
+        :return: new queue's length
         :rtype: int
         """
-        return len(self.__values__)
+
+    @abstractmethod
+    def discard(self, start=0, stop=1) -> int:
+        """A method to append one single item to the queue
+        :return: queue's length after discard its first item
+        :rtype: int
+        """
 
 
 class HitRate:
@@ -80,6 +68,12 @@ class SpamBlocker:
         """
         pass
 
+    def mark(self, time: int, block_signal_handler: Callable = None) -> None:
+        """Mark a single-violence.
+        Notify on blocking
+        """
+        pass
+
 
 class GenericLimiter:
     """A Basic Rate-Limiter that supports both LeakyBucket & TokenBucket algorimth
@@ -87,10 +81,9 @@ class GenericLimiter:
     LeakyBucket (allowance time for each request) or TokenBucket (maximum
     number of each request over an unit of time)
     - In addition, there is an option to `cap` the request rate in a secondary time-window,
-    eg: primary-rate=60 requests/minute and secondary=1000 requests/day
+    eg: primary-rate=60 requests/minute and maximum-rate=1000 requests/day
     """
-    bucket = None
-    _lock = None
+    bucket: AbstractBucket = None
 
     def __init__(
         self,
@@ -101,12 +94,12 @@ class GenericLimiter:
     ):
 
         self.bucket = bucket
-        self._lock = RLock()
         self.average = average
 
         if maximum and maximum.time <= average.time:
             msg = "Maximum's time must be larger than Average's time"
             raise Exception(msg)
+
         if maximum and maximum.hit <= average.hit:
             msg = "Maximum's hit must be larger than Average's hit"
             raise Exception(msg)
@@ -117,79 +110,45 @@ class GenericLimiter:
         if blocker:
             self.blocker = blocker
 
-    def allow(self, item):
-        pass
+    @property
+    def leak_rate(self) -> float:
+        """To ensure the stability & consistency of Average HitRate Limit
+        - when override, should consider window-overlapping that results in
+        actual hit-rate being greater than average hit-rate
+        """
+        rate: HitRate = self.average
+        return rate.time / rate.hit
 
+    def allow(self, item: Any) -> bool:
+        """Determining if an item is allowed to pass through
+        - We are using lazy-mechanism to calculate the bucket's current volume
+        - To prevent race condition, locking/syncing should be considred accordingly
+        """
+        now = int(time())
+        bucket: AbstractBucket = self.bucket
 
-class LeakyBucketLimiter:
-    queue = None
-    capacity = None
-    window = None
-    _lock = None
+        with bucket.sync() as Store:
+            logged_item = {'item': item, 'timestamp': now}
 
-    def __init__(self, bucket: AbstractBucket, capacity=10, window=3600):
-        self.queue = bucket
-        self.capacity = capacity
-        self.window = window
-        self._lock = RLock()
+            if not Store:
+                bucket.append(logged_item)
+                return True
 
-    def append(self, item):
-        with self._lock:
-            self.leak()
+            bucket_capacity = self.average.hit
+            lastest: NamedTuple = Store[-1]
+            timestamp = lastest['timestamp']
 
-            if self.queue.getlen() >= self.capacity:
-                raise BucketFullException('Bucket full')
+            drain = Math.min(
+                Math.floor(now - timestamp / self.leak_rate),
+                bucket_capacity,
+            )
 
-            timestamp = time()
-            self.queue.append({'timestamp': timestamp, 'item': item})
+            if drain >= 1:
+                bucket.discard(start=0, stop=drain)
+                bucket.append(logged_item)
+                return True
 
-    def leak(self):
-        with self._lock:
-            if not self.queue.getlen():
-                return
+            if self.blocker:
+                self.blocker.mark(now)
 
-            now = time()
-            value_list = self.queue.values()
-            new_queue = deepcopy(value_list)
-
-            for idx, item in enumerate(value_list):
-                interval = now - item.get('timestamp')
-                if interval > self.window:
-                    new_queue = value_list[idx + 1:]
-                else:
-                    break
-
-            self.queue.update(new_queue)
-
-
-class TokenBucketLimiter:
-    queue = None
-    capacity = None
-    window = None
-    _lock = None
-
-    def __init__(self, bucket, capacity=10, window=3600):
-        self.queue = bucket
-        self.capacity = capacity
-        self.window = window
-        self._lock = RLock()
-
-    def process(self, item):
-        with self._lock:
-            self.refill()
-
-            if self.queue.getlen() >= self.capacity:
-                raise BucketFullException('No more tokens')
-
-            self.queue.append({'timestamp': time(), 'item': item})
-
-    def refill(self):
-        with self._lock:
-            if not self.queue.getlen():
-                return
-
-            last_item = self.queue.values()[-1]
-            now = time()
-
-            if now - last_item['timestamp'] >= self.window:
-                self.queue.update([])
+            return False
