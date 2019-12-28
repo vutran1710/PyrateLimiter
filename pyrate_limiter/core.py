@@ -2,9 +2,10 @@
 - https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
 - https://nordicapis.com/everything-you-need-to-know-about-api-rate-limiting/
 """
+from __future__ import annotations
 import math
 from contextlib import contextmanager
-from typing import Any, Callable, List, NamedTuple
+from typing import Any, Callable, NamedTuple
 from time import time
 from abc import ABC, abstractmethod
 
@@ -20,10 +21,25 @@ class AbstractBucket(ABC):
     """
     @abstractmethod
     @contextmanager
-    def sync(self) -> List[LoggedItem]:
+    def synchronizing(self) -> AbstractBucket:
         """Synchronizing the local class values with remote queue value
         :return: remote queue
         :rtype: list
+        """
+
+    @abstractmethod
+    def __iter__(self):
+        """Bucket should be iterable
+        """
+
+    @abstractmethod
+    def __getitem__(self, index: int):
+        """Bucket should be subscriptable
+        """
+
+    @abstractmethod
+    def __len__(self):
+        """Bucket should return queue's size at request
         """
 
     @abstractmethod
@@ -132,29 +148,31 @@ class BasicLimiter:
     def allow(self, item: Any) -> bool:
         """Determining if an item is allowed to pass through
         - Using lazy-mechanism to calculate the bucket's current volume
-        - To prevent race condition, locking/syncing should be considred accordingly
+        - To prevent race condition, locking/synchronizinging should be considred accordingly
         """
         now = int(time())
         bucket: AbstractBucket = self.bucket
 
-        with bucket.sync() as Store:
+        with bucket.synchronizing() as Bucket:
             logged_item = LoggedItem(item=item, timestamp=now)
+            bucket_capacity = self.average.hit
 
-            if not Store:
+            if not len(Bucket) or len(Bucket) < bucket_capacity:
                 bucket.append(logged_item)
                 return True
 
-            bucket_capacity = self.average.hit
-            latest_item: NamedTuple = Store[-1]
+            latest_item: NamedTuple = Bucket[-1]
             timestamp = latest_item.timestamp
 
-            drain = Math.min(
-                Math.floor(now - timestamp / self.leak_rate),
+            drain = min(
+                int(math.floor((now - timestamp) / self.leak_rate)),
                 bucket_capacity,
             )
 
+            print('>>>>>> Drain ==', drain)
+
             if drain >= 1:
-                bucket.discard(start=0, stop=drain)
+                bucket.discard(number=drain)
                 bucket.append(logged_item)
                 return True
 
