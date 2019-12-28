@@ -169,8 +169,6 @@ class BasicLimiter:
                 bucket_capacity,
             )
 
-            print('>>>>>> Drain ==', drain)
-
             if drain >= 1:
                 bucket.discard(number=drain)
                 bucket.append(logged_item)
