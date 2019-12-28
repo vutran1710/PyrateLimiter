@@ -1,13 +1,16 @@
 """Ref:
 - https://www.figma.com/blog/an-alternative-approach-to-rate-limiting/
+- https://nordicapis.com/everything-you-need-to-know-about-api-rate-limiting/
 """
-import Math
+import math
+from contextlib import contextmanager
 from typing import Any, Callable, List, NamedTuple
 from time import time
 from abc import ABC, abstractmethod
 
 
 class LoggedItem(NamedTuple):
+    __name__ = 'LoggedItem'
     item: Any
     timestamp: int
 
@@ -16,6 +19,7 @@ class AbstractBucket(ABC):
     """An abstract class for Bucket as Queue
     """
     @abstractmethod
+    @contextmanager
     def sync(self) -> List[LoggedItem]:
         """Synchronizing the local class values with remote queue value
         :return: remote queue
@@ -30,7 +34,7 @@ class AbstractBucket(ABC):
         """
 
     @abstractmethod
-    def discard(self, start=0, stop=1) -> int:
+    def discard(self, number=1) -> int:
         """A method to append one single item to the queue
         :return: queue's length after discard its first item
         :rtype: int
@@ -53,7 +57,13 @@ class SpamBlocker:
     """Blocking spammer for a limited time based on
     how many times the bucket has been overflown
     """
-    def __init__(self, failure_rate: HitRate, block_time: int):
+    def __init__(
+        self,
+        failure_rate: HitRate,
+        block_time: int,
+        blocking_signal: Callable = None,
+        unblocking_signal: Callable = None,
+    ):
         """
         :param failure_rate: permitted number of time a request is disallowed over time
         :param block_time: how long the spammer will be blocked
@@ -68,14 +78,14 @@ class SpamBlocker:
         """
         pass
 
-    def mark(self, time: int, block_signal_handler: Callable = None) -> None:
+    def mark(self, time: int) -> None:
         """Mark a single-violence.
         Notify on blocking
         """
         pass
 
 
-class GenericLimiter:
+class BasicLimiter:
     """A Basic Rate-Limiter that supports both LeakyBucket & TokenBucket algorimth
     - Depending on how average HitRate is defined, the Limiter will behave like
     LeakyBucket (allowance time for each request) or TokenBucket (maximum
@@ -121,22 +131,22 @@ class GenericLimiter:
 
     def allow(self, item: Any) -> bool:
         """Determining if an item is allowed to pass through
-        - We are using lazy-mechanism to calculate the bucket's current volume
+        - Using lazy-mechanism to calculate the bucket's current volume
         - To prevent race condition, locking/syncing should be considred accordingly
         """
         now = int(time())
         bucket: AbstractBucket = self.bucket
 
         with bucket.sync() as Store:
-            logged_item = {'item': item, 'timestamp': now}
+            logged_item = LoggedItem(item=item, timestamp=now)
 
             if not Store:
                 bucket.append(logged_item)
                 return True
 
             bucket_capacity = self.average.hit
-            lastest: NamedTuple = Store[-1]
-            timestamp = lastest['timestamp']
+            latest_item: NamedTuple = Store[-1]
+            timestamp = latest_item.timestamp
 
             drain = Math.min(
                 Math.floor(now - timestamp / self.leak_rate),

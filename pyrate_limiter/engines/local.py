@@ -1,23 +1,37 @@
+from queue import SimpleQueue
+from contextlib import contextmanager
 from pyrate_limiter.core import AbstractBucket
 from pyrate_limiter.exceptions import InvalidInitialValues
 
 
 class LocalBucket(AbstractBucket):
+    __q__ = None
 
-    __values__ = []
+    def __init__(self, initial: list = None):
+        self.__q__ = SimpleQueue()
 
-    def __init__(self, initial_values=None):
-        initial_values = initial_values or []
-        if initial_values and type(initial_values) != list:
+        if initial is None:
+            return
+
+        if not isinstance(initial, list):
             raise InvalidInitialValues
 
-        self.__values__ = initial_values
+        if initial:
+            [self.__q__.put(t) for t in initial]
+
+    @contextmanager
+    def sync(self):
+        try:
+            yield self.__q__.qsize()
+        finally:
+            pass
 
     def append(self, item):
-        self.__values__.append(item)
+        self.__q__.put(item)
 
-    def values(self):
-        return self.__values__
+    def discard(self, number=1):
+        if number <= 0:
+            return self.__q__.qsize()
 
-    def update(self, new_list):
-        self.__values__ = new_list
+        while not q.empty() and number > 0:
+            self.__q__.get(item)

@@ -8,4 +8,5 @@ def lint() -> None:
 
 
 def test() -> None:
-    check_call(["pytest", "tests/", "--verbose", "-s", "--cov-report", "html", "--cov=pyrate_limiter"])
+    # check_call(["pytest", "tests/", "--verbose", "-s", "--cov-report", "html", "--cov=pyrate_limiter"])
+    check_call(["pytest", "tests/", "--verbose", "-s", "--cov=pyrate_limiter"])
