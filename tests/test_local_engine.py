@@ -1,15 +1,18 @@
 from logzero import logger    # noqa
 from time import sleep, time
 import pytest
-from pyrate_limiter.engines.local import LocalBucket
-from pyrate_limiter.core import (
+from pyrate_limiter.limiters import (
+    LocalBucket,
     BasicLimiter,
+)
+
+from pyrate_limiter.core import (
     HitRate,
     LoggedItem,
 )
-from pyrate_limiter.exceptions import (
-    InvalidInitialValues,
-    BucketFullException,
+
+from pyrate_limiter.exceptions import (    # noqa
+    InvalidInitialValues, BucketFullException,
 )
 
 
@@ -19,17 +22,17 @@ def test_invalid_initials():
 
 
 def test_name_tuple():
-    item = LoggedItem(item='x', timestamp=int(time()))
+    item = LoggedItem(item='x', timestamp=int(time()), nth=2)
     obj = item._asdict()
     assert obj['item'] == 'x'
     assert item.item == 'x'
+    assert item.nth == 2
 
 
-def test_block():
+def test_sliding_window_log_limiter():
     bucket = LocalBucket()
     avg_rate = HitRate(5, 10)
-    max_rate = HitRate(10, 15)
-    limiter = BasicLimiter(bucket, average=avg_rate, maximum=max_rate)
+    limiter = BasicLimiter(bucket, avg_rate)
     now = int(time())
 
     for idx in range(7):
