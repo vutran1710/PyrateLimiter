@@ -105,7 +105,7 @@ the user can write their own AbstractBucket implementation that fits their needs
 `HitRate` class is not abstract. `HitRate` is to describe how many `hit` per time unit the Limiter can allow to pass
 thru.
 
-Considering about API throttling business, we usually see the strategies are somewhat similar to this.
+Considering API throttling business models, we usually see strategies somewhat similar to this.
 
 ``` shell
 Some commercial/free API (Linkedin, Github etc)

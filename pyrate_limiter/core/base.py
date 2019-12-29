@@ -3,15 +3,14 @@
 - https://nordicapis.com/everything-you-need-to-know-about-api-rate-limiting/
 """
 from __future__ import annotations
-import math
 from contextlib import contextmanager
 from typing import Any, Callable, NamedTuple
-from time import time
 from abc import ABC, abstractmethod
 
 
 class LoggedItem(NamedTuple):
     __name__ = 'LoggedItem'
+    nth: int
     item: Any
     timestamp: int
 
