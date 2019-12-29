@@ -110,6 +110,7 @@ class BasicLimiter:
     eg: primary-rate=60 requests/minute and maximum-rate=1000 requests/day
     """
     bucket: AbstractBucket = None
+    blocker: SpamBlocker = None
 
     def __init__(
         self,
@@ -136,14 +137,12 @@ class BasicLimiter:
         if blocker:
             self.blocker = blocker
 
-    @property
-    def leak_rate(self) -> float:
+    def leak(self, elapsed) -> bool:
         """To ensure the stability & consistency of Average HitRate Limit
         - when override, should consider window-overlapping that results in
         actual hit-rate being greater than average hit-rate
         """
-        rate: HitRate = self.average
-        return rate.time / rate.hit
+        return elapsed > self.average.time
 
     def allow(self, item: Any) -> bool:
         """Determining if an item is allowed to pass through
@@ -156,21 +155,24 @@ class BasicLimiter:
         with bucket.synchronizing() as Bucket:
             logged_item = LoggedItem(item=item, timestamp=now)
             bucket_capacity = self.average.hit
+            volume = len(Bucket)
 
-            if not len(Bucket) or len(Bucket) < bucket_capacity:
+            if not volume or volume < bucket_capacity:
                 bucket.append(logged_item)
                 return True
 
-            latest_item: NamedTuple = Bucket[-1]
-            timestamp = latest_item.timestamp
+            after_leak_volume = volume
 
-            drain = min(
-                int(math.floor((now - timestamp) / self.leak_rate)),
-                bucket_capacity,
-            )
+            for idx in range(volume):
+                item: LoggedItem = Bucket[0]
+                timestamp = item.timestamp
 
-            if drain >= 1:
-                bucket.discard(number=drain)
+                if self.leak(now - timestamp):
+                    after_leak_volume = Bucket.discard(number=1)
+                else:
+                    break
+
+            if after_leak_volume < bucket_capacity:
                 bucket.append(logged_item)
                 return True
 

@@ -27,23 +27,27 @@ def test_name_tuple():
 
 def test_block():
     bucket = LocalBucket()
-    avg_rate = HitRate(3, 5)
+    avg_rate = HitRate(5, 10)
     max_rate = HitRate(10, 15)
     limiter = BasicLimiter(bucket, average=avg_rate, maximum=max_rate)
+    now = int(time())
 
-    for idx in range(5):
+    for idx in range(7):
         item = 'item_{}'.format(idx)
         allowed = limiter.allow(item)
+        then = int(time())
+        elapsed = then - now
 
-        if idx == 3:
-            assert not allowed
-
-        if idx < 3:
+        if idx < 5:
             assert allowed
             assert len(limiter.bucket) == idx + 1
 
-        if idx > 3:
-            assert allowed
-            assert len(limiter.bucket) == 3
+        if idx == 5:
+            assert not allowed
+            logger.debug('Elapsed:%s', elapsed)
+            sleep(11)
 
-        sleep(1)
+        if idx == 6:
+            logger.debug('Elapsed:%s', elapsed)
+            assert len(limiter.bucket) == 1
+            assert allowed

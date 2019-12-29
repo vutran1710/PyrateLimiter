@@ -1,3 +1,4 @@
+import traceback, sys
 from queue import Queue
 from contextlib import contextmanager
 from pyrate_limiter.core import AbstractBucket
@@ -23,8 +24,8 @@ class LocalBucket(AbstractBucket):
     def synchronizing(self):
         try:
             yield self
-        except Exception as err:
-            print(err.__traceback__)
+        except Exception:
+            traceback.print_exc(limit=2, file=sys.stdout)
         finally:
             return None
 
@@ -56,3 +57,5 @@ class LocalBucket(AbstractBucket):
         while not q.empty() and number > 0:
             q.get()
             number -= 1
+
+        return q.qsize()
