@@ -1,19 +1,27 @@
 from logzero import logger    # noqa
 import pytest    # noqa
 from time import sleep, time
+
 from pyrate_limiter.limiters import BasicLimiter
 from pyrate_limiter.buckets import LocalBucket
-
 from pyrate_limiter.core import HitRate
 from pyrate_limiter.algorithms import Algorithms
-
-from pyrate_limiter.exceptions import (    # noqa
-    InvalidInitialValues, BucketFullException,
-)
+from pyrate_limiter.exceptions import BucketFullException, InvalidParams
 
 
 def test_sliding_window_log_limiter():
     rate = HitRate(5, 10)
+
+    try:
+        bucket = LocalBucket(alg=Algorithms.SLIDING_WINDOW_LOG)
+    except Exception as err:
+        assert isinstance(err, InvalidParams)
+
+    try:
+        limiter = BasicLimiter()
+    except Exception as err:
+        assert isinstance(err, InvalidParams)
+
     bucket = LocalBucket(alg=Algorithms.SLIDING_WINDOW_LOG, rate=rate)
     limiter = BasicLimiter(bucket)
     bucket = limiter.buckets[0]

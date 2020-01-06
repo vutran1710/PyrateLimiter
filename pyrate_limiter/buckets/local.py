@@ -48,9 +48,6 @@ class LocalBucket(AbstractBucket):
     def discard(self, number=1):
         queue = self.queue
 
-        if number <= 0:
-            return queue.qsize()
-
         while not queue.empty() and number > 0:
             queue.get()
             number -= 1
