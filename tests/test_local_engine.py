@@ -1,49 +1,43 @@
 from logzero import logger    # noqa
+import pytest    # noqa
 from time import sleep, time
-import pytest
-from pyrate_limiter.limiters import (
-    LocalBucket,
-    BasicLimiter,
-)
+from pyrate_limiter.limiters import BasicLimiter
+from pyrate_limiter.buckets import LocalBucket
 
-from pyrate_limiter.core import (
-    HitRate,
-    LoggedItem,
-)
+from pyrate_limiter.core import HitRate
+from pyrate_limiter.algorithms import Algorithms
 
 from pyrate_limiter.exceptions import (    # noqa
     InvalidInitialValues, BucketFullException,
 )
 
 
-def test_invalid_initials():
-    with pytest.raises(InvalidInitialValues):
-        LocalBucket(initial='abcde')
-
-
-def test_name_tuple():
-    item = LoggedItem(item='x', timestamp=int(time()), nth=2)
-    obj = item._asdict()
-    assert obj['item'] == 'x'
-    assert item.item == 'x'
-    assert item.nth == 2
-
-
 def test_sliding_window_log_limiter():
-    bucket = LocalBucket()
-    avg_rate = HitRate(5, 10)
-    limiter = BasicLimiter(bucket, avg_rate)
+    rate = HitRate(5, 10)
+    bucket = LocalBucket(alg=Algorithms.SLIDING_WINDOW_LOG, rate=rate)
+    limiter = BasicLimiter(bucket)
+    bucket = limiter.buckets[0]
+
     now = int(time())
 
     for idx in range(7):
         item = 'item_{}'.format(idx)
-        allowed = limiter.allow(item)
+        allowed = False
+
+        try:
+            limiter.allow(item)
+            allowed = True
+        except Exception as err:
+            assert isinstance(err, BucketFullException)
+            print('>>> Exception', err)
+            print('>>> allowed?', allowed)
+
         then = int(time())
         elapsed = then - now
 
         if idx < 5:
             assert allowed
-            assert len(limiter.bucket) == idx + 1
+            assert len(bucket) == idx + 1
 
         if idx == 5:
             assert not allowed
@@ -52,5 +46,5 @@ def test_sliding_window_log_limiter():
 
         if idx == 6:
             logger.debug('Elapsed:%s', elapsed)
-            assert len(limiter.bucket) == 1
+            assert len(bucket) == 1
             assert allowed

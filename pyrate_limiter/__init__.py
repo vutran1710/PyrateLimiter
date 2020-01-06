@@ -1,1 +1,3 @@
-__version__ = '1.1.0'
+"""PyrateLimiter
+"""
+__version__ = '2.0.0'

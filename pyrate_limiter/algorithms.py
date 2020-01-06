@@ -2,11 +2,7 @@
 """
 from typing import Any
 from enum import Enum
-from .base import (
-    AbstractBucket,
-    HitRate,
-    LoggedItem,
-)
+from .core import HitRate, LoggedItem, AbstractBucket
 
 
 def sliding_window_log(
@@ -15,6 +11,12 @@ def sliding_window_log(
     item: Any,
     now: int,
 ):
+    """Sliding-Window-Log algorithm to limit rate, eg:
+    - 100 req/min
+    - For each request comes in, a timestamp and a counter number are added
+    - Lazy-discarding outdated items at fixed-rate, eg 60/100 sec/item in the queue
+    to ensure no excessiveness at any moment
+    """
     volume = len(bucket)
 
     if not volume or volume < rate.hit:
@@ -24,9 +26,9 @@ def sliding_window_log(
 
     after_leak_volume = volume
 
-    for idx in range(volume):
-        item: LoggedItem = bucket[0]
-        timestamp = item.timestamp
+    for _ in range(volume):
+        latest_item = bucket[0]
+        timestamp = latest_item.timestamp
         if (now - timestamp) > rate.time:
             after_leak_volume = bucket.discard(number=1)
         else:
@@ -44,10 +46,8 @@ def sliding_window_log(
     return False
 
 
-######################################################
-# Algorithm Enum Class, extensible at much as needed #
-######################################################
-
-
 class Algorithms(Enum):
-    SLIDING_WINDOW_LOG: sliding_window_log
+    """
+    Algorithm Enum Class, extensible at much as needed
+    """
+    SLIDING_WINDOW_LOG = sliding_window_log
