@@ -16,79 +16,27 @@ This lib is being rewritten from scratch for the next major release (v2.0).
 Checkout `master` branch for `v1.0`
 
 
-### Abstract Classes
-`core` module provides 3 ready-for-use classes.
-
+## Available modules
 ```python
-from pyrate_limiter.core import (
-    AbstractBucket,
-    LoggedItem,
-    HitRate,
+from pyrate_limiter import (
+    Bucket,
+    Strategies,
+    RequestRate,
+    Limiter,
+    TimeEnum,
+    Option,
 )
 ```
 
-#### AbstractBucket
+## Strategies
 
-AbstractBucket is a python abstract class that provides the Interface for, well, a `queue`. The algorithms provided in
+`Bucket` class is a python abstract class that provides the Interface for, well, a `queue`. The algorithms provided in
 `pyrate_limiter.core` all make use of this data-structure. A concrete implementation of this abstract class must includes 4
 methods of the *bucket* instance.
 
-``` python
-class AbstractBucket(ABC):
-    """An abstract class for Bucket as Queue
-    """
-    @abstractmethod
-    @contextmanager
-    def synchronizing(self) -> AbstractBucket:
-        """Synchronizing the local class values with remote queue value
-        :return: remote queue
-        :rtype: list
-        """
+### Subscription strategies
 
-    @abstractmethod
-    def __iter__(self):
-        """Bucket should be iterable
-        """
-
-    @abstractmethod
-    def __getitem__(self, index: int):
-        """Bucket should be subscriptable
-        """
-
-    @abstractmethod
-    def __len__(self):
-        """Bucket should return queue's size at request
-        """
-
-    @abstractmethod
-    def append(self, item: LoggedItem) -> int:
-        """A method to append one single item to the queue
-        :return: new queue's length
-        :rtype: int
-        """
-
-    @abstractmethod
-    def discard(self, number=1) -> int:
-        """A method to append one single item to the queue
-        :return: queue's length after discard its first item
-        :rtype: int
-        """
-```
-
-A complete Bucket must be `iterable`, `subscriptable`, suport `len(Bucket)` syntax and support `synchronizing` in context
-for prevent any kind of race-condition.
-
-Due to personal needs, 2 ready-use implementations with [Redis](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/engines/redis.py) and [Application Local State](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/engines/local.py) are provided.
-
-When designing a rate-limiting service that depends on a different type of data-store, like `Postgres` or `Mysql`,
-the user can write their own AbstractBucket implementation that fits their needs.
-
-#### HitRate
-
-`HitRate` class is not abstract. `HitRate` is to describe how many `hit` per time unit the Limiter can allow to pass
-thru.
-
-Considering API throttling business models, we usually see strategies somewhat similar to this.
+Considering API throttling logic for usual business models of Subscription, we usually see strategies somewhat similar to these.
 
 ``` shell
 Some commercial/free API (Linkedin, Github etc)
@@ -97,12 +45,29 @@ Some commercial/free API (Linkedin, Github etc)
 - maximum 10,000 requests/month
 ```
 
-`HitRate` class is designed to describe this strategies, eg for the above we have a Limiter as following
+`RequestRate` class is designed to describe this strategies - eg for the above strategies we have a Rate-Limiter defined
+as following
 
 ``` python
-hourly_rate = HitRate(500, 3600)
-daily_rate = HitRate(1000, 3600 * 24)
-monthly_rate = HitRate(10000, 3600 * 24 * 30)
+hourly_rate = RequestRate(500, 3600)
+daily_rate = RequestRate(1000, 3600 * 24)
+monthly_rate = RequestRate(10000, 3600 * 24 * 30)
 
-Limiter = BasicLimiter(bucket, hourly_rate, daily_rate, monthly_rate)
+Limiter = Limiter(bucket, hourly_rate, daily_rate, monthly_rate, *other_rates)
 ```
+
+### Spam-protection strategies
+
+Sometimes, we need a rate-limiter to protect our API from spamming/ddos attack. Some usual strategies for this could be as
+following
+
+``` shell
+1. No more than 100 requests/minute, or
+2. 100 request per minute, and no more than 300 request per hour
+```
+
+### More complex scenario
+https://www.keycdn.com/support/rate-limiting#types-of-rate-limits
+
+Sometimes, we may need to apply specific rate-limiting strategies based on schedules/region or some other metrics. It
+requires the capability to `switch` the strategies instantly without re-deploying the whole service.
