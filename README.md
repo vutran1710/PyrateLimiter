@@ -53,7 +53,11 @@ hourly_rate = RequestRate(500, 3600)
 daily_rate = RequestRate(1000, 3600 * 24)
 monthly_rate = RequestRate(10000, 3600 * 24 * 30)
 
-Limiter = Limiter(bucket, hourly_rate, daily_rate, monthly_rate, *other_rates)
+limiter = Limiter(bucket, hourly_rate, daily_rate, monthly_rate, *other_rates)
+
+# usage
+identity = user_id # or ip-address, or maybe both
+limiter.consume(identity)
 ```
 
 ### Spam-protection strategies
@@ -64,6 +68,14 @@ following
 ``` shell
 1. No more than 100 requests/minute, or
 2. 100 request per minute, and no more than 300 request per hour
+```
+
+### Throttling handling
+When the number of incoming requets go beyond the limit, we can either do..
+
+``` shell
+1. Raise a 429 Http Error, or
+2. Keep the incoming requests, wait then slowly process them one by one.
 ```
 
 ### More complex scenario
