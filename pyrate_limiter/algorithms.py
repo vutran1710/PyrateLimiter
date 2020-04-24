@@ -1,5 +1,6 @@
 """ Providing rate-limitting algorithms
 """
+from math import floor
 from typing import Any
 from enum import Enum
 from .core import HitRate, LoggedItem, AbstractBucket
@@ -46,8 +47,43 @@ def sliding_window_log(
     return False
 
 
+def fixed_window_log(
+    bucket: AbstractBucket,
+    rate: HitRate,
+    item: Any,
+    now: int,
+    starting: int = None,
+):
+    """Fixed-Window-Log algorithm to limit rate, eg:
+    - 1000 req/week, reset limiter every week, counting from the `starting` point
+    - For this algorithm to work, we need to keep a `state` item that tracks the
+    checkpoint in the Bucket
+    """
+    volume = len(bucket)
+
+    if not volume:
+        # Reseted!
+        checkpoint_item = LoggedItem(
+            item='',
+            timestamp=floor((now - starting) / rate.time),
+            nth=0,
+        )
+
+        bucket.append(checkpoint_item)
+    else:
+        checkpoint_item = bucket[rate.hit]
+        should_reset = False
+
+    if volume < (rate.hit + 1):
+        # Dont forget the checkpoint item!
+        logged_item = LoggedItem(item=item, timestamp=now, nth=1)
+        bucket.append(logged_item)
+        return True
+
+
 class Algorithms(Enum):
     """
     Algorithm Enum Class, extensible at much as needed
     """
     SLIDING_WINDOW_LOG = sliding_window_log
+    FIXED_WINDOW_LOG = fixed_window_log

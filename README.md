@@ -12,26 +12,9 @@ The request rate limiter using Leaky-bucket algorithm
 <br>
 
 ## Introduction
-This module can be used to apply rate-limit for API request, using `leaky-bucket` algorithm. User defines `window`
-duration and the limit of function calls within such interval.
+This lib is being rewritten from scratch for the next major release (v2.0).
+Checkout `master` branch for `v1.0`
 
-- To hold the state of the Bucket, you can use `LocalBucket` as internal bucket.
-- To use PyrateLimiter with `Redis`,  `redis-py` is required to be installed.
-- It is also possible to use your own Bucket implementation, by extending `AbstractBucket` from `pyrate_limiter.core`
-
-
-## Installation
-Using pip/pipenv/poetry, whatever that works for your
-
-``` shell
-$ pip install pyrate-limiter
-```
-
-
-## API
-One of the most pleasing features of this lib is that it is meant to be very extensible. People's efforts to solve the rate-limiting
-problem have so far led to the introduction of a few variations of the **leaky-bucket** algorithm. The idea behind this is project is that
-you can extend the main core data-structure that powers every member of this algorithm family.
 
 ### Abstract Classes
 `core` module provides 3 ready-for-use classes.

@@ -27,13 +27,7 @@ class HitRate(NamedTuple):
     time: int
 
 
-AlgorithmFunc = NewType(
-    'AlgorithmFunc', Callable[[
-        Sequence[LoggedItem],
-        HitRate,
-        Any,
-        int,
-    ], bool])
+AlgorithmFunc = Callable[[Sequence[LoggedItem], HitRate, Any, int, ...], bool]
 
 
 class AbstractBucket(ABC):
@@ -54,11 +48,11 @@ class AbstractBucket(ABC):
         self.__rate = rate
         self.__err = err
 
-    def check_in(self, item):
+    def check_in(self, item, **kwargs):
         """Register an incoming item/request
         """
         now = int(time())
-        if not self.__alg(self, self.__rate, item, now):
+        if not self.__alg(self, self.__rate, item, now, **kwargs):
             raise BucketFullException(self.__err)
 
     @property
