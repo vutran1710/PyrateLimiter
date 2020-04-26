@@ -19,20 +19,13 @@ Checkout `master` branch for `v1.0`
 ## Available modules
 ```python
 from pyrate_limiter import (
-    Bucket,
-    Strategies,
     RequestRate,
     Limiter,
     TimeEnum,
-    Option,
 )
 ```
 
 ## Strategies
-
-`Bucket` class is a python abstract class that provides the Interface for, well, a `queue`. The algorithms provided in
-`pyrate_limiter.core` all make use of this data-structure. A concrete implementation of this abstract class must includes 4
-methods of the *bucket* instance.
 
 ### Subscription strategies
 
@@ -53,12 +46,14 @@ hourly_rate = RequestRate(500, 3600)
 daily_rate = RequestRate(1000, 3600 * 24)
 monthly_rate = RequestRate(10000, 3600 * 24 * 30)
 
-limiter = Limiter(bucket, hourly_rate, daily_rate, monthly_rate, *other_rates)
+limiter = Limiter(hourly_rate, daily_rate, monthly_rate, *other_rates)
 
 # usage
 identity = user_id # or ip-address, or maybe both
-limiter.consume(identity)
+limiter.try_acquire(identity)
 ```
+
+RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
 
 ### Spam-protection strategies
 
