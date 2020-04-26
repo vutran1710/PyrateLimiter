@@ -6,7 +6,7 @@ from .request_rate import RequestRate
 
 
 class Limiter:
-    bucket_group: Dict[str, Queue]
+    bucket_group: Dict[str, Queue] = {}
 
     def __init__(
         self,
@@ -30,7 +30,7 @@ class Limiter:
         if opts:
             self._opts = opts
 
-    def process(self, *identities):
+    def try_acquire(self, *identities):
         for idt in identities:
             # Setup Queue for each Identity if needed
             # Queue's maxsize equals the max limit of request-rates
@@ -44,20 +44,35 @@ class Limiter:
             for idt in identities:
                 bucket = self.bucket_group[idt]
                 volume = bucket.qsize()
-
+                # print(f'bucket-size: {volume}')
                 if volume < rate.limit:
-                    if idx + 1 == len(self._rates):
-                        bucket.put(now)
                     continue
 
                 # Determine time-window up until now
                 time_window = now - rate.interval
+                # print(f'window = {time_window}')
                 total_reqs = 0
 
                 for log_idx, log in enumerate(list(bucket.queue)):
+                    # print(f'log-time: {log}')
                     if log >= time_window:
                         total_reqs = volume - log_idx
                         break
+                # print(f'total_reqs = {total_reqs}')
 
                 if total_reqs >= rate.limit:
                     raise BucketFullException(idt, rate)
+
+                if idx == len(self._rates) - 1:
+                    # We remove item based on the request-rate with the max-limit
+                    for _ in range(volume - total_reqs):
+                        bucket.get()
+
+        for idt in identities:
+            bucket = self.bucket_group[idt]
+            # print(bucket)
+            bucket.put(now)
+
+    def get_current_volume(self, identity):
+        bucket = self.bucket_group[identity]
+        return bucket.qsize()
