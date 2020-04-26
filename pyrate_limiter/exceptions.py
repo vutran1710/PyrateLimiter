@@ -1,8 +1,11 @@
 # pylint: disable=C0114,C0115
+from .request_rate import RequestRate
 
 
 class BucketFullException(Exception):
-    pass
+    def __init__(self, identity, rate: RequestRate):
+        super(BucketFullException, self).__init__()
+        self.message = f'Bucket for {identity} with Rate {rate} is already full'
 
 
 class InvalidParams(Exception):

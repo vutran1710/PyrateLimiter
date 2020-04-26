@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from queue import Queue
 from time import time
 from .exceptions import InvalidParams, BucketFullException
@@ -6,8 +6,7 @@ from .request_rate import RequestRate
 
 
 class Limiter:
-    bucket_group = {}
-    time_logs = {}
+    bucket_group: Dict[str, Queue]
 
     def __init__(
         self,
@@ -22,32 +21,35 @@ class Limiter:
         if opts:
             self._opts = opts
 
-    def process(
-        self,
-        *identities,
-        exception_cls=BucketFullException,
-        exception_args=None,
-    ):
+    def process(self, *identities):
+        for idt in identities:
+            # Setup Queue for each Identity if needed
+            # Queue's maxsize equals the max limit of request-rates
+            if not self.bucket_group.get(idt):
+                maxsize = self._rates[-1].limit
+                self.bucket_group[idt] = Queue(maxsize=maxsize)
+
+        # Check
         now = int(time())
 
-        for rate in self._rates:
+        for idx, rate in enumerate(self._rates):
             for idt in identities:
-                bucket: Queue = self.bucket_group.get(idt)
+                bucket = self.bucket_group[idt]
+                volume = bucket.qsize()
 
-                if not bucket:
-                    # Set queue's maxsize equals the utter request-rate's limit
-                    maxsize = self._rates[-1].limit
-                    self.bucket_group[idt] = Queue(maxsize=maxsize)
+                if volume < rate.limit:
+                    if idx + 1 == len(self._rates):
+                        bucket.put(now)
                     continue
 
-                volume = len(bucket)
+                # Determine time-window up until now
+                time_window = now - rate.interval
+                total_reqs = 0
 
-                if rate.valid_rate(idt, volume, now):
-                    continue
+                for log_idx, log in enumerate(list(bucket.queue)):
+                    if log >= time_window:
+                        total_reqs = volume - log_idx
+                        break
 
-                if exception_cls:
-                    raise exception_cls(exception_args)
-
-        for rate in self._rates:
-            for idt in identities:
-                rate.log_now(idt, now)
+                if total_reqs >= rate.limit:
+                    raise BucketFullException(idt, rate)

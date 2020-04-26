@@ -8,10 +8,12 @@ class ResetTypes(Enum):
 
 
 class RequestRate:
-    def __init__(self,
-                 limit,
-                 interval,
-                 reset: ResetTypes = ResetTypes.INTERVAL):
+    def __init__(
+        self,
+        limit,
+        interval,
+        reset: ResetTypes = ResetTypes.INTERVAL,
+    ):
         self._limit = limit
         self._interval = interval
         self._reset = reset
@@ -33,33 +35,5 @@ class RequestRate:
     def interval(self, _):
         raise ImmutableClassProperty(self, 'interval')
 
-    def valid_rate(
-        self,
-        identity,
-        total_reqs: int,
-        now: int,
-    ):
-        last_req = self._log.get(identity)
-
-        if not last_req:
-            return True
-
-        elapsed = now - last_req
-
-        if total_reqs < self._limit:
-            return True
-
-        if total_reqs >= self._limit and elapsed <= self._interval:
-            return False
-
-        return False
-
-    def log_now(
-        self,
-        identity,
-        time,
-    ):
-        last_req = self._log.get(identity, 0)
-
-        if time - last_req > self._interval:
-            self._log[identity] = time
+    def __str__(self):
+        return f'{self.limit}/{self.interval}'
