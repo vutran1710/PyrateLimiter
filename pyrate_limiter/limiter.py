@@ -16,6 +16,15 @@ class Limiter:
         if not rates:
             raise InvalidParams('Rates')
 
+        # Validate rates
+        for idx, rate in enumerate(rates):
+            if idx == 0:
+                continue
+
+            prev_rate = rates[idx - 1]
+            if rate.limit < prev_rate.limit or rate.interval < prev_rate.interval:
+                raise InvalidParams(f'{prev_rate} cannot come before {rate}')
+
         self._rates = rates
 
         if opts:
@@ -29,7 +38,6 @@ class Limiter:
                 maxsize = self._rates[-1].limit
                 self.bucket_group[idt] = Queue(maxsize=maxsize)
 
-        # Check
         now = int(time())
 
         for idx, rate in enumerate(self._rates):
