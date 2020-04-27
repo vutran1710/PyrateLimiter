@@ -76,3 +76,21 @@ class Limiter:
     def get_current_volume(self, identity):
         bucket = self.bucket_group[identity]
         return bucket.qsize()
+
+    def get_filled_slots(self, rate, identity):
+        found_rate = next(
+            (r for r in self._rates
+             if r.limit == rate.limit and r.interval == rate.interval), None)
+
+        if not found_rate:
+            raise ValueError(f'Such rate {rate} is not found')
+
+        if not self.bucket_group.get(identity):
+            raise ValueError(f'Such identity {identity} is not found')
+
+        bucket = self.bucket_group[identity]
+        time_frame_start_point = int(time()) - rate.interval
+        return [
+            log_item for log_item in list(bucket.queue)
+            if log_item >= time_frame_start_point
+        ]
