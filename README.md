@@ -12,16 +12,19 @@ The request rate limiter using Leaky-bucket algorithm
 <br>
 
 ## Introduction
-This lib is being rewritten from scratch for the next major release (v2.0).
-Checkout `master` branch for `v1.0`
+- This lib is being rewritten from scratch for the next major release (v2.0). Checkout `master` branch for `v1.0`
+
+- Feature with checked-box is done
 
 
 ## Available modules
 ```python
 from pyrate_limiter import (
+    BucketFullException,
+    Duration,
     RequestRate,
     Limiter,
-    TimeEnum,
+    MemoryListBucket,
 )
 ```
 
@@ -38,13 +41,13 @@ Some commercial/free API (Linkedin, Github etc)
 - maximum 10,000 requests/month
 ```
 
-`RequestRate` class is designed to describe this strategies - eg for the above strategies we have a Rate-Limiter defined
+- [x] `RequestRate` class is designed to describe this strategies - eg for the above strategies we have a Rate-Limiter defined
 as following
 
 ``` python
-hourly_rate = RequestRate(500, 3600)
-daily_rate = RequestRate(1000, 3600 * 24)
-monthly_rate = RequestRate(10000, 3600 * 24 * 30)
+hourly_rate = RequestRate(500, Duration.HOUR) # maximum 500 requests/hour
+daily_rate = RequestRate(1000, Duration.DAY) # maximum 1000 requests/day
+monthly_rate = RequestRate(10000, Duration.MONTH) # and so on
 
 limiter = Limiter(hourly_rate, daily_rate, monthly_rate, *other_rates)
 
@@ -53,11 +56,17 @@ identity = user_id # or ip-address, or maybe both
 limiter.try_acquire(identity)
 ```
 
-RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
+As the logic is pretty self-explainatory, note that the superior rate-limit must come after the inferiors, ie
+1000 req/day must be declared after an hourly-rate-limit, and the daily-limit must be larger than hourly-limit.
+
+- [ ] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
+      request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case.
+
+- [ ] RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
 
 ### Spam-protection strategies
 
-Sometimes, we need a rate-limiter to protect our API from spamming/ddos attack. Some usual strategies for this could be as
+- [x] Sometimes, we need a rate-limiter to protect our API from spamming/ddos attack. Some usual strategies for this could be as
 following
 
 ``` shell
@@ -76,5 +85,5 @@ When the number of incoming requets go beyond the limit, we can either do..
 ### More complex scenario
 https://www.keycdn.com/support/rate-limiting#types-of-rate-limits
 
-Sometimes, we may need to apply specific rate-limiting strategies based on schedules/region or some other metrics. It
+- [ ] Sometimes, we may need to apply specific rate-limiting strategies based on schedules/region or some other metrics. It
 requires the capability to `switch` the strategies instantly without re-deploying the whole service.

@@ -3,7 +3,7 @@ import pytest
 
 from pyrate_limiter import (
     BucketFullException,
-    TimeEnum,
+    Duration,
     RequestRate,
     Limiter,
     MemoryListBucket,
@@ -13,7 +13,7 @@ from pyrate_limiter import (
 def test_simple_01():
     """ Single-rate Limiter
     """
-    rate = RequestRate(3, 5 * TimeEnum.SECOND)
+    rate = RequestRate(3, 5 * Duration.SECOND)
     limiter = Limiter(rate)
     item = 'vutran'
 
@@ -36,8 +36,8 @@ def test_simple_01():
 def test_simple_02():
     """ Multi-rates Limiter
     """
-    rate_1 = RequestRate(5, 5 * TimeEnum.SECOND)
-    rate_2 = RequestRate(7, 9 * TimeEnum.SECOND)
+    rate_1 = RequestRate(5, 5 * Duration.SECOND)
+    rate_2 = RequestRate(7, 9 * Duration.SECOND)
     limiter2 = Limiter(rate_1, rate_2)
     item = 'tranvu'
 
@@ -98,7 +98,7 @@ def test_simple_02():
 def test_simple_03():
     """ Single-rate Limiter with MemoryListBucket
     """
-    rate = RequestRate(3, 5 * TimeEnum.SECOND)
+    rate = RequestRate(3, 5 * Duration.SECOND)
     limiter = Limiter(rate, bucket_class=MemoryListBucket)
     item = 'vutran_list'
 
@@ -121,8 +121,8 @@ def test_simple_03():
 def test_simple_04():
     """ Multi-rates Limiter with MemoryListBucket
     """
-    rate_1 = RequestRate(5, 5 * TimeEnum.SECOND)
-    rate_2 = RequestRate(7, 9 * TimeEnum.SECOND)
+    rate_1 = RequestRate(5, 5 * Duration.SECOND)
+    rate_2 = RequestRate(7, 9 * Duration.SECOND)
     limiter2 = Limiter(rate_1, rate_2, bucket_class=MemoryListBucket)
     item = 'tranvu_list'
 
