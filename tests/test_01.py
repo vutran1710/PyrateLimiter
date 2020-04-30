@@ -36,7 +36,7 @@ def test_simple_02():
     rate_1 = RequestRate(5, 5 * TimeEnum.SECOND)
     rate_2 = RequestRate(7, 9 * TimeEnum.SECOND)
     limiter2 = Limiter(rate_1, rate_2)
-    item = 'vutran'
+    item = 'tranvu'
 
     with pytest.raises(BucketFullException):
         # Try add 6 items within 5 seconds

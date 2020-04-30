@@ -13,7 +13,7 @@ def test() -> None:
         "tests/",
         "--verbose",
         "-s",
-        "--fulltrace",
+    # "--fulltrace",
     # "--cov-report", "html",
     # "--cov=pyrate_limiter"
     ])
