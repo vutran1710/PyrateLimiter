@@ -5,6 +5,7 @@ The request rate limiter using Leaky-bucket algorithm
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
 [![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
+[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/vutran1710/PyrateLimiter/graphs/commit-activity)
 [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/pyrate-limiter/)
 [![HitCount](http://hits.dwyl.io/vutran1710/PyrateLimiter.svg)](http://hits.dwyl.io/vutran1710/PyrateLimiter)
@@ -25,6 +26,7 @@ from pyrate_limiter import (
     RequestRate,
     Limiter,
     MemoryListBucket,
+    MemoryQueueBucket,
 )
 ```
 
@@ -49,7 +51,7 @@ hourly_rate = RequestRate(500, Duration.HOUR) # maximum 500 requests/hour
 daily_rate = RequestRate(1000, Duration.DAY) # maximum 1000 requests/day
 monthly_rate = RequestRate(10000, Duration.MONTH) # and so on
 
-limiter = Limiter(hourly_rate, daily_rate, monthly_rate, *other_rates)
+limiter = Limiter(hourly_rate, daily_rate, monthly_rate, *other_rates, bucket_class=MemoryListBucket) # default is MemoryQueueBucket
 
 # usage
 identity = user_id # or ip-address, or maybe both
@@ -58,6 +60,9 @@ limiter.try_acquire(identity)
 
 As the logic is pretty self-explainatory, note that the superior rate-limit must come after the inferiors, ie
 1000 req/day must be declared after an hourly-rate-limit, and the daily-limit must be larger than hourly-limit.
+
+- [x] `bucket_class` is the type of bucket that holds request. It could be an in-memory data structure like Python List (`MemoryListBucket`), or Queue `MemoryQueueBucket`.
+
 
 - [ ] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
       request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case.
