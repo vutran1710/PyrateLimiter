@@ -4,6 +4,7 @@ a workable bucket for Limiter to use
 from typing import List
 from abc import ABC, abstractmethod
 from queue import Queue
+from threading import RLock
 
 
 class AbstractBucket(ABC):
@@ -43,12 +44,12 @@ class AbstractBucket(ABC):
         """
 
 
-class MemoryBucket(AbstractBucket):
+class MemoryQueueBucket(AbstractBucket):
     """ A bucket that resides in memory
     using python's built-in Queue class
     """
     def __init__(self, maxsize=0):
-        super(MemoryBucket, self).__init__()
+        super(MemoryQueueBucket, self).__init__()
         self._q = Queue(maxsize=maxsize)
 
     def size(self):
@@ -67,3 +68,35 @@ class MemoryBucket(AbstractBucket):
 
     def all_items(self):
         return list(self._q.queue)
+
+
+class MemoryListBucket(AbstractBucket):
+    """ A bucket that resides in memory
+    using python's List
+    """
+    def __init__(self, maxsize=0):
+        super(MemoryListBucket, self).__init__(maxsize=maxsize)
+        self._q = []
+        self._lock = RLock()
+
+    def size(self):
+        return len(self._q)
+
+    def put(self, item):
+        with self._lock:
+            if self.size() < self.maxsize():
+                self._q.append(item)
+                return 1
+            return 0
+
+    def get(self, number):
+        with self._lock:
+            counter = 0
+            for _ in range(number):
+                self._q.pop(0)
+                counter += 1
+
+            return counter
+
+    def all_items(self):
+        return self._q.copy()

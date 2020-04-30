@@ -4,7 +4,7 @@ from typing import List, Dict
 from time import time
 from .exceptions import InvalidParams, BucketFullException
 from .request_rate import RequestRate
-from .bucket import AbstractBucket, MemoryBucket
+from .bucket import AbstractBucket, MemoryQueueBucket
 
 
 class Limiter:
@@ -15,7 +15,7 @@ class Limiter:
     def __init__(
         self,
         *rates: List[RequestRate],
-        bucket_class: AbstractBucket = MemoryBucket,
+        bucket_class: AbstractBucket = MemoryQueueBucket,
         opts=None,
     ):
         if not rates:
