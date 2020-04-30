@@ -5,13 +5,14 @@ from typing import List
 from abc import ABC, abstractmethod
 from queue import Queue
 from threading import RLock
+from .exceptions import InvalidParams
 
 
 class AbstractBucket(ABC):
     """Documentation for AbstractBucket
 
     """
-    def __init__(self, maxsize=0):
+    def __init__(self, maxsize=0, **_kwargs):
         self._maxsize = maxsize
 
     def maxsize(self) -> int:
@@ -48,7 +49,7 @@ class MemoryQueueBucket(AbstractBucket):
     """ A bucket that resides in memory
     using python's built-in Queue class
     """
-    def __init__(self, maxsize=0):
+    def __init__(self, maxsize=0, **_kwargs):
         super(MemoryQueueBucket, self).__init__()
         self._q = Queue(maxsize=maxsize)
 
@@ -74,7 +75,7 @@ class MemoryListBucket(AbstractBucket):
     """ A bucket that resides in memory
     using python's List
     """
-    def __init__(self, maxsize=0):
+    def __init__(self, maxsize=0, **_kwargs):
         super(MemoryListBucket, self).__init__(maxsize=maxsize)
         self._q = []
         self._lock = RLock()
@@ -100,3 +101,62 @@ class MemoryListBucket(AbstractBucket):
 
     def all_items(self):
         return self._q.copy()
+
+
+class RedisBucket(AbstractBucket):
+    """ A bucket with Redis
+    using List
+    """
+    def __init__(
+        self,
+        maxsize=0,
+        redis_pool=None,
+        bucket_name: str = None,
+        **_kwargs,
+    ):
+        super(RedisBucket, self).__init__(maxsize=maxsize)
+
+        if not bucket_name or not isinstance(bucket_name, str):
+            msg = 'keyword argument bucket-name is missing: a distict name is required'
+            raise InvalidParams(msg)
+
+        self._pool = redis_pool
+        self._bucket_name = bucket_name
+
+    def get_connection(self):
+        """ Obtain a connection from redis pool
+        """
+        from redis import Redis
+        return Redis(connection_pool=self._pool)
+
+    def get_pipeline(self):
+        """ Using redis pipeline for batch operation
+        """
+        conn = self.get_connection()
+        pipeline = conn.pipeline()
+        return pipeline
+
+    def size(self):
+        conn = self.get_connection()
+        return conn.llen(self._bucket_name)
+
+    def put(self, item):
+        if self.size() < self.maxsize():
+            conn = self.get_connection()
+            conn.lpush(item)
+            return 1
+
+        return 0
+
+    def get(self, number):
+        pipeline = self.get_pipeline()
+
+        for _ in range(number):
+            pipeline.rpop(self._bucket_name)
+
+        result = pipeline.execute()
+        return result
+
+    def all_items(self):
+        conn = self.get_connection()
+        return conn.lrange(self._bucket_name, 0, -1)

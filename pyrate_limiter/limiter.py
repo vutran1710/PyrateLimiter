@@ -16,8 +16,13 @@ class Limiter:
         self,
         *rates: List[RequestRate],
         bucket_class: AbstractBucket = MemoryQueueBucket,
-        opts=None,
+        bucket_kwargs=None,
     ):
+        """ Init a limiter with rates and specific bucket type
+        - Bucket type can be any class that extends AbstractBucket
+        - 3 kinds of Bucket are provided, being MemoryQueueBucket, MemoryListBucket and RedisBucket
+        - Opts is extra keyword-arguements for Bucket class constructor
+        """
         if not rates:
             raise InvalidParams('Rates')
 
@@ -32,9 +37,7 @@ class Limiter:
 
         self._rates = rates
         self._bkclass = bucket_class
-
-        if opts:
-            self._opts = opts
+        self._bucket_args = bucket_kwargs or {}
 
     def try_acquire(self, *identities) -> None:
         """ Acquiring an item or reject it if rate-limit has been exceeded
@@ -44,7 +47,10 @@ class Limiter:
             # Queue's maxsize equals the max limit of request-rates
             if not self.bucket_group.get(idt):
                 maxsize = self._rates[-1].limit
-                self.bucket_group[idt] = self._bkclass(maxsize=maxsize)
+                self.bucket_group[idt] = self._bkclass(
+                    maxsize=maxsize,
+                    **self._bucket_args,
+                )
 
         now = int(time())
 
