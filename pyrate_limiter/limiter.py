@@ -1,20 +1,21 @@
 """ Basic Rate-Limiter
 """
 from typing import List, Dict
-from queue import Queue
 from time import time
 from .exceptions import InvalidParams, BucketFullException
 from .request_rate import RequestRate
+from .bucket import AbstractBucket, MemoryBucket
 
 
 class Limiter:
     """ Basic rate-limiter class that makes use of built-in python Queue
     """
-    bucket_group: Dict[str, Queue] = {}
+    bucket_group: Dict[str, AbstractBucket] = {}
 
     def __init__(
         self,
         *rates: List[RequestRate],
+        bucket_class: AbstractBucket = MemoryBucket,
         opts=None,
     ):
         if not rates:
@@ -30,6 +31,7 @@ class Limiter:
                 raise InvalidParams(f'{prev_rate} cannot come before {rate}')
 
         self._rates = rates
+        self._bkclass = bucket_class
 
         if opts:
             self._opts = opts
@@ -42,14 +44,14 @@ class Limiter:
             # Queue's maxsize equals the max limit of request-rates
             if not self.bucket_group.get(idt):
                 maxsize = self._rates[-1].limit
-                self.bucket_group[idt] = Queue(maxsize=maxsize)
+                self.bucket_group[idt] = self._bkclass(maxsize=maxsize)
 
         now = int(time())
 
         for idx, rate in enumerate(self._rates):
             for idt in identities:
                 bucket = self.bucket_group[idt]
-                volume = bucket.qsize()
+                volume = bucket.size()
                 # print(f'bucket-size: {volume}')
                 if volume < rate.limit:
                     continue
@@ -59,7 +61,7 @@ class Limiter:
                 # print(f'window = {time_window}')
                 total_reqs = 0
 
-                for log_idx, log in enumerate(list(bucket.queue)):
+                for log_idx, log in enumerate(bucket.all_items()):
                     # print(f'log-time: {log}')
                     if log >= time_window:
                         total_reqs = volume - log_idx
@@ -71,8 +73,7 @@ class Limiter:
 
                 if idx == len(self._rates) - 1:
                     # We remove item based on the request-rate with the max-limit
-                    for _ in range(volume - total_reqs):
-                        bucket.get()
+                    bucket.get(volume - total_reqs)
 
         for idt in identities:
             bucket = self.bucket_group[idt]
@@ -83,7 +84,7 @@ class Limiter:
         """ Get current bucket volume for a specific identity
         """
         bucket = self.bucket_group[identity]
-        return bucket.qsize()
+        return bucket.size()
 
     def get_filled_slots(self, rate, identity) -> List[int]:
         """ Get logged items in bucket for a specific identity
@@ -101,6 +102,6 @@ class Limiter:
         bucket = self.bucket_group[identity]
         time_frame_start_point = int(time()) - rate.interval
         return [
-            log_item for log_item in list(bucket.queue)
+            log_item for log_item in bucket.all_items()
             if log_item >= time_frame_start_point
         ]
