@@ -1,3 +1,5 @@
+""" Basic Rate-Limiter
+"""
 from typing import List, Dict
 from queue import Queue
 from time import time
@@ -6,6 +8,8 @@ from .request_rate import RequestRate
 
 
 class Limiter:
+    """ Basic rate-limiter class that makes use of built-in python Queue
+    """
     bucket_group: Dict[str, Queue] = {}
 
     def __init__(
@@ -30,7 +34,9 @@ class Limiter:
         if opts:
             self._opts = opts
 
-    def try_acquire(self, *identities):
+    def try_acquire(self, *identities) -> None:
+        """ Acquiring an item or reject it if rate-limit has been exceeded
+        """
         for idt in identities:
             # Setup Queue for each Identity if needed
             # Queue's maxsize equals the max limit of request-rates
@@ -73,11 +79,15 @@ class Limiter:
             # print(bucket)
             bucket.put(now)
 
-    def get_current_volume(self, identity):
+    def get_current_volume(self, identity) -> int:
+        """ Get current bucket volume for a specific identity
+        """
         bucket = self.bucket_group[identity]
         return bucket.qsize()
 
-    def get_filled_slots(self, rate, identity):
+    def get_filled_slots(self, rate, identity) -> List[int]:
+        """ Get logged items in bucket for a specific identity
+        """
         found_rate = next(
             (r for r in self._rates
              if r.limit == rate.limit and r.interval == rate.interval), None)
