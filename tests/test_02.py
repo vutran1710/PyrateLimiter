@@ -11,11 +11,13 @@ from pyrate_limiter import (
     RedisBucket,
 )
 
-from redis import ConnectionPool, Redis
+from fakeredis import FakeStrictRedis
 
-pool = ConnectionPool.from_url('redis://localhost:6379')
-conn = Redis(connection_pool=pool)
-conn.flushall()
+# pool = ConnectionPool.from_url('redis://localhost:6379')
+# conn = Redis(connection_pool=pool)
+# conn.flushall()
+dummy_redis = FakeStrictRedis()
+pool = dummy_redis.connection_pool
 
 
 def test_simple_01():
