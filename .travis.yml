@@ -24,6 +24,7 @@ jobs:
       name: lint
       script: poetry run test
     - stage: Publish
+      if: branch = master
       script: skip
       before_deploy:
         - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
