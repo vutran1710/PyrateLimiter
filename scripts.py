@@ -10,11 +10,13 @@ def lint() -> None:
 def test() -> None:
     check_call([
         "pytest",
-        "tests/",
+        "tests",
+        "--maxfail=1",
         "--verbose",
         "-s",
     # "--fulltrace",
-    # "--cov-report", "html",
-    # "--cov=pyrate_limiter"
+        "--cov-report",
+        "html",
+        "--cov=pyrate_limiter"
     ])
     # check_call(["pytest", "tests/", "--verbose", "-s", "--cov=pyrate_limiter"])

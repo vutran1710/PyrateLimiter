@@ -112,6 +112,7 @@ class RedisBucket(AbstractBucket):
         maxsize=0,
         redis_pool=None,
         bucket_name: str = None,
+        identity: str = None,
         **_kwargs,
     ):
         super(RedisBucket, self).__init__(maxsize=maxsize)
@@ -121,7 +122,7 @@ class RedisBucket(AbstractBucket):
             raise InvalidParams(msg)
 
         self._pool = redis_pool
-        self._bucket_name = bucket_name
+        self._bucket_name = f'{bucket_name}___{identity}'
 
     def get_connection(self):
         """ Obtain a connection from redis pool
@@ -141,22 +142,27 @@ class RedisBucket(AbstractBucket):
         return conn.llen(self._bucket_name)
 
     def put(self, item):
-        if self.size() < self.maxsize():
-            conn = self.get_connection()
-            conn.lpush(item)
+        conn = conn = self.get_connection()
+        current_size = conn.llen(self._bucket_name)
+
+        if current_size < self.maxsize():
+            conn.rpush(self._bucket_name, item)
             return 1
 
         return 0
 
     def get(self, number):
         pipeline = self.get_pipeline()
+        counter = 0
 
         for _ in range(number):
-            pipeline.rpop(self._bucket_name)
+            pipeline.lpop(self._bucket_name)
+            counter += 1
 
-        result = pipeline.execute()
-        return result
+        pipeline.execute()
+        return counter
 
     def all_items(self):
         conn = self.get_connection()
-        return conn.lrange(self._bucket_name, 0, -1)
+        items = conn.lrange(self._bucket_name, 0, -1)
+        return [int(i.decode('utf-8')) for i in items]

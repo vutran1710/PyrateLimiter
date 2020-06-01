@@ -64,7 +64,7 @@ As the logic is pretty self-explainatory, note that the superior rate-limit must
 - [x] `bucket_class` is the type of bucket that holds request. It could be an in-memory data structure like Python List (`MemoryListBucket`), or Queue `MemoryQueueBucket`.
 
 
-- [ ] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
+- [x] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
       request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case.
 
 - [ ] RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month

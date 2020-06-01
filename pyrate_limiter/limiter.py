@@ -47,8 +47,10 @@ class Limiter:
             # Queue's maxsize equals the max limit of request-rates
             if not self.bucket_group.get(idt):
                 maxsize = self._rates[-1].limit
+                # print(self._bucket_args)
                 self.bucket_group[idt] = self._bkclass(
                     maxsize=maxsize,
+                    identity=idt,
                     **self._bucket_args,
                 )
 
@@ -64,15 +66,12 @@ class Limiter:
 
                 # Determine time-window up until now
                 time_window = now - rate.interval
-                # print(f'window = {time_window}')
                 total_reqs = 0
 
                 for log_idx, log in enumerate(bucket.all_items()):
-                    # print(f'log-time: {log}')
                     if log >= time_window:
                         total_reqs = volume - log_idx
                         break
-                # print(f'total_reqs = {total_reqs}')
 
                 if total_reqs >= rate.limit:
                     raise BucketFullException(idt, rate)
