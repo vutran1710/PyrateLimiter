@@ -20,3 +20,7 @@ def test() -> None:
         "--cov=pyrate_limiter"
     ])
     # check_call(["pytest", "tests/", "--verbose", "-s", "--cov=pyrate_limiter"])
+
+
+def coveralls() -> None:
+    check_call(["coveralls"])
