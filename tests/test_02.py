@@ -82,41 +82,41 @@ def test_simple_02():
     limiter4.try_acquire(item)
     assert limiter4.get_current_volume(item) == 7
 
-    # with pytest.raises(BucketFullException):
-    #     # Exceed Rate-2
-    #     limiter4.try_acquire(item)
+    with pytest.raises(BucketFullException):
+        # Exceed Rate-2
+        limiter4.try_acquire(item)
 
-    # sleep(6)
-    # # 12 seconds passed
-    # limiter4.try_acquire(item)
-    # # Only items within last 9 seconds kept, plus the new one
-    # assert limiter4.get_current_volume(item) == 3
+    sleep(6)
+    # 12 seconds passed
+    limiter4.try_acquire(item)
+    # Only items within last 9 seconds kept, plus the new one
+    assert limiter4.get_current_volume(item) == 3
 
     # print('Bucket Rate-1:', limiter4.get_filled_slots(rate_1, item))
     # print('Bucket Rate-2:', limiter4.get_filled_slots(rate_2, item))
-    # # Within the nearest 5 second interval
-    # # Rate-1 has only 1 item, so we can add 4 more
-    # limiter4.try_acquire(item)
-    # limiter4.try_acquire(item)
-    # limiter4.try_acquire(item)
-    # limiter4.try_acquire(item)
+    # Within the nearest 5 second interval
+    # Rate-1 has only 1 item, so we can add 4 more
+    limiter4.try_acquire(item)
+    limiter4.try_acquire(item)
+    limiter4.try_acquire(item)
+    limiter4.try_acquire(item)
 
-    # with pytest.raises(BucketFullException):
-    #     # Exceed Rate-1 again
-    #     limiter4.try_acquire(item)
+    with pytest.raises(BucketFullException):
+        # Exceed Rate-1 again
+        limiter4.try_acquire(item)
 
-    # # Withint the nearest 9 second-interval, we have 7 items
-    # assert limiter4.get_current_volume(item) == 7
+    # Withint the nearest 9 second-interval, we have 7 items
+    assert limiter4.get_current_volume(item) == 7
 
-    # # Fast forward to 6 more seconds
-    # # Bucket Rate-1 is refreshed and empty by now
-    # # Bucket Rate-2 has now only 5 items
-    # sleep(6)
-    # # print('Bucket Rate-1:', limiter4.get_filled_slots(rate_1, item))
-    # # print('Bucket Rate-2:', limiter4.get_filled_slots(rate_2, item))
-    # limiter4.try_acquire(item)
-    # limiter4.try_acquire(item)
+    # Fast forward to 6 more seconds
+    # Bucket Rate-1 is refreshed and empty by now
+    # Bucket Rate-2 has now only 5 items
+    sleep(6)
+    # print('Bucket Rate-1:', limiter4.get_filled_slots(rate_1, item))
+    # print('Bucket Rate-2:', limiter4.get_filled_slots(rate_2, item))
+    limiter4.try_acquire(item)
+    limiter4.try_acquire(item)
 
-    # with pytest.raises(BucketFullException):
-    #     # Exceed Rate-2 again
-    #     limiter4.try_acquire(item)
+    with pytest.raises(BucketFullException):
+        # Exceed Rate-2 again
+        limiter4.try_acquire(item)
