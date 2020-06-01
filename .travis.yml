@@ -1,0 +1,35 @@
+language: python
+dist: xenial
+python:
+  - "3.7"
+
+stages:
+  - Check
+  - Publish
+
+before_install:
+  - pip install poetry
+
+install:
+  - poetry install
+
+jobs:
+  include:
+    - stage: Check
+      name: lint
+      script: poetry run test
+    - stage: Publish
+      script: skip
+      before_deploy:
+        - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
+        - poetry build -f sdist
+      deploy:
+        provider: script
+        script: poetry publish
+        skip_cleanup: true
+        on:
+          tags: true
+      if: tag IS present
+
+after_success:
+  poetry run coveralls
