@@ -65,7 +65,29 @@ As the logic is pretty self-explainatory, note that the superior rate-limit must
 
 
 - [x] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
-      request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case.
+      request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case, and required
+      `redis-py` as its peer-dependency. The usage difference is when using Redis, a naming `prefix` must be provide so
+      the keys can be distinct for each item's identity.
+
+``` python
+from redis import ConnectionPool
+
+pool = ConnectionPool.from_url('redis://localhost:6379')
+
+rate = RequestRate(3, 5 * Duration.SECOND)
+
+bucket_kwargs = {
+    "redis_pool": redis_pool,
+    "bucket_name": "my-ultimate-bucket-prefix"
+}
+
+# so each item buckets will have a key name as
+# my-ultimate-bucket-prefix__item-identity
+
+limiter = Limiter(rate, bucket_class=RedisBucket, bucket_kwargs=bucket_kwargs)
+item = 'vutran_item'
+limiter.try_acquire(item)
+```
 
 - [ ] RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
 
