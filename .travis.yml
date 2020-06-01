@@ -15,6 +15,7 @@ install:
 
 jobs:
   include:
+    - if: branch = master
     - stage: Check
       name: lint
       script: poetry run test
@@ -27,9 +28,6 @@ jobs:
         provider: script
         script: poetry publish
         skip_cleanup: true
-        on:
-          tags: true
-      if: tag IS present
 
 after_success:
   poetry run coveralls
