@@ -35,4 +35,4 @@ jobs:
         skip_cleanup: true
 
 after_success:
-  poetry run coveralls
+  poetry run cover
