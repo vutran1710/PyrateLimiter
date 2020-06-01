@@ -90,7 +90,7 @@ item = 'vutran_item'
 limiter.try_acquire(item)
 ```
 
-- [ ] RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
+- [ ] *RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
 
 ### Spam-protection strategies
 
@@ -113,5 +113,8 @@ When the number of incoming requets go beyond the limit, we can either do..
 ### More complex scenario
 https://www.keycdn.com/support/rate-limiting#types-of-rate-limits
 
-- [ ] Sometimes, we may need to apply specific rate-limiting strategies based on schedules/region or some other metrics. It
+- [ ] *Sometimes, we may need to apply specific rate-limiting strategies based on schedules/region or some other metrics. It
 requires the capability to `switch` the strategies instantly without re-deploying the whole service.
+
+## Notes
+Todo-items marked with (*) are planned for v3 release.
