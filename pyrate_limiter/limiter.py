@@ -67,14 +67,18 @@ class Limiter:
                 # Determine time-window up until now
                 time_window = now - rate.interval
                 total_reqs = 0
+                remaining_time = 0
 
                 for log_idx, log in enumerate(bucket.all_items()):
+                    # print(f'log_idx: {log_idx} -> {log}')
                     if log >= time_window:
                         total_reqs = volume - log_idx
+                        remaining_time = log - time_window
+                        # print(f'breaking --> {total_reqs} -> {remaining_time}')
                         break
 
                 if total_reqs >= rate.limit:
-                    raise BucketFullException(idt, rate)
+                    raise BucketFullException(idt, rate, remaining_time)
 
                 if idx == len(self._rates) - 1:
                     # We remove item based on the request-rate with the max-limit

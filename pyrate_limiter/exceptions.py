@@ -5,14 +5,13 @@ from json import dumps
 class BucketFullException(Exception):
     def __init__(self, identity, rate, remaining_time):
         error = f'Bucket for {identity} with Rate {rate} is already full'
-        meta = {
+        self.meta_info = {
             "error": error,
             "identity": identity,
             "rate": str(rate),
             "remaining_time": remaining_time,
         }
-        self.message = dumps(meta)
-        super().__init__(self.message)
+        super().__init__(error)
 
 
 class InvalidParams(Exception):
