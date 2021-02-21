@@ -22,12 +22,12 @@ It is also possible to use your own Bucket implementation, by extending Abstract
 ## Available modules
 ```python
 from pyrate_limiter import (
-    BucketFullException,
-    Duration,
-    RequestRate,
-    Limiter,
-    MemoryListBucket,
-    MemoryQueueBucket,
+	BucketFullException,
+	Duration,
+	RequestRate,
+	Limiter,
+	MemoryListBucket,
+	MemoryQueueBucket,
 )
 ```
 
@@ -66,9 +66,9 @@ As the logic is pretty self-explainatory, note that the superior rate-limit must
 
 
 - [x] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
-      request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case, and required
-      `redis-py` as its peer-dependency. The usage difference is when using Redis, a naming `prefix` must be provide so
-      the keys can be distinct for each item's identity.
+	  request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case, and required
+	  `redis-py` as its peer-dependency. The usage difference is when using Redis, a naming `prefix` must be provide so
+	  the keys can be distinct for each item's identity.
 
 ``` python
 from redis import ConnectionPool
@@ -78,8 +78,8 @@ pool = ConnectionPool.from_url('redis://localhost:6379')
 rate = RequestRate(3, 5 * Duration.SECOND)
 
 bucket_kwargs = {
-    "redis_pool": redis_pool,
-    "bucket_name": "my-ultimate-bucket-prefix"
+	"redis_pool": redis_pool,
+	"bucket_name": "my-ultimate-bucket-prefix"
 }
 
 # so each item buckets will have a key name as
@@ -89,6 +89,25 @@ limiter = Limiter(rate, bucket_class=RedisBucket, bucket_kwargs=bucket_kwargs)
 item = 'vutran_item'
 limiter.try_acquire(item)
 ```
+
+### BucketFullException
+If the Bucket is full, an exception *BucketFullException* will be raised, with info about identity it received, the rate that has raised, and the remaining time until the next request can be processed.
+
+```python
+rate = RequestRate(3, 5 * Duration.SECOND)
+limiter = Limiter(rate)
+item = 'vutran'
+
+has_raised = False
+try:
+	for _ in range(4):
+		limiter.try_acquire(item)
+		sleep(1)
+except BucketFullException as err:
+	has_raised = True
+	assert str(err) # Bucket for vutran with Rate 3/5 is already full
+	assert isinstance(err.meta_info, dict) # {'error': 'Bucket for vutran with Rate 3/5 is already full', 'identity': 'tranvu', 'rate': '5/5', 'remaining_time': 2}
+-```
 
 - [ ] *RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
 
