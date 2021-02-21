@@ -91,7 +91,7 @@ limiter.try_acquire(item)
 ```
 
 ### BucketFullException
-If the Bucket is full, an exception *BucketFullException* will be raised, with info about identity it received, the rate that has raised, and the remaining time until the next request can be processed.
+If the Bucket is full, an exception *BucketFullException* will be raised, with meta-info about the identity it received, the rate that has raised, and the remaining time until the next request can be processed.
 
 ```python
 rate = RequestRate(3, 5 * Duration.SECOND)
@@ -105,9 +105,11 @@ try:
 		sleep(1)
 except BucketFullException as err:
 	has_raised = True
-	assert str(err) # Bucket for vutran with Rate 3/5 is already full
-	assert isinstance(err.meta_info, dict) # {'error': 'Bucket for vutran with Rate 3/5 is already full', 'identity': 'tranvu', 'rate': '5/5', 'remaining_time': 2}
--```
+	assert str(err)
+	# Bucket for vutran with Rate 3/5 is already full
+	assert isinstance(err.meta_info, dict)
+	# {'error': 'Bucket for vutran with Rate 3/5 is already full', 'identity': 'tranvu', 'rate': '5/5', 'remaining_time': 2}
+```
 
 - [ ] *RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
 
