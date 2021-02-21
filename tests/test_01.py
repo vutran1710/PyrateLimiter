@@ -17,10 +17,20 @@ def test_simple_01():
     limiter = Limiter(rate)
     item = 'vutran'
 
-    with pytest.raises(BucketFullException):
+    has_raised = False
+    try:
         for _ in range(4):
             limiter.try_acquire(item)
+            sleep(1)
+    except BucketFullException as err:
+        has_raised = True
+        print(err)
+        assert str(err)
+        assert isinstance(err.meta_info, dict)
+        assert err.meta_info['remaining_time'] == 2
 
+    assert has_raised
+    
     sleep(6)
     limiter.try_acquire(item)
     vol = limiter.get_current_volume(item)
@@ -40,13 +50,15 @@ def test_simple_02():
     rate_2 = RequestRate(7, 9 * Duration.SECOND)
     limiter2 = Limiter(rate_1, rate_2)
     item = 'tranvu'
+    err = None
 
-    with pytest.raises(BucketFullException):
+    with pytest.raises(BucketFullException) as err:
         # Try add 6 items within 5 seconds
         # Exceed Rate-1
         for _ in range(6):
             limiter2.try_acquire(item)
 
+    print(err.value.meta_info)
     assert limiter2.get_current_volume(item) == 5
 
     sleep(6)
@@ -55,10 +67,11 @@ def test_simple_02():
     limiter2.try_acquire(item)
     assert limiter2.get_current_volume(item) == 7
 
-    with pytest.raises(BucketFullException):
+    with pytest.raises(BucketFullException) as err:
         # Exceed Rate-2
         limiter2.try_acquire(item)
 
+    print(err.value.meta_info)
     sleep(6)
     # 12 seconds passed
     limiter2.try_acquire(item)
