@@ -1,5 +1,7 @@
 """ Basic Rate-Limiter
 """
+from functools import wraps
+from inspect import iscoroutinefunction
 from typing import List, Dict
 from time import time
 from .exceptions import InvalidParams, BucketFullException
@@ -88,6 +90,36 @@ class Limiter:
             bucket = self.bucket_group[idt]
             # print(bucket)
             bucket.put(now)
+
+    def ratelimit(self, *identities):
+        """ A decorator that applies rate-limiting, with async support.
+
+        Usage::
+
+            @limiter.ratelimit('identity')
+            def my_function():
+                do_stuff()
+
+            @limiter.ratelimit('identity')
+            async def my_function():
+                do_stuff()
+
+        """
+        def ratelimit_decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                self.try_acquire(*identities)
+                return func(*args, **kwargs)
+
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                self.try_acquire(*identities)
+                return await func(*args, **kwargs)
+
+            # Return either an async or normal wrapper, depending on the type of the wrapped function
+            return async_wrapper if iscoroutinefunction(func) else wrapper
+
+        return ratelimit_decorator
 
     def get_current_volume(self, identity) -> int:
         """ Get current bucket volume for a specific identity
