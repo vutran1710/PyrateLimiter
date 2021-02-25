@@ -1,12 +1,16 @@
 """ Basic Rate-Limiter
 """
+import asyncio
 from functools import wraps
 from inspect import iscoroutinefunction
-from typing import List, Dict
-from time import time
+from logging import getLogger
+from typing import List, Dict, Optional, Union
+from time import sleep, time
 from .exceptions import InvalidParams, BucketFullException
 from .request_rate import RequestRate
 from .bucket import AbstractBucket, MemoryQueueBucket
+
+logger = getLogger(__name__)
 
 
 class Limiter:
@@ -91,35 +95,63 @@ class Limiter:
             # print(bucket)
             bucket.put(now)
 
-    def ratelimit(self, *identities):
+    def ratelimit(
+        self,
+        *identities,
+        delay: bool = False,
+        max_delay: Union[int, float] = None,
+    ):
         """ A decorator that applies rate-limiting, with async support.
+        Depending on arguments, calls that exceed the rate limit will either raise an exception, or
+        sleep until space is available in the bucket.
 
-        Usage::
-
-            @limiter.ratelimit('identity')
-            def my_function():
-                do_stuff()
-
-            @limiter.ratelimit('identity')
-            async def my_function():
-                do_stuff()
-
+        Args:
+            identities: Bucket identities
+            delay: Delay until the next request instead of raising an exception
+            max_delay: The maximum allowed delay time (in seconds); anything over this will raise
+                an exception
         """
         def ratelimit_decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                self.try_acquire(*identities)
+                try:
+                    self.try_acquire(*identities)
+                except BucketFullException as err:
+                    delay_time = self._delay_or_reraise(err, delay, max_delay)
+                    sleep(delay_time)
+
                 return func(*args, **kwargs)
 
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
-                self.try_acquire(*identities)
+                try:
+                    self.try_acquire(*identities)
+                except BucketFullException as err:
+                    delay_time = self._delay_or_reraise(err, delay, max_delay)
+                    await asyncio.sleep(delay_time)
+
                 return await func(*args, **kwargs)
 
             # Return either an async or normal wrapper, depending on the type of the wrapped function
             return async_wrapper if iscoroutinefunction(func) else wrapper
 
         return ratelimit_decorator
+
+    @staticmethod
+    def _delay_or_reraise(
+        err: BucketFullException,
+        delay: bool,
+        max_delay: Union[int, float],
+    ) -> int:
+        """ Determine if we should delay after exceeding a rate limit. If so, return the delay time,
+        otherwise re-raise the exception.
+        """
+        delay_time = err.meta_info['remaining_time']
+        logger.info(f'Rate limit reached; {delay_time} seconds remaining before next request')
+        exceeded_max_delay = max_delay and (delay_time > max_delay)
+        if delay and not exceeded_max_delay:
+            return delay_time
+        raise err
 
     def get_current_volume(self, identity) -> int:
         """ Get current bucket volume for a specific identity
