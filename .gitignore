@@ -4,4 +4,5 @@ __pycache__/
 dist/
 htmlcov/
 env/
+.vim/
 .vscode/
