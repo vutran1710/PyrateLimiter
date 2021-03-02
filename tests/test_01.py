@@ -9,6 +9,7 @@ from pyrate_limiter import (
     MemoryListBucket,
 )
 
+
 def test_sleep():
     rate = RequestRate(6, 10 * Duration.SECOND)
     iterations = 10
@@ -18,22 +19,21 @@ def test_sleep():
     for i in range(iterations):
         try:
             for _ in range(2):
-                limiter.try_acquire('test')
+                limiter.try_acquire("test")
                 push += 1
             print(f"Pushed: {push} items")
             sleep(1)
         except BucketFullException as e:
-            sleep_time = e.meta_info['remaining_time']
+            sleep_time = e.meta_info["remaining_time"]
             print(f"Stuck at {i}, sleep for {sleep_time}")
             sleep(sleep_time)
 
 
 def test_simple_01():
-    """ Single-rate Limiter
-    """
+    """Single-rate Limiter"""
     rate = RequestRate(3, 5 * Duration.SECOND)
     limiter = Limiter(rate)
-    item = 'vutran'
+    item = "vutran"
 
     has_raised = False
     try:
@@ -45,10 +45,10 @@ def test_simple_01():
         print(err)
         assert str(err)
         assert isinstance(err.meta_info, dict)
-        assert err.meta_info['remaining_time'] == 2
+        assert err.meta_info["remaining_time"] == 2
 
     assert has_raised
-    
+
     sleep(6)
     limiter.try_acquire(item)
     vol = limiter.get_current_volume(item)
@@ -62,12 +62,11 @@ def test_simple_01():
 
 
 def test_simple_02():
-    """ Multi-rates Limiter
-    """
+    """Multi-rates Limiter"""
     rate_1 = RequestRate(5, 5 * Duration.SECOND)
     rate_2 = RequestRate(7, 9 * Duration.SECOND)
     limiter2 = Limiter(rate_1, rate_2)
-    item = 'tranvu'
+    item = "tranvu"
     err = None
 
     with pytest.raises(BucketFullException) as err:
@@ -127,11 +126,10 @@ def test_simple_02():
 
 
 def test_simple_03():
-    """ Single-rate Limiter with MemoryListBucket
-    """
+    """Single-rate Limiter with MemoryListBucket"""
     rate = RequestRate(3, 5 * Duration.SECOND)
     limiter = Limiter(rate, bucket_class=MemoryListBucket)
-    item = 'vutran_list'
+    item = "vutran_list"
 
     with pytest.raises(BucketFullException):
         for _ in range(4):
@@ -150,12 +148,11 @@ def test_simple_03():
 
 
 def test_simple_04():
-    """ Multi-rates Limiter with MemoryListBucket
-    """
+    """Multi-rates Limiter with MemoryListBucket"""
     rate_1 = RequestRate(5, 5 * Duration.SECOND)
     rate_2 = RequestRate(7, 9 * Duration.SECOND)
     limiter2 = Limiter(rate_1, rate_2, bucket_class=MemoryListBucket)
-    item = 'tranvu_list'
+    item = "tranvu_list"
 
     with pytest.raises(BucketFullException):
         # Try add 6 items within 5 seconds

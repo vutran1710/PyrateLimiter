@@ -33,6 +33,7 @@ fakeredis = "^1.1.0"
 jedi = "^0.15.2"
 yapf = "^0.29.0"
 coveralls = "^2.0.0"
+black = "^20.8b1"
 
 [tool.poetry.scripts]
 test = 'scripts:test'

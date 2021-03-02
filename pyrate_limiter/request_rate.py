@@ -25,7 +25,7 @@ class RequestRate:
 
     @limit.setter
     def limit(self, _):
-        raise ImmutableClassProperty(self, 'limit')
+        raise ImmutableClassProperty(self, "limit")
 
     @property
     def interval(self):
@@ -33,7 +33,7 @@ class RequestRate:
 
     @interval.setter
     def interval(self, _):
-        raise ImmutableClassProperty(self, 'interval')
+        raise ImmutableClassProperty(self, "interval")
 
     def __str__(self):
-        return f'{self.limit}/{self.interval}'
+        return f"{self.limit}/{self.interval}"

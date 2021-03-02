@@ -14,8 +14,8 @@ logger = getLogger(__name__)
 
 
 class Limiter:
-    """ Basic rate-limiter class that makes use of built-in python Queue
-    """
+    """Basic rate-limiter class that makes use of built-in python Queue"""
+
     bucket_group: Dict[str, AbstractBucket] = {}
 
     def __init__(
@@ -24,13 +24,13 @@ class Limiter:
         bucket_class: AbstractBucket = MemoryQueueBucket,
         bucket_kwargs=None,
     ):
-        """ Init a limiter with rates and specific bucket type
+        """Init a limiter with rates and specific bucket type
         - Bucket type can be any class that extends AbstractBucket
         - 3 kinds of Bucket are provided, being MemoryQueueBucket, MemoryListBucket and RedisBucket
         - Opts is extra keyword-arguements for Bucket class constructor
         """
         if not rates:
-            raise InvalidParams('Rates')
+            raise InvalidParams("Rates")
 
         # Validate rates
         for idx, rate in enumerate(rates):
@@ -39,15 +39,14 @@ class Limiter:
 
             prev_rate = rates[idx - 1]
             if rate.limit < prev_rate.limit or rate.interval < prev_rate.interval:
-                raise InvalidParams(f'{prev_rate} cannot come before {rate}')
+                raise InvalidParams(f"{prev_rate} cannot come before {rate}")
 
         self._rates = rates
         self._bkclass = bucket_class
         self._bucket_args = bucket_kwargs or {}
 
     def try_acquire(self, *identities) -> None:
-        """ Acquiring an item or reject it if rate-limit has been exceeded
-        """
+        """Acquiring an item or reject it if rate-limit has been exceeded"""
         for idt in identities:
             # Setup Queue for each Identity if needed
             # Queue's maxsize equals the max limit of request-rates
@@ -101,7 +100,7 @@ class Limiter:
         delay: bool = False,
         max_delay: Union[int, float] = None,
     ):
-        """ A decorator that applies rate-limiting, with async support.
+        """A decorator that applies rate-limiting, with async support.
         Depending on arguments, calls that exceed the rate limit will either raise an exception, or
         sleep until space is available in the bucket.
 
@@ -111,6 +110,7 @@ class Limiter:
             max_delay: The maximum allowed delay time (in seconds); anything over this will raise
                 an exception
         """
+
         def ratelimit_decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
@@ -143,19 +143,20 @@ class Limiter:
         delay: bool,
         max_delay: Union[int, float],
     ) -> int:
-        """ Determine if we should delay after exceeding a rate limit. If so, return the delay time,
+        """Determine if we should delay after exceeding a rate limit. If so, return the delay time,
         otherwise re-raise the exception.
         """
-        delay_time = err.meta_info['remaining_time']
-        logger.info(f'Rate limit reached; {delay_time} seconds remaining before next request')
+        delay_time = err.meta_info["remaining_time"]
+        logger.info(
+            f"Rate limit reached; {delay_time} seconds remaining before next request"
+        )
         exceeded_max_delay = max_delay and (delay_time > max_delay)
         if delay and not exceeded_max_delay:
             return delay_time
         raise err
 
     def get_current_volume(self, identity) -> int:
-        """ Get current bucket volume for a specific identity
-        """
+        """Get current bucket volume for a specific identity"""
         bucket = self.bucket_group[identity]
         return bucket.size()
 
