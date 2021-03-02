@@ -9,6 +9,24 @@ from pyrate_limiter import (
     MemoryListBucket,
 )
 
+def test_sleep():
+    rate = RequestRate(6, 10 * Duration.SECOND)
+    iterations = 10
+    limiter = Limiter(rate)
+    push = 0
+
+    for i in range(iterations):
+        try:
+            for _ in range(2):
+                limiter.try_acquire('test')
+                push += 1
+            print(f"Pushed: {push} items")
+            sleep(1)
+        except BucketFullException as e:
+            sleep_time = e.meta_info['remaining_time']
+            print(f"Stuck at {i}, sleep for {sleep_time}")
+            sleep(sleep_time)
+
 
 def test_simple_01():
     """ Single-rate Limiter

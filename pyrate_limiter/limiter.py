@@ -77,7 +77,7 @@ class Limiter:
 
                 for log_idx, log in enumerate(bucket.all_items()):
                     # print(f'log_idx: {log_idx} -> {log}')
-                    if log >= time_window:
+                    if log > time_window:
                         total_reqs = volume - log_idx
                         remaining_time = log - time_window
                         # print(f'breaking --> {total_reqs} -> {remaining_time}')
