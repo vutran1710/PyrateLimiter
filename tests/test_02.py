@@ -21,18 +21,14 @@ pool = dummy_redis.connection_pool
 
 
 def test_simple_01():
-    """ Single-rate Limiter with RedisBucket
-    """
+    """Single-rate Limiter with RedisBucket"""
     rate = RequestRate(3, 5 * Duration.SECOND)
     limiter = Limiter(
         rate,
         bucket_class=RedisBucket,
-        bucket_kwargs={
-            "redis_pool": pool,
-            "bucket_name": "test-bucket-1"
-        },
+        bucket_kwargs={"redis_pool": pool, "bucket_name": "test-bucket-1"},
     )
-    item = 'vutran_list'
+    item = "vutran_list"
 
     with pytest.raises(BucketFullException):
         for _ in range(4):
@@ -51,8 +47,7 @@ def test_simple_01():
 
 
 def test_simple_02():
-    """ Multi-rates Limiter with RedisBucket
-    """
+    """Multi-rates Limiter with RedisBucket"""
     rate_1 = RequestRate(5, 5 * Duration.SECOND)
     rate_2 = RequestRate(7, 9 * Duration.SECOND)
     limiter4 = Limiter(
@@ -64,7 +59,7 @@ def test_simple_02():
             "bucket_name": "test-bucket-2",
         },
     )
-    item = 'redis-test-item'
+    item = "redis-test-item"
 
     with pytest.raises(BucketFullException):
         # Try add 6 items within 5 seconds

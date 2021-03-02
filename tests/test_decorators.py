@@ -11,14 +11,14 @@ from pyrate_limiter import (
 )
 
 # Make log messages visible on test failure (or with pytest -s)
-basicConfig(level='INFO')
+basicConfig(level="INFO")
 
 
 def test_ratelimit__synchronous():
     """ Test ratelimit decorator - synchronous version """
     limiter = Limiter(RequestRate(5, Duration.SECOND))
 
-    @limiter.ratelimit('identity_1')
+    @limiter.ratelimit("identity_1")
     def limited_function():
         pass
 
@@ -39,7 +39,7 @@ def test_ratelimit__delay_synchronous():
     """ Test ratelimit decorator with automatic delays - synchronous version """
     limiter = Limiter(RequestRate(5, Duration.SECOND))
 
-    @limiter.ratelimit('identity_1', delay=True)
+    @limiter.ratelimit("identity_1", delay=True)
     def limited_function():
         pass
 
@@ -52,7 +52,7 @@ def test_ratelimit__exceeds_max_delay_synchronous():
     """ Test ratelimit decorator with automatic delays - synchronous version """
     limiter = Limiter(RequestRate(5, Duration.MINUTE))
 
-    @limiter.ratelimit('identity_1', delay=True, max_delay=10)
+    @limiter.ratelimit("identity_1", delay=True, max_delay=10)
     def limited_function():
         pass
 
@@ -67,7 +67,7 @@ async def test_ratelimit__async():
     """ Test ratelimit decorator - async version """
     limiter = Limiter(RequestRate(5, Duration.SECOND))
 
-    @limiter.ratelimit('identity_2')
+    @limiter.ratelimit("identity_2")
     async def limited_function():
         pass
 
@@ -89,7 +89,7 @@ async def test_ratelimit__delay_async():
     """ Test ratelimit decorator with automatic delays - synchronous version """
     limiter = Limiter(RequestRate(5, Duration.SECOND))
 
-    @limiter.ratelimit('identity_1', delay=True)
+    @limiter.ratelimit("identity_1", delay=True)
     async def limited_function():
         pass
 
@@ -103,7 +103,7 @@ async def test_ratelimit__exceeds_max_delay_async():
     """ Test ratelimit decorator with automatic delays - synchronous version """
     limiter = Limiter(RequestRate(5, Duration.MINUTE))
 
-    @limiter.ratelimit('identity_1', delay=True, max_delay=10)
+    @limiter.ratelimit("identity_1", delay=True, max_delay=10)
     async def limited_function():
         pass
 
