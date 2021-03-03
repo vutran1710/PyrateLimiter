@@ -1,7 +1,8 @@
 from time import sleep
 import pytest
-
 from pyrate_limiter import (
+    ImmutableClassProperty,
+    InvalidParams,
     BucketFullException,
     Duration,
     RequestRate,
@@ -11,10 +12,10 @@ from pyrate_limiter import (
 
 
 def test_sleep():
-    rate = RequestRate(6, 10 * Duration.SECOND)
+    rate = RequestRate(6, 5 * Duration.SECOND)
     iterations = 10
     limiter = Limiter(rate)
-    push = 0
+    push, sleep_count = 0, 0
 
     for i in range(iterations):
         try:
@@ -26,12 +27,31 @@ def test_sleep():
         except BucketFullException as e:
             sleep_time = e.meta_info["remaining_time"]
             print(f"Stuck at {i}, sleep for {sleep_time}")
+            sleep_count += 1
             sleep(sleep_time)
+
+    assert sleep_count == 2
 
 
 def test_simple_01():
     """Single-rate Limiter"""
+    with pytest.raises(InvalidParams):
+        # No rates provided
+        Limiter()
+
+    with pytest.raises(InvalidParams):
+        rate_1 = RequestRate(3, 5 * Duration.SECOND)
+        rate_2 = RequestRate(4, 5 * Duration.SECOND)
+        Limiter(rate_1, rate_2)
+
     rate = RequestRate(3, 5 * Duration.SECOND)
+
+    with pytest.raises(ImmutableClassProperty):
+        rate.limit = 10
+
+    with pytest.raises(ImmutableClassProperty):
+        rate.interval = 10
+
     limiter = Limiter(rate)
     item = "vutran"
 

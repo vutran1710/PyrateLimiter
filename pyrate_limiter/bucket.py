@@ -1,7 +1,7 @@
 """ Implement this class to create
 a workable bucket for Limiter to use
 """
-from typing import List
+from typing import List, Tuple
 from abc import ABC, abstractmethod
 from queue import Queue
 from threading import RLock
@@ -41,6 +41,20 @@ class AbstractBucket(ABC):
     @abstractmethod
     def all_items(self) -> List[int]:
         """Return a list as copies of all items in the bucket"""
+
+    def inspect_expired_items(self, time: int) -> Tuple[int, int]:
+        """ Find how many items in bucket that have slipped out of the time-window
+        """
+        volume = self.size()
+        item_count, remaining_time = 0, 0
+        
+        for log_idx, log_item in enumerate(self.all_items()):
+            if log_item > time:
+                item_count = volume - log_idx
+                remaining_time = log_item - time
+                break
+            
+        return item_count, remaining_time
 
 
 class MemoryQueueBucket(AbstractBucket):

@@ -1,7 +1,4 @@
 # pylint: disable=C0114,C0115
-from json import dumps
-
-
 class BucketFullException(Exception):
     def __init__(self, identity, rate, remaining_time):
         error = f"Bucket for {identity} with Rate {rate} is already full"

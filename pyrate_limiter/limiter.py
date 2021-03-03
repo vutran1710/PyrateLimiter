@@ -4,7 +4,7 @@ import asyncio
 from functools import wraps
 from inspect import iscoroutinefunction
 from logging import getLogger
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Union
 from time import sleep, time
 from .exceptions import InvalidParams, BucketFullException
 from .request_rate import RequestRate
@@ -29,70 +29,64 @@ class Limiter:
         - 3 kinds of Bucket are provided, being MemoryQueueBucket, MemoryListBucket and RedisBucket
         - Opts is extra keyword-arguements for Bucket class constructor
         """
-        if not rates:
-            raise InvalidParams("Rates")
-
-        # Validate rates
-        for idx, rate in enumerate(rates):
-            if idx == 0:
-                continue
-
-            prev_rate = rates[idx - 1]
-            if rate.limit < prev_rate.limit or rate.interval < prev_rate.interval:
-                raise InvalidParams(f"{prev_rate} cannot come before {rate}")
-
+        self._validate_rate_list(rates)
         self._rates = rates
         self._bkclass = bucket_class
         self._bucket_args = bucket_kwargs or {}
 
-    def try_acquire(self, *identities) -> None:
-        """Acquiring an item or reject it if rate-limit has been exceeded"""
-        for idt in identities:
-            # Setup Queue for each Identity if needed
-            # Queue's maxsize equals the max limit of request-rates
-            if not self.bucket_group.get(idt):
+    def _validate_rate_list(self, rates):  # pylint: disable=no-self-use
+        if not rates:
+            raise InvalidParams("Rate(s) must be provided")
+
+        for idx, rate in enumerate(rates[1:]):
+            prev_rate = rates[idx]
+            invalid = (
+                rate.limit <= prev_rate.limit or rate.interval <= prev_rate.interval
+            )
+            if invalid:
+                msg = f"{prev_rate} cannot come before {rate}"
+                raise InvalidParams(msg)
+
+    def _init_buckets(self, identities) -> None:
+        """Setup Queue for each Identity if needed
+        Queue's maxsize equals the max limit of request-rates
+        """
+        for id in identities:
+            if not self.bucket_group.get(id):
                 maxsize = self._rates[-1].limit
                 # print(self._bucket_args)
-                self.bucket_group[idt] = self._bkclass(
+                self.bucket_group[id] = self._bkclass(
                     maxsize=maxsize,
-                    identity=idt,
+                    identity=id,
                     **self._bucket_args,
                 )
 
+    def try_acquire(self, *identities) -> None:
+        """Acquiring an item or reject it if rate-limit has been exceeded"""
+        self._init_buckets(identities)
         now = int(time())
 
         for idx, rate in enumerate(self._rates):
-            for idt in identities:
-                bucket = self.bucket_group[idt]
+            for id in identities:
+                bucket = self.bucket_group[id]
                 volume = bucket.size()
-                # print(f'bucket-size: {volume}')
+                
                 if volume < rate.limit:
                     continue
 
-                # Determine time-window up until now
-                time_window = now - rate.interval
-                total_reqs = 0
-                remaining_time = 0
+                # Determine rate's time-window starting point
+                start_time = now - rate.interval
+                item_count, remaining_time = bucket.inspect_expired_items(start_time)
 
-                for log_idx, log in enumerate(bucket.all_items()):
-                    # print(f'log_idx: {log_idx} -> {log}')
-                    if log > time_window:
-                        total_reqs = volume - log_idx
-                        remaining_time = log - time_window
-                        # print(f'breaking --> {total_reqs} -> {remaining_time}')
-                        break
-
-                if total_reqs >= rate.limit:
-                    raise BucketFullException(idt, rate, remaining_time)
+                if item_count >= rate.limit:
+                    raise BucketFullException(id, rate, remaining_time)
 
                 if idx == len(self._rates) - 1:
                     # We remove item based on the request-rate with the max-limit
-                    bucket.get(volume - total_reqs)
+                    bucket.get(volume - item_count)
 
-        for idt in identities:
-            bucket = self.bucket_group[idt]
-            # print(bucket)
-            bucket.put(now)
+        for id in identities:
+            self.bucket_group[id].put(now)
 
     def ratelimit(
         self,
