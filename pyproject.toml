@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyrate-limiter"
-version = "2.2.2"
+version = "2.3.0"
 description = "Python Rate-Limiter using Leaky-Bucket Algorimth Family"
 authors = ["vutr <me@vutr.io>"]
 license = "MIT"
@@ -40,6 +40,12 @@ flake8_polyfill = "^1.0.2"
 test = 'scripts:test'
 lint = 'scripts:lint'
 cover = 'scripts:cover'
+
+[tool.black]
+line-length = 100
+
+[tool.ipdb]
+context=7
 
 [build-system]
 requires = ["poetry>=0.12"]

@@ -47,13 +47,13 @@ class AbstractBucket(ABC):
         """
         volume = self.size()
         item_count, remaining_time = 0, 0
-        
+
         for log_idx, log_item in enumerate(self.all_items()):
             if log_item > time:
                 item_count = volume - log_idx
                 remaining_time = log_item - time
                 break
-            
+
         return item_count, remaining_time
 
 

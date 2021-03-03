@@ -113,42 +113,56 @@ except BucketFullException as err:
 
 - [ ] *RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
 
-### Decorator usage with rate-limiting exceptions
+### Decorator
 Rate-limiting is also available in decorator form, using `Limiter.ratelimit`. Example:
 ```python
-    @limiter.ratelimit(item)
-    def my_function():
-        do_stuff()
-```
-
-It also works on async functions:
-```python
-    @limiter.ratelimit(item)
-    async def my_function():
-        await do_stuff()
+@limiter.ratelimit(item)
+def my_function():
+    do_stuff()
 ```
 
 As with `Limiter.try_acquire`, if calls to the wrapped function exceed the rate limits you
 defined, a `BucketFullException` will be raised.
 
-### Decorator usage with rate-limiting delays
+### Rate-limiting delays
 In some cases, you may want to simply slow down your calls to stay within the rate limits instead of
 canceling them. In that case you can use the `delay` flag, optionally with a `max_delay`
 (in seconds) that you are willing to wait in between calls.
 
 Example:
 ```python
-    @limiter.ratelimit(item, delay=True, max_delay=10)
-    def my_function():
-        do_stuff()
+@limiter.ratelimit(item, delay=True, max_delay=10)
+def my_function():
+    do_stuff()
 ```
 
 In this case, calls may be delayed by at most 10 seconds to stay within the rate limits; any longer
 than that, and a `BucketFullException` will be raised instead. Without specifying `max_delay`, calls
 will be delayed as long as necessary.
 
-This also works for async functions, which will be delayed using `asyncio.sleep` instead of
-`time.sleep`.
+### Contextmanager
+`Limiter.ratelimit` also works as a contextmanager:
+
+```python
+def my_function():
+    with limiter.ratelimit(item, delay=True):
+        do_stuff()
+```
+
+### Async decorator/contextmanager
+All the above features of `Limiter.ratelimit` also work on async functions:
+```python
+@limiter.ratelimit(item, delay=True)
+async def my_function():
+    await do_stuff()
+
+async def my_function():
+    async with limiter.ratelimit(item):
+        await do_stuff()
+```
+
+When delays are enabled, `asyncio.sleep` will be used instead of `time.sleep`.
+
 
 ### Spam-protection strategies
 - [x] Sometimes, we need a rate-limiter to protect our API from spamming/ddos attack. Some usual strategies for this could be as
