@@ -21,8 +21,7 @@ install:
 jobs:
   include:
     - stage: Check
-      name: lint
-      script: poetry run test
+      script: poetry run cover
     - stage: Publish
       if: branch = master
       script: skip
@@ -33,6 +32,3 @@ jobs:
         provider: script
         script: poetry publish
         skip_cleanup: true
-
-after_success:
-  poetry run cover
