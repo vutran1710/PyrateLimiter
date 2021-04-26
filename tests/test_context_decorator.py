@@ -5,7 +5,7 @@
 """
 import asyncio
 from logging import getLogger
-from time import sleep
+from time import time, sleep
 from uuid import uuid4
 
 import pytest
@@ -25,7 +25,7 @@ def test_ratelimit__synchronous():
         pass
 
     # If we stay under 10 requests/sec, expect no errors
-    for i in range(12):
+    for _ in range(12):
         limited_function()
         sleep(0.1)
 
@@ -33,7 +33,7 @@ def test_ratelimit__synchronous():
 
     # If we exceed 10 requests/sec, expect an exception
     with pytest.raises(BucketFullException):
-        for i in range(12):
+        for _ in range(12):
             limited_function()
 
 
@@ -46,8 +46,13 @@ def test_ratelimit__delay_synchronous():
         pass
 
     # This should insert appropriate delays to stay within the rate limit
-    for i in range(12):
+    start = time()
+    for _ in range(22):
         limited_function()
+
+    # Exact time will depend on the test environment, but it should be slightly more than 2 seconds
+    elapsed = time() - start
+    assert 2 < elapsed <= 3
 
 
 def test_ratelimit__exceeds_max_delay_synchronous():
@@ -60,7 +65,7 @@ def test_ratelimit__exceeds_max_delay_synchronous():
 
     # This should exceed the rate limit, with a delay above max_delay, and raise an error
     with pytest.raises(BucketFullException):
-        for i in range(10):
+        for _ in range(10):
             limited_function()
 
 
@@ -77,7 +82,7 @@ def test_ratelimit__contextmanager_synchronous():
             pass
 
     # If we stay under 10 requests/sec, expect no errors
-    for i in range(12):
+    for _ in range(12):
         limited_function()
         sleep(0.1)
 
@@ -85,7 +90,7 @@ def test_ratelimit__contextmanager_synchronous():
 
     # If we exceed 10 requests/sec, expect an exception
     with pytest.raises(BucketFullException):
-        for i in range(12):
+        for _ in range(12):
             limited_function()
 
 
@@ -99,16 +104,16 @@ async def test_ratelimit__async():
         pass
 
     # If we stay under 10 requests/sec, expect no errors
-    for i in range(12):
+    for _ in range(12):
         await limited_function()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
 
     await asyncio.sleep(1)
 
     # If we exceed 10 requests/sec, expect an exception
+    tasks = [limited_function() for _ in range(12)]
     with pytest.raises(BucketFullException):
-        for i in range(12):
-            await limited_function()
+        await asyncio.gather(*tasks)
 
 
 @pytest.mark.asyncio
@@ -121,8 +126,13 @@ async def test_ratelimit__delay_async():
         pass
 
     # This should insert appropriate delays to stay within the rate limit
-    for i in range(12):
-        await limited_function()
+    tasks = [limited_function() for _ in range(22)]
+    start = time()
+    await asyncio.gather(*tasks)
+
+    # Exact time will depend on the test environment, but it should be slightly more than 2 seconds
+    elapsed = time() - start
+    assert 2 < elapsed <= 3
 
 
 @pytest.mark.asyncio
@@ -135,9 +145,9 @@ async def test_ratelimit__exceeds_max_delay_async():
         pass
 
     # This should exceed the rate limit, with a delay above max_delay, and raise an error
+    tasks = [limited_function() for _ in range(10)]
     with pytest.raises(BucketFullException):
-        for i in range(10):
-            await limited_function()
+        await asyncio.gather(*tasks)
 
 
 @pytest.mark.asyncio
@@ -154,13 +164,13 @@ async def test_ratelimit__contextmanager_async():
             pass
 
     # If we stay under 10 requests/sec, expect no errors
-    for i in range(12):
+    for _ in range(12):
         await limited_function()
         await asyncio.sleep(0.1)
 
     await asyncio.sleep(1)
 
     # If we exceed 10 requests/sec, expect an exception
+    tasks = [limited_function() for _ in range(12)]
     with pytest.raises(BucketFullException):
-        for i in range(12):
-            await limited_function()
+        await asyncio.gather(*tasks)

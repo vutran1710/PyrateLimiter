@@ -70,18 +70,26 @@ class LimitContextDecorator:
         pass
 
     def delayed_acquire(self):
-        try:
-            self.try_acquire()
-        except BucketFullException as err:
-            delay_time = self.delay_or_reraise(err)
-            sleep(delay_time)
+        """Delay and retry until we can successfully acquire an available bucket item"""
+        while True:
+            try:
+                self.try_acquire()
+            except BucketFullException as err:
+                delay_time = self.delay_or_reraise(err)
+                sleep(delay_time)
+            else:
+                break
 
     async def async_delayed_acquire(self):
-        try:
-            self.try_acquire()
-        except BucketFullException as err:
-            delay_time = self.delay_or_reraise(err)
-            await asyncio.sleep(delay_time)
+        """Delay and retry until we can successfully acquire an available bucket item"""
+        while True:
+            try:
+                self.try_acquire()
+            except BucketFullException as err:
+                delay_time = self.delay_or_reraise(err)
+                await asyncio.sleep(delay_time)
+            else:
+                break
 
     def delay_or_reraise(self, err: BucketFullException) -> int:
         """Determine if we should delay after exceeding a rate limit. If so, return the delay time,
