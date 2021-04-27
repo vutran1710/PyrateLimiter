@@ -163,6 +163,47 @@ async def my_function():
 
 When delays are enabled, `asyncio.sleep` will be used instead of `time.sleep`.
 
+### Examples
+To prove that pyrate-limiter is working as expected, here is a complete example to demonstrate
+rate-limiting with delays:
+```python
+from time import perf_counter as time
+from pyrate_limiter import Duration, Limiter, RequestRate
+
+limiter = Limiter(RequestRate(5, Duration.SECOND))
+n_requests = 27
+
+@limiter.ratelimit("test", delay=True)
+def limited_function(start_time):
+    print(f"t + {(time() - start_time):.5f}")
+
+start_time = time()
+for _ in range(n_requests):
+    limited_function(start_time)
+print(f"Ran {n_requests} requests in {time() - start_time:.5f} seconds")
+```
+
+And an equivalent example for async usage:
+```python
+import asyncio
+from time import perf_counter as time
+from pyrate_limiter import Duration, Limiter, RequestRate
+
+limiter = Limiter(RequestRate(5, Duration.SECOND))
+n_requests = 27
+
+@limiter.ratelimit("test", delay=True)
+async def limited_function(start_time):
+    print(f"t + {(time() - start_time):.5f}")
+
+async def test_ratelimit():
+    start_time = time()
+    tasks = [limited_function(start_time) for _ in range(n_requests)]
+    await asyncio.gather(*tasks)
+    print(f"Ran {n_requests} requests in {time() - start_time:.5f} seconds")
+
+asyncio.run(test_ratelimit())
+```
 
 ### Spam-protection strategies
 - [x] Sometimes, we need a rate-limiter to protect our API from spamming/ddos attack. Some usual strategies for this could be as
