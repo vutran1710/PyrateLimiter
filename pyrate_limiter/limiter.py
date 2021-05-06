@@ -1,6 +1,6 @@
 """ Basic Rate-Limiter
 """
-from typing import Dict, Union
+from typing import Dict, Union, Type
 from time import time
 from .exceptions import InvalidParams, BucketFullException
 from .request_rate import RequestRate
@@ -16,7 +16,7 @@ class Limiter:
     def __init__(
         self,
         *rates: RequestRate,
-        bucket_class: AbstractBucket = MemoryQueueBucket,
+        bucket_class: Type[AbstractBucket] = MemoryQueueBucket,
         bucket_kwargs=None,
     ):
         """Init a limiter with rates and specific bucket type
