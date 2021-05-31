@@ -11,8 +11,6 @@ from .limit_context_decorator import LimitContextDecorator
 class Limiter:
     """Basic rate-limiter class that makes use of built-in python Queue"""
 
-    bucket_group: Dict[str, AbstractBucket] = {}
-
     def __init__(
         self,
         *rates: RequestRate,
@@ -28,6 +26,7 @@ class Limiter:
         self._rates = rates
         self._bkclass = bucket_class
         self._bucket_args = bucket_kwargs or {}
+        self.bucket_group = {}
 
     def _validate_rate_list(self, rates):  # pylint: disable=no-self-use
         if not rates:
@@ -35,9 +34,7 @@ class Limiter:
 
         for idx, rate in enumerate(rates[1:]):
             prev_rate = rates[idx]
-            invalid = (
-                rate.limit <= prev_rate.limit or rate.interval <= prev_rate.interval
-            )
+            invalid = rate.limit <= prev_rate.limit or rate.interval <= prev_rate.interval
             if invalid:
                 msg = f"{prev_rate} cannot come before {rate}"
                 raise InvalidParams(msg)
