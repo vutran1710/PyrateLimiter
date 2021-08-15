@@ -1,11 +1,15 @@
 """ Basic Rate-Limiter
 """
+from logging import getLogger
 from typing import Union, Type
 from time import time
 from pyrate_limiter.exceptions import InvalidParams, BucketFullException
 from pyrate_limiter.request_rate import RequestRate
 from pyrate_limiter.bucket import AbstractBucket, MemoryQueueBucket
 from pyrate_limiter.limit_context_decorator import LimitContextDecorator
+
+
+logger = getLogger(__name__)
 
 
 class Limiter:
@@ -24,7 +28,11 @@ class Limiter:
         """
         self._validate_rate_list(rates)
         self._rates = rates
+        # R1: avoid short names like bkclass, it is less readable.
         self._bkclass = bucket_class
+        # R2: Here the object property is renamed, for not good reason
+        # R3: Also, it might be better to pass a bucket factory that
+        # takes no arguments.
         self._bucket_args = bucket_kwargs or {}
         self.bucket_group = {}
 
@@ -32,33 +40,42 @@ class Limiter:
         if not rates:
             raise InvalidParams("Rate(s) must be provided")
 
-        for idx, rate in enumerate(rates[1:]):
-            prev_rate = rates[idx]
-            invalid = rate.limit <= prev_rate.limit or rate.interval <= prev_rate.interval
+        # R0: Smart. Here is another approach
+        for previous, rate in zip(rates, rates[:1]):
+            invalid = rate.limit <= previous.limit or rate.interval <= previous.interval
             if invalid:
-                msg = f"{prev_rate} cannot come before {rate}"
+                msg = f"{previous} cannot come before {rate}"
                 raise InvalidParams(msg)
 
     def _init_buckets(self, identities) -> None:
-        """Setup Queue for each Identity if needed
-        Queue's maxsize equals the max limit of request-rates
+        """Setup Queue for each Identity if needed Queue's maxsize equals the
+        max limit of request-rates
+
         """
         for id in identities:
             if not self.bucket_group.get(id):
                 maxsize = self._rates[-1].limit
-                # print(self._bucket_args)
+                msg = "Creating bucket for identity: %r, with klass: %r args: %r"
+                logger.debug(msg, id, self._bkclass, self._bucket_args)
                 self.bucket_group[id] = self._bkclass(
                     maxsize=maxsize,
                     identity=id,
                     **self._bucket_args,
                 )
 
+    # R4: I am not sure what is the best approach, and I am not sure
+    # but I think *args will create a copy of identities at at the
+    # call site. My approach is to use sparingly.
     def try_acquire(self, *identities) -> None:
         """Acquiring an item or reject it if rate-limit has been exceeded"""
         self._init_buckets(identities)
+        # R5: time is slow.
         now = int(time())
 
-        for idx, rate in enumerate(self._rates):
+        # R8: Instead of two loops, one can use itertools.product It
+        # is the same complexity... but it can be faster.
+        for rate in self._rates:
+            # R6: here identity is better than id.
             for id in identities:
                 bucket = self.bucket_group[id]
                 volume = bucket.size()
@@ -73,8 +90,10 @@ class Limiter:
                 if item_count >= rate.limit:
                     raise BucketFullException(id, rate, remaining_time)
 
-                if idx == len(self._rates) - 1:
+                # is it the last?
+                if rate is self._rates[-1]:
                     # We remove item based on the request-rate with the max-limit
+                    # R7: Here i would see a purge method instead of bucket.get.
                     bucket.get(volume - item_count)
 
         for id in identities:
@@ -100,6 +119,9 @@ class Limiter:
 
     def get_current_volume(self, identity) -> int:
         """Get current bucket volume for a specific identity"""
+        # R9: I think the 'abstraction shouldn't leak' and in general
+        # what is called 'sugar' must be used sparingly (ref:
+        # https://en.wikipedia.org/wiki/Leaky_abstraction)
         bucket = self.bucket_group[identity]
         return bucket.size()
 
