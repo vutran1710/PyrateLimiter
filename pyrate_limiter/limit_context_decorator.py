@@ -5,27 +5,33 @@ from logging import getLogger
 from time import sleep
 from typing import Union
 
-from .exceptions import BucketFullException
+from pyrate_limiter.exceptions import BucketFullException
+
 
 logger = getLogger(__name__)
 
 
 class LimitContextDecorator:
     """A class that can be used as a:
+
     * decorator
     * async decorator
     * contextmanager
     * async contextmanager
 
-    Mainly used via ``Limiter.ratelimit()``. Depending on arguments, calls that exceed the rate
-    limit will either raise an exception, or sleep until space is available in the bucket.
+    Mainly used via ``Limiter.ratelimit()``. Depending on arguments,
+    calls that exceed the rate limit will either raise an exception,
+    or sleep until space is available in the bucket.
 
     Args:
-        limiter: Limiter object
-        identities: Bucket identities
-        delay: Delay until the next request instead of raising an exception
-        max_delay: The maximum allowed delay time (in seconds); anything over this will raise
-            an exception
+
+    - limiter: Limiter object
+    - identities: Bucket identities
+    - delay: Delay until the next request instead of raising an
+      exception
+    - max_delay: The maximum allowed delay time (in seconds);
+      anything over this will raise an exception
+
     """
 
     def __init__(
@@ -40,7 +46,9 @@ class LimitContextDecorator:
         self.try_acquire = lambda: limiter.try_acquire(*identities)
 
     def __call__(self, func):
-        """Allows usage as a decorator for both normal and async functions"""
+        """Decorator for both synchronous and asynchronous functions
+
+        """
 
         @wraps(func)
         def wrapper(*args, **kwargs):

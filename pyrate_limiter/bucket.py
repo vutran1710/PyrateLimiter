@@ -1,11 +1,12 @@
-""" Implement this class to create
-a workable bucket for Limiter to use
+"""Implement this class to create a workable bucket to use with
+Limiter instance.
+
 """
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 from queue import Queue
 from threading import RLock
-from .exceptions import InvalidParams
+from pyrate_limiter.exceptions import InvalidParams
 
 
 class AbstractBucket(ABC):
@@ -15,27 +16,30 @@ class AbstractBucket(ABC):
         self._maxsize = maxsize
 
     def maxsize(self) -> int:
-        """Return the maximum size of the bucket,
-        ie the maxinum number of item this bucket can hold
+        """Return the maximum size of the bucket, ie the maxinum number of
+        item this bucket can hold
+
         """
         return self._maxsize
 
     @abstractmethod
     def size(self) -> int:
-        """Return the current size of the bucket,
-        ie the count of all items currently in the bucket
+        """Return the current size of the bucket, ie the count of all items
+        currently in the bucket
+
         """
 
     @abstractmethod
     def put(self, item) -> int:
-        """Putting an item in the bucket
-        Return 1 if successful, else 0
+        """Putting an item in the bucket Return 1 if successful, else 0
+
         """
 
     @abstractmethod
     def get(self, number: int) -> int:
         """Get items and remove them from the bucket in the FIFO fashion
         Return the number of items that have been removed
+
         """
 
     @abstractmethod
@@ -43,7 +47,9 @@ class AbstractBucket(ABC):
         """Return a list as copies of all items in the bucket"""
 
     def inspect_expired_items(self, time: int) -> Tuple[int, int]:
-        """ Find how many items in bucket that have slipped out of the time-window
+        """Find how many items in bucket that have slipped out of the
+        time-window
+
         """
         volume = self.size()
         item_count, remaining_time = 0, 0
@@ -58,8 +64,8 @@ class AbstractBucket(ABC):
 
 
 class MemoryQueueBucket(AbstractBucket):
-    """A bucket that resides in memory
-    using python's built-in Queue class
+    """A bucket that resides in python's stdblib queue.Queue.
+
     """
 
     def __init__(self, maxsize=0, **_kwargs):
@@ -85,8 +91,8 @@ class MemoryQueueBucket(AbstractBucket):
 
 
 class MemoryListBucket(AbstractBucket):
-    """A bucket that resides in memory
-    using python's List
+    """A bucket that resides in python's list
+
     """
 
     def __init__(self, maxsize=0, **_kwargs):
@@ -118,8 +124,8 @@ class MemoryListBucket(AbstractBucket):
 
 
 class RedisBucket(AbstractBucket):
-    """A bucket with Redis
-    using List
+    """A bucket with REDIS using List
+
     """
 
     def __init__(

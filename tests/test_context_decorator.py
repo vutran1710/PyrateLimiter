@@ -45,12 +45,14 @@ def test_ratelimit__delay_synchronous():
     def limited_function():
         pass
 
-    # This should insert appropriate delays to stay within the rate limit
+    # This should insert appropriate delays to stay within the rate
+    # limit
     start = time()
     for _ in range(22):
         limited_function()
 
-    # Exact time will depend on the test environment, but it should be slightly more than 2 seconds
+    # Exact time will depend on the test environment, but it should be
+    # slightly more than 2 seconds
     elapsed = time() - start
     assert 2 < elapsed <= 3
 
@@ -63,7 +65,8 @@ def test_ratelimit__exceeds_max_delay_synchronous():
     def limited_function():
         pass
 
-    # This should exceed the rate limit, with a delay above max_delay, and raise an error
+    # This should exceed the rate limit, with a delay above max_delay,
+    # and raise an error
     with pytest.raises(BucketFullException):
         for _ in range(10):
             limited_function()
@@ -71,8 +74,10 @@ def test_ratelimit__exceeds_max_delay_synchronous():
 
 def test_ratelimit__contextmanager_synchronous():
     """Test ratelimit decorator with contextmanager - synchronous version
-    Aside from using __enter__ and __exit__, all behavior is identical to the decorator version,
-    so this only needs one test case
+
+    Aside from using __enter__ and __exit__, all behavior is identical
+    to the decorator version, so this only needs one test case
+
     """
     limiter = Limiter(RequestRate(10, Duration.SECOND))
     identity = uuid4()
@@ -96,7 +101,7 @@ def test_ratelimit__contextmanager_synchronous():
 
 @pytest.mark.asyncio
 async def test_ratelimit__async():
-    """ Test ratelimit decorator - async version """
+    """Test async version ratelimit decorator"""
     limiter = Limiter(RequestRate(10, Duration.SECOND))
 
     @limiter.ratelimit(uuid4())
@@ -118,33 +123,36 @@ async def test_ratelimit__async():
 
 @pytest.mark.asyncio
 async def test_ratelimit__delay_async():
-    """ Test ratelimit decorator with automatic delays - async version """
+    """Test async verions ratelimit decorator with automatic delays"""
     limiter = Limiter(RequestRate(10, Duration.SECOND))
 
     @limiter.ratelimit(uuid4(), delay=True)
     async def limited_function():
         pass
 
-    # This should insert appropriate delays to stay within the rate limit
+    # This should insert appropriate delays to stay within the rate
+    # limit
     tasks = [limited_function() for _ in range(22)]
     start = time()
     await asyncio.gather(*tasks)
 
-    # Exact time will depend on the test environment, but it should be slightly more than 2 seconds
+    # Exact time will depend on the test environment, but it should be
+    # slightly more than 2 seconds
     elapsed = time() - start
     assert 2 < elapsed <= 3
 
 
 @pytest.mark.asyncio
 async def test_ratelimit__exceeds_max_delay_async():
-    """ Test ratelimit decorator with automatic delays - async version """
+    """Test async version ratelimit decorator with automatic delays"""
     limiter = Limiter(RequestRate(5, Duration.MINUTE))
 
     @limiter.ratelimit(uuid4(), delay=True, max_delay=10)
     async def limited_function():
         pass
 
-    # This should exceed the rate limit, with a delay above max_delay, and raise an error
+    # This should exceed the rate limit, with a delay above max_delay,
+    # and raise an error
     tasks = [limited_function() for _ in range(10)]
     with pytest.raises(BucketFullException):
         await asyncio.gather(*tasks)
@@ -152,9 +160,12 @@ async def test_ratelimit__exceeds_max_delay_async():
 
 @pytest.mark.asyncio
 async def test_ratelimit__contextmanager_async():
-    """Test ratelimit decorator with contextmanager - async version
-    Aside from using __aenter__ and __aexit__, all behavior is identical to the decorator version,
-    so this only needs one test case
+    """Test async version ratelimit decorator with contextmanager
+
+    Aside from using __aenter__ and __aexit__, all behavior is
+    identical to the decorator version, so this only needs one test
+    case
+
     """
     limiter = Limiter(RequestRate(10, Duration.SECOND))
     identity = uuid4()

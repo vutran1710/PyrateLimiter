@@ -1,11 +1,11 @@
 """ Basic Rate-Limiter
 """
-from typing import Dict, Union, Type
+from typing import Union, Type
 from time import time
-from .exceptions import InvalidParams, BucketFullException
-from .request_rate import RequestRate
-from .bucket import AbstractBucket, MemoryQueueBucket
-from .limit_context_decorator import LimitContextDecorator
+from pyrate_limiter.exceptions import InvalidParams, BucketFullException
+from pyrate_limiter.request_rate import RequestRate
+from pyrate_limiter.bucket import AbstractBucket, MemoryQueueBucket
+from pyrate_limiter.limit_context_decorator import LimitContextDecorator
 
 
 class Limiter:

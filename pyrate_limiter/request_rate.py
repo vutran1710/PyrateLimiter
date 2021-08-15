@@ -1,5 +1,5 @@
 from enum import Enum
-from .exceptions import ImmutableClassProperty
+from pyrate_limiter.exceptions import ImmutableClassProperty
 
 
 class ResetTypes(Enum):

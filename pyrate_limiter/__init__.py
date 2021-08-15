@@ -1,8 +1,9 @@
 """PyrateLimiter
+
 """
 
-from .bucket import *
-from .limiter import *
-from .request_rate import *
-from .constants import *
-from .exceptions import *
+from pyrate_limiter.bucket import *
+from pyrate_limiter.limiter import *
+from pyrate_limiter.request_rate import *
+from pyrate_limiter.constants import *
+from pyrate_limiter.exceptions import *
