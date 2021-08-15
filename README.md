@@ -1,6 +1,7 @@
 <img align="left" width="95" height="120" src="https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/img/log.png">
 
 # PyrateLimiter
+
 The request rate limiter using Leaky-bucket algorithm
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
@@ -14,12 +15,17 @@ The request rate limiter using Leaky-bucket algorithm
 <br>
 
 ## Introduction
-This module can be used to apply rate-limit for API request. User defines window duration and the limit of function calls within such interval.
-To hold the state of the Bucket, you can use MemoryListBucket/MemoryQueueBucket as internal bucket.
-To use PyrateLimiter with Redis, redis-py is required to be installed.
-It is also possible to use your own Bucket implementation, by extending AbstractBucket from pyrate_limiter.core
+
+This module can be used to apply rate-limit for API request. User
+defines window duration and the limit of function calls within such
+interval.  To hold the state of the Bucket, you can use
+`MemoryListBucket` / `MemoryQueueBucket` as internal bucket.  To use
+PyrateLimiter with REDIS, redis-py is required to be installed.  It is
+also possible to use your own Bucket implementation, by extending
+`AbstractBucket` from `pyrate_limiter.core`.
 
 ## Available modules
+
 ```python
 from pyrate_limiter import (
 	BucketFullException,
@@ -35,42 +41,56 @@ from pyrate_limiter import (
 
 ### Subscription strategies
 
-Considering API throttling logic for usual business models of Subscription, we usually see strategies somewhat similar to these.
+Considering API throttling logic for usual business models of
+Subscription, we usually see strategies somewhat similar to these.
 
-``` shell
+```shell
 Some commercial/free API (Linkedin, Github etc)
 - 500 requests/hour, and
 - 1000 requests/day, and
 - maximum 10,000 requests/month
 ```
 
-- [x] `RequestRate` class is designed to describe this strategies - eg for the above strategies we have a Rate-Limiter defined
-as following
+- [x] `RequestRate` class is designed to describe this strategies - eg
+for the above strategies we have a Rate-Limiter defined as following
 
-``` python
-hourly_rate = RequestRate(500, Duration.HOUR) # maximum 500 requests/hour
-daily_rate = RequestRate(1000, Duration.DAY) # maximum 1000 requests/day
-monthly_rate = RequestRate(10000, Duration.MONTH) # and so on
+```python
+hourly_rate = RequestRate(500, Duration.HOUR)  # maximum 500 requests/hour
+daily_rate = RequestRate(1000, Duration.DAY)  # maximum 1000 requests/day
+monthly_rate = RequestRate(10000, Duration.MONTH)  # and so on
 
-limiter = Limiter(hourly_rate, daily_rate, monthly_rate, *other_rates, bucket_class=MemoryListBucket) # default is MemoryQueueBucket
+limiter = Limiter(
+    hourly_rate,
+    daily_rate,
+    monthly_rate,
+    *other_rates,
+    bucket_class=MemoryListBucket  # default is MemoryQueueBucket
+)
 
 # usage
 identity = user_id # or ip-address, or maybe both
 limiter.try_acquire(identity)
 ```
 
-As the logic is pretty self-explainatory, note that the superior rate-limit must come after the inferiors, ie
-1000 req/day must be declared after an hourly-rate-limit, and the daily-limit must be larger than hourly-limit.
+As the logic is pretty self-explainatory, note that the superior
+rate-limit must come after the inferiors, ie 1000 req/day must be
+declared after an hourly-rate-limit, and the daily-limit must be
+larger than hourly-limit.
 
-- [x] `bucket_class` is the type of bucket that holds request. It could be an in-memory data structure like Python List (`MemoryListBucket`), or Queue `MemoryQueueBucket`.
+- [x] `bucket_class` is the type of bucket that holds request. It
+      could be an in-memory data structure like a Python list
+      `MemoryListBucket`, or a queue `MemoryQueueBucket`.
 
 
-- [x] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
-	  request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case, and required
-	  `redis-py` as its peer-dependency. The usage difference is when using Redis, a naming `prefix` must be provide so
-	  the keys can be distinct for each item's identity.
+- [x] For microservices or decentralized platform, multiple
+	  rate-Limiter may share a single store for storing request-rate
+	  history, ie REDIS. This lib provides a ready-use `RedisBucket`
+	  to handle such case, and required `redis-py` as its
+	  peer-dependency. The usage difference is when using REDIS, a
+	  naming `prefix` must be provided so the keys can be distinct for
+	  each item's identity.
 
-``` python
+```python
 from redis import ConnectionPool
 
 pool = ConnectionPool.from_url('redis://localhost:6379')
@@ -91,7 +111,11 @@ limiter.try_acquire(item)
 ```
 
 ### BucketFullException
-If the Bucket is full, an exception *BucketFullException* will be raised, with meta-info about the identity it received, the rate that has raised, and the remaining time until the next request can be processed.
+
+If the Bucket is full, an exception `BucketFullException` will be
+raised, with meta info about the identity it received, the rate that
+has raised, and the remaining time until the next request can be
+processed.
 
 ```python
 rate = RequestRate(3, 5 * Duration.SECOND)
@@ -111,36 +135,45 @@ except BucketFullException as err:
 	# {'error': 'Bucket for vutran with Rate 3/5 is already full', 'identity': 'tranvu', 'rate': '5/5', 'remaining_time': 2}
 ```
 
-- [ ] *RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
+- [ ] *RequestRate may be required to `reset` on a fixed schedule, eg:
+      every first-day of a month
 
 ### Decorator
-Rate-limiting is also available in decorator form, using `Limiter.ratelimit`. Example:
+
+Rate-limiting is also available in decorator form, using
+`Limiter.ratelimit`. Example:
+
 ```python
 @limiter.ratelimit(item)
 def my_function():
     do_stuff()
 ```
 
-As with `Limiter.try_acquire`, if calls to the wrapped function exceed the rate limits you
-defined, a `BucketFullException` will be raised.
+As with `Limiter.try_acquire`, if calls to the wrapped function exceed
+the rate limits you defined, a `BucketFullException` will be raised.
 
 ### Rate-limiting delays
-In some cases, you may want to simply slow down your calls to stay within the rate limits instead of
-canceling them. In that case you can use the `delay` flag, optionally with a `max_delay`
-(in seconds) that you are willing to wait in between calls.
+
+In some cases, you may want to simply slow down your calls to stay
+within the rate limits instead of canceling them. In that case you can
+use the `delay` flag, optionally with a `max_delay` (in seconds) that
+you are willing to wait in between calls.
 
 Example:
+
 ```python
 @limiter.ratelimit(item, delay=True, max_delay=10)
 def my_function():
     do_stuff()
 ```
 
-In this case, calls may be delayed by at most 10 seconds to stay within the rate limits; any longer
-than that, and a `BucketFullException` will be raised instead. Without specifying `max_delay`, calls
-will be delayed as long as necessary.
+In this case, calls may be delayed by at most 10 seconds to stay
+within the rate limits; any longer than that, and a
+`BucketFullException` will be raised instead. Without specifying
+`max_delay`, calls will be delayed as long as necessary.
 
 ### Contextmanager
+
 `Limiter.ratelimit` also works as a contextmanager:
 
 ```python
@@ -150,7 +183,10 @@ def my_function():
 ```
 
 ### Async decorator/contextmanager
-All the above features of `Limiter.ratelimit` also work on async functions:
+
+All the above features of `Limiter.ratelimit` also work on async
+functions:
+
 ```python
 @limiter.ratelimit(item, delay=True)
 async def my_function():
@@ -161,11 +197,14 @@ async def my_function():
         await do_stuff()
 ```
 
-When delays are enabled, `asyncio.sleep` will be used instead of `time.sleep`.
+When delays are enabled, `asyncio.sleep` will be used instead of
+`time.sleep`.
 
 ### Examples
-To prove that pyrate-limiter is working as expected, here is a complete example to demonstrate
-rate-limiting with delays:
+
+To prove that pyrate-limiter is working as expected, here is a
+complete example to demonstrate rate-limiting with delays:
+
 ```python
 from time import perf_counter as time
 from pyrate_limiter import Duration, Limiter, RequestRate
@@ -184,6 +223,7 @@ print(f"Ran {n_requests} requests in {time() - start_time:.5f} seconds")
 ```
 
 And an equivalent example for async usage:
+
 ```python
 import asyncio
 from time import perf_counter as time
@@ -206,27 +246,31 @@ asyncio.run(test_ratelimit())
 ```
 
 ### Spam-protection strategies
-- [x] Sometimes, we need a rate-limiter to protect our API from spamming/ddos attack. Some usual strategies for this could be as
-following
 
-``` shell
+- [x] Sometimes, we need a rate-limiter to protect our API from
+  spamming/DDOS attack. Some usual strategies for this could be as
+  following
+
 1. No more than 100 requests/minute, or
 2. 100 request per minute, and no more than 300 request per hour
-```
 
 ### Throttling handling
-When the number of incoming requets go beyond the limit, we can either do..
 
-``` shell
-1. Raise a 429 Http Error, or
+When the number of incoming requets go beyond the limit, we can either
+do..
+
+1. Raise a 429 Too Many Requests HTTP error code, or
 2. Keep the incoming requests, wait then slowly process them one by one.
-```
 
 ### More complex scenario
+
 https://www.keycdn.com/support/rate-limiting#types-of-rate-limits
 
-- [ ] *Sometimes, we may need to apply specific rate-limiting strategies based on schedules/region or some other metrics. It
-requires the capability to `switch` the strategies instantly without re-deploying the whole service.
+- [ ] *Sometimes, we may need to apply specific rate-limiting
+  strategies based on schedules/region or some other metrics. It
+  requires the capability to `switch` the strategies instantly without
+  re-deploying the whole service.
 
 ## Notes
+
 Todo-items marked with (*) are planned for v3 release.
