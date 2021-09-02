@@ -73,7 +73,7 @@ As the logic is pretty self-explainatory, note that the superior rate-limit must
 ``` python
 from redis import ConnectionPool
 
-pool = ConnectionPool.from_url('redis://localhost:6379')
+redis_pool = ConnectionPool.from_url('redis://localhost:6379')
 
 rate = RequestRate(3, 5 * Duration.SECOND)
 
