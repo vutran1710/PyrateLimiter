@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyrate-limiter"
-version = "2.3.4"
+version = "2.3.5"
 description = "Python Rate-Limiter using Leaky-Bucket Algorimth Family"
 authors = ["vutr <me@vutr.io>"]
 license = "MIT"

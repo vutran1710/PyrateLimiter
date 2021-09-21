@@ -27,24 +27,23 @@ class AbstractBucket(ABC):
         """
 
     @abstractmethod
-    def put(self, item) -> int:
-        """Putting an item in the bucket
+    def put(self, item: float) -> int:
+        """Put an item (typically the current time) in the bucket
         Return 1 if successful, else 0
         """
 
     @abstractmethod
-    def get(self, number: int) -> int:
+    def get(self, number: int) -> float:
         """Get items and remove them from the bucket in the FIFO fashion
         Return the number of items that have been removed
         """
 
     @abstractmethod
-    def all_items(self) -> List[int]:
+    def all_items(self) -> List[float]:
         """Return a list as copies of all items in the bucket"""
 
-    def inspect_expired_items(self, time: int) -> Tuple[int, int]:
-        """ Find how many items in bucket that have slipped out of the time-window
-        """
+    def inspect_expired_items(self, time: float) -> Tuple[int, float]:
+        """Find how many items in bucket that have slipped out of the time-window"""
         volume = self.size()
         item_count, remaining_time = 0, 0
 
@@ -179,4 +178,4 @@ class RedisBucket(AbstractBucket):
     def all_items(self):
         conn = self.get_connection()
         items = conn.lrange(self._bucket_name, 0, -1)
-        return [int(i.decode("utf-8")) for i in items]
+        return [float(i.decode("utf-8")) for i in items]
