@@ -4,6 +4,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.3.5] - 2021-09-22
+### Added
+* Support for floating point rate-limiting delays (more granular than 1 second)
+
+## [2.3.4] - 2021-06-01
+### Fixed
+* Bucket group initialization
+
+## [2.3.3] - 2021-05-08
+### Added
+* Support for python 3.6
+
+## [2.3.2] - 2021-05-06
+### Fixed
+* Incorrect type hint
+
+## [2.3.1] - 2021-04-26
+### Added
+* LICENSE file to be included in PyPI package
+
+### Fixed
+* Incorrect delay time when using using `Limiter.ratelimit()` with `delay=True`
+
+## [2.3.0] - 2021-03-01
+### Added
+* Support for using `Limiter.ratelimit()` as a contextmanager or async contextmanager
+* Separate `LimitContextDecorator` class to handle `Limiter.ratelimit()` behavior
+* Package published on conda-forge
+
+## [2.2.2] - 2021-03-03
+### Changed
+* Internal: Reduce cognitive complexity
+
+## [2.2.1] - 2021-03-02
+### Fixed
+* Incorrect check log against time-window
+
+## [2.2.0] - 2021-02-26
+### Added
+* `Limiter.ratelimit()` method, an async-compatible decorator that optionally adds rate-limiting delays
+
+## [2.1.0] - 2021-02-21
+
+## [2.0.3] - 2020-06-01
+
+## [2.0.2] - 2020-06-01
+
+## [2.0.1] - 2020-06-01
+
+## [2.0.0] - 2019-12-29
+
 ## [1.1.0] - 2019-12-17
 ### Removed
 - Code duplication
