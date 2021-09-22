@@ -1,7 +1,7 @@
 """ Basic Rate-Limiter
 """
-from typing import Dict, Union, Type
-from time import time
+from typing import Union, Type
+from time import monotonic
 from .exceptions import InvalidParams, BucketFullException
 from .request_rate import RequestRate
 from .bucket import AbstractBucket, MemoryQueueBucket
@@ -56,7 +56,7 @@ class Limiter:
     def try_acquire(self, *identities) -> None:
         """Acquiring an item or reject it if rate-limit has been exceeded"""
         self._init_buckets(identities)
-        now = int(time())
+        now = monotonic()
 
         for idx, rate in enumerate(self._rates):
             for id in identities:

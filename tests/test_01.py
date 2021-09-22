@@ -65,7 +65,7 @@ def test_simple_01():
         print(err)
         assert str(err)
         assert isinstance(err.meta_info, dict)
-        assert err.meta_info["remaining_time"] == 2
+        assert 1.9 < err.meta_info["remaining_time"] < 2.0
 
     assert has_raised
 
@@ -226,3 +226,20 @@ def test_simple_04():
     with pytest.raises(BucketFullException):
         # Exceed Rate-2 again
         limiter2.try_acquire(item)
+
+
+def test_remaining_time():
+    """The remaining_time metadata returned from a BucketFullException should take into account
+    the time elapsed during limited calls (including values less than 1 second).
+    """
+    limiter2 = Limiter(RequestRate(5, Duration.SECOND))
+    for _ in range(5):
+        limiter2.try_acquire("item")
+    sleep(0.1)
+
+    try:
+        limiter2.try_acquire("item")
+    except BucketFullException as err:
+        delay_time = err.meta_info["remaining_time"]
+
+    assert 0.8 < delay_time < 0.9
