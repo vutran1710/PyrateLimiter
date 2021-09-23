@@ -21,17 +21,18 @@ before_install:
 install:
   - poetry install
 
-jobs:
-  include:
-    - stage: Check
-      script: poetry run cover
-    - stage: Publish
-      if: branch = master
-      script: skip
-      before_deploy:
-        - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
-        - poetry build -f sdist
-      deploy:
-        provider: script
-        script: poetry publish
-        skip_cleanup: true
+# Run tests for all python versions
+script:
+  - poetry run cover
+
+# Publish package only for master branch
+before_deploy:
+  - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
+  - poetry build -f sdist
+deploy:
+  provider: script
+  script: poetry publish
+  skip_cleanup: true
+  on:
+    branch: master
+
