@@ -6,3 +6,4 @@ htmlcov/
 env/
 .vim/
 .vscode/
+.coveralls.yml
