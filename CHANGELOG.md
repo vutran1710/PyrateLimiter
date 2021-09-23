@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [2.3.5] - 2021-09-22
 ### Added
+* Use `time.monotonic()` instead of `time.time()`
 * Support for floating point rate-limiting delays (more granular than 1 second)
 
 ## [2.3.4] - 2021-06-01

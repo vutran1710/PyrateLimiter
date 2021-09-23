@@ -1,4 +1,6 @@
-from time import sleep
+from time import sleep, time
+from unittest.mock import Mock
+
 import pytest
 from pyrate_limiter import (
     ImmutableClassProperty,
@@ -12,25 +14,26 @@ from pyrate_limiter import (
 
 
 def test_sleep():
+    """Make requests at a rate of 6 requests per 5 seconds (avg. 1.2 requests per second).
+    If each request takes ~0.5 seconds, then the bucket should be full after 6 requests.
+    Run 15 requests, and expect a total of 2 delays required to stay within the rate limit.
+    """
     rate = RequestRate(6, 5 * Duration.SECOND)
-    iterations = 10
     limiter = Limiter(rate)
-    push, sleep_count = 0, 0
+    track_sleep = Mock(side_effect=sleep)  # run time.sleep() and track the number of calls
+    start = time()
 
-    for i in range(iterations):
+    for i in range(15):
         try:
-            for _ in range(2):
-                limiter.try_acquire("test")
-                push += 1
-            print(f"Pushed: {push} items")
-            sleep(1)
+            limiter.try_acquire("test")
+            print(f"[{time() - start:07.4f}] Pushed: {i+1} items")
+            sleep(0.5)
         except BucketFullException as e:
-            sleep_time = e.meta_info["remaining_time"]
-            print(f"Stuck at {i}, sleep for {sleep_time}")
-            sleep_count += 1
-            sleep(sleep_time)
+            print(e.meta_info)
+            track_sleep(e.meta_info["remaining_time"])
 
-    assert sleep_count == 2
+    print(f"Elapsed: {time() - start:07.4f} seconds")
+    assert track_sleep.call_count == 2
 
 
 def test_simple_01():
