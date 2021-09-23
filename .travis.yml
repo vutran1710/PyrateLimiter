@@ -6,15 +6,6 @@ python:
   - "3.8"
   - "3.9"
 
-branches:
-  only:
-  - master
-  - release
-
-stages:
-  - Check
-  - Publish
-
 before_install:
   - pip install poetry
 
@@ -25,14 +16,17 @@ install:
 script:
   - poetry run cover
 
-# Publish package only for master branch
-before_deploy:
-  - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
-  - poetry build -f sdist
-deploy:
-  provider: script
-  script: poetry publish
-  skip_cleanup: true
-  on:
-    branch: master
-
+# Publish package only for master branch, after all tests have passed
+jobs:
+  include:
+    - stage: deploy
+      python: 3.9
+      script: skip
+      before_deploy:
+        - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
+        - poetry build -f sdist
+      deploy:
+        provider: script
+        script: poetry publish
+        on:
+          branch: master

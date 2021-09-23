@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.3.6] - 2021-09-23
+* Run CI tests for all supported python versions
+* Fix issue with deployments on Travis CI
+
 ## [2.3.5] - 2021-09-22
 ### Added
 * Use `time.monotonic()` instead of `time.time()`
