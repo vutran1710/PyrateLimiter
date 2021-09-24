@@ -30,3 +30,4 @@ jobs:
         script: poetry publish
         on:
           branch: master
+        skip_cleanup: true
