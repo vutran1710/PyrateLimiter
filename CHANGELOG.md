@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.3.7] - 2021-09-30
+* Add `RedisClusterBucket` to support using `PyrateLimiter` with `redis-py-cluster`
+* Update README, add Table of Content
+
 ## [2.3.6] - 2021-09-23
 * Run CI tests for all supported python versions
 * Fix issue with deployments on Travis CI
