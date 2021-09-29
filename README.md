@@ -8,9 +8,26 @@ The request rate limiter using Leaky-bucket algorithm
 [![Coverage Status](https://coveralls.io/repos/github/vutran1710/PyrateLimiter/badge.svg?branch=master)](https://coveralls.io/github/vutran1710/PyrateLimiter?branch=master)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/vutran1710/PyrateLimiter/graphs/commit-activity)
 [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/pyrate-limiter/)
-[![HitCount](http://hits.dwyl.io/vutran1710/PyrateLimiter.svg)](http://hits.dwyl.io/vutran1710/PyrateLimiter)
 
 <br>
+
+- [PyrateLimiter](#pyratelimiter)
+  * [Introduction](#introduction)
+  * [Available modules](#available-modules)
+  * [Strategies](#strategies)
+    + [Subscription strategies](#subscription-strategies)
+    + [BucketFullException](#bucketfullexception)
+    + [Decorator](#decorator)
+    + [Rate-limiting delays](#rate-limiting-delays)
+    + [Contextmanager](#contextmanager)
+    + [Async decorator/contextmanager](#async-decorator-contextmanager)
+    + [Examples](#examples)
+    + [Spam-protection strategies](#spam-protection-strategies)
+    + [Throttling handling](#throttling-handling)
+    + [More complex scenario](#more-complex-scenario)
+  * [Notes](#notes)
+
+<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
 
 ## Introduction
 This module can be used to apply rate-limit for API request. User defines window duration and the limit of function calls within such interval.
@@ -21,12 +38,12 @@ It is also possible to use your own Bucket implementation, by extending Abstract
 ## Available modules
 ```python
 from pyrate_limiter import (
-	BucketFullException,
-	Duration,
-	RequestRate,
-	Limiter,
-	MemoryListBucket,
-	MemoryQueueBucket,
+    BucketFullException,
+    Duration,
+    RequestRate,
+    Limiter,
+    MemoryListBucket,
+    MemoryQueueBucket,
 )
 ```
 
@@ -65,11 +82,10 @@ As the logic is pretty self-explainatory, note that the superior rate-limit must
 
 
 - [x] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
-	  request-rate history, ie `Redis`. This lib provides a ready-use `RedisBucket` to handle such case, and required
-	  `redis-py` as its peer-dependency. The usage difference is when using Redis, a naming `prefix` must be provide so
-	  the keys can be distinct for each item's identity.
+      request-rate history, ie `Redis`. This lib provides ready-to-use `RedisBucket` (`redis-py` is required), and `RedisClusterBucket` (with `redis-py-cluster` being required). The usage difference is when using Redis, a naming `prefix` must be provide so the keys can be distinct for each item's identity.
 
 ``` python
+from pyrate_limiter.bucket import RedisBucket, RedisClusterBucket
 from redis import ConnectionPool
 
 redis_pool = ConnectionPool.from_url('redis://localhost:6379')
@@ -77,14 +93,16 @@ redis_pool = ConnectionPool.from_url('redis://localhost:6379')
 rate = RequestRate(3, 5 * Duration.SECOND)
 
 bucket_kwargs = {
-	"redis_pool": redis_pool,
-	"bucket_name": "my-ultimate-bucket-prefix"
+    "redis_pool": redis_pool,
+    "bucket_name": "my-ultimate-bucket-prefix"
 }
 
 # so each item buckets will have a key name as
 # my-ultimate-bucket-prefix__item-identity
 
 limiter = Limiter(rate, bucket_class=RedisBucket, bucket_kwargs=bucket_kwargs)
+# or RedisClusterBucket when used with a redis cluster
+# limiter = Limiter(rate, bucket_class=RedisClusterBucket, bucket_kwargs=bucket_kwargs)
 item = 'vutran_item'
 limiter.try_acquire(item)
 ```
@@ -99,15 +117,15 @@ item = 'vutran'
 
 has_raised = False
 try:
-	for _ in range(4):
-		limiter.try_acquire(item)
-		sleep(1)
+    for _ in range(4):
+        limiter.try_acquire(item)
+        sleep(1)
 except BucketFullException as err:
-	has_raised = True
-	assert str(err)
-	# Bucket for vutran with Rate 3/5 is already full
-	assert isinstance(err.meta_info, dict)
-	# {'error': 'Bucket for vutran with Rate 3/5 is already full', 'identity': 'tranvu', 'rate': '5/5', 'remaining_time': 2}
+    has_raised = True
+    assert str(err)
+    # Bucket for vutran with Rate 3/5 is already full
+    assert isinstance(err.meta_info, dict)
+    # {'error': 'Bucket for vutran with Rate 3/5 is already full', 'identity': 'tranvu', 'rate': '5/5', 'remaining_time': 2}
 ```
 
 - [ ] *RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month

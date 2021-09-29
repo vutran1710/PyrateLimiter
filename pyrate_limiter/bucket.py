@@ -1,10 +1,11 @@
 """ Implement this class to create
 a workable bucket for Limiter to use
 """
-from typing import List, Tuple
 from abc import ABC, abstractmethod
 from queue import Queue
 from threading import RLock
+from typing import List, Tuple
+
 from .exceptions import InvalidParams
 
 
@@ -155,7 +156,7 @@ class RedisBucket(AbstractBucket):
         return conn.llen(self._bucket_name)
 
     def put(self, item):
-        conn = conn = self.get_connection()
+        conn = self.get_connection()
         current_size = conn.llen(self._bucket_name)
 
         if current_size < self.maxsize():
@@ -179,3 +180,13 @@ class RedisBucket(AbstractBucket):
         conn = self.get_connection()
         items = conn.lrange(self._bucket_name, 0, -1)
         return [float(i.decode("utf-8")) for i in items]
+
+
+class RedisClusterBucket(RedisBucket):
+    """A bucket with RedisCluster"""
+
+    def get_connection(self):
+        """Obtain a connection from redis pool"""
+        from rediscluster import RedisCluster
+
+        return RedisCluster(connection_pool=self._pool)
