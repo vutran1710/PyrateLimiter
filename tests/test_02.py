@@ -1,21 +1,12 @@
 """ Testing with RedisBucket
 """
 from time import sleep
+
 import pytest
-
-from pyrate_limiter import (
-    BucketFullException,
-    Duration,
-    RequestRate,
-    Limiter,
-    RedisBucket,
-)
-
 from fakeredis import FakeStrictRedis
+from pyrate_limiter import (BucketFullException, Duration, Limiter,
+                            RedisBucket, RedisClusterBucket, RequestRate)
 
-# pool = ConnectionPool.from_url('redis://localhost:6379')
-# conn = Redis(connection_pool=pool)
-# conn.flushall()
 dummy_redis = FakeStrictRedis()
 pool = dummy_redis.connection_pool
 
@@ -115,3 +106,13 @@ def test_simple_02():
     with pytest.raises(BucketFullException):
         # Exceed Rate-2 again
         limiter4.try_acquire(item)
+
+
+def test_redis_cluster():
+    "Testing RedisClusterBucket initialization"
+    rate = RequestRate(3, 5 * Duration.SECOND)
+    Limiter(
+        rate,
+        bucket_class=RedisClusterBucket,
+        bucket_kwargs={"redis_pool": pool, "bucket_name": "test-bucket-1"},
+    )

@@ -187,4 +187,6 @@ class RedisClusterBucket(RedisBucket):
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
+        from rediscluster import RedisCluster
+
         return RedisCluster(connection_pool=self._pool)
