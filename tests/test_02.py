@@ -111,8 +111,11 @@ def test_simple_02():
 def test_redis_cluster():
     "Testing RedisClusterBucket initialization"
     rate = RequestRate(3, 5 * Duration.SECOND)
+    bucket = RedisClusterBucket(pool=pool, bucket_name="any-name", identity="id-string")
     Limiter(
         rate,
         bucket_class=RedisClusterBucket,
         bucket_kwargs={"redis_pool": pool, "bucket_name": "test-bucket-1"},
     )
+
+    assert bucket.get_connection()
