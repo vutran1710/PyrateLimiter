@@ -1,4 +1,5 @@
 import sqlite3
+from hashlib import sha1
 from os.path import join
 from tempfile import gettempdir
 from typing import List
@@ -13,16 +14,20 @@ class SQLiteBucket(AbstractBucket):
         maxsize: Maximum number of items in the bucket
         identity: Bucket identity, used as the table name
         path: Path to the SQLite database file; defaults to a temp file in the system temp directory
-            Use ``:memory:`` to use an in-memory database.
         kwargs: Additional keyword arguments for :py:func:`sqlite3.connect`
     """
 
-    def __init__(self, maxsize=0, identity: str = "default_bucket", path: str = None, **kwargs):
+    def __init__(self, maxsize=0, identity: str = None, path: str = None, **kwargs):
         super().__init__(maxsize=maxsize)
         self._connection = None
         self.connection_kwargs = kwargs
         self.path = path or join(gettempdir(), "pyrate_limiter.sqlite")
-        self.table = identity
+
+        if not identity:
+            raise ValueError("Bucket identity is required")
+
+        # Hash identity to use as a table name, to avoid potential issues with user-provided values
+        self.table = f"ratelimit_{sha1(identity.encode()).hexdigest()}"
 
     @property
     def connection(self) -> sqlite3.Connection:

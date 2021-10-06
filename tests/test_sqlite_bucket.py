@@ -9,28 +9,36 @@ import pytest
 from pyrate_limiter.sqlite_bucket import SQLiteBucket
 
 
+def get_test_bucket():
+    return SQLiteBucket(identity="id", path=":memory:", maxsize=1000)
+
+
 def test_init():
-    """Just make sure that the system temp directory is used unless a path is provided"""
-    assert SQLiteBucket().path.startswith(gettempdir())
-    assert SQLiteBucket(path="bucket.db").path == "bucket.db"
+    # The system temp directory should be used unless a path is provided
+    assert SQLiteBucket(identity="id").path.startswith(gettempdir())
+    assert SQLiteBucket(identity="id", path="bucket.db").path == "bucket.db"
+
+    # An identity is required since it's used as the table name
+    with pytest.raises(ValueError):
+        SQLiteBucket()
 
 
 def test_close():
-    bucket = SQLiteBucket(path=":memory:")
+    bucket = get_test_bucket()
     connection = bucket.connection
     bucket.close()
     with pytest.raises(ProgrammingError):
         connection.execute("SELECT * FROM default_bucket")
 
     # Closing an unopened connection should have no effect
-    bucket = SQLiteBucket(path=":memory:")
+    bucket = get_test_bucket()
     bucket.close()
     assert bucket._connection is None
 
 
 def test_put_get_size():
     """Test put, get, and size methods"""
-    bucket = SQLiteBucket(path=":memory:", maxsize=1000)
+    bucket = get_test_bucket()
     for i in range(1000):
         bucket.put(i)
     assert bucket.size() == 1000
@@ -47,7 +55,7 @@ def test_put_get_size():
 
 def test_maxsize():
     """Test that no more items can be added when the bucket is full"""
-    bucket = SQLiteBucket(path=":memory:", maxsize=1000)
+    bucket = get_test_bucket()
     for i in range(1000):
         assert bucket.put(i) == 1
     assert bucket.put(1) == 0
@@ -55,14 +63,14 @@ def test_maxsize():
 
 
 def test_all_items():
-    bucket = SQLiteBucket(path=":memory:", maxsize=1000)
+    bucket = get_test_bucket()
     for i in range(10):
         bucket.put(i + 0.1)
     assert bucket.all_items() == [0.1, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1, 9.1]
 
 
 def test_inspect_expired_items():
-    bucket = SQLiteBucket(path=":memory:", maxsize=1000)
+    bucket = get_test_bucket()
     current_time = time()
 
     # Add 30 items at 1-second intervals
