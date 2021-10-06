@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.5.0] - 2021-10-TBD
+### Added
+* SQLite bucket backend
+
 ## [2.4.6] - 2021-09-30
 * Add `RedisClusterBucket` to support using `PyrateLimiter` with `redis-py-cluster`
 * Update README, add Table of Content

@@ -1,4 +1,3 @@
-# TODO: Tests, docs, performance profiling
 import sqlite3
 from os.path import join
 from tempfile import gettempdir
