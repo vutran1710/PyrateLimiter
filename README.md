@@ -14,6 +14,11 @@ The request rate limiter using Leaky-bucket algorithm
 - [PyrateLimiter](#pyratelimiter)
   * [Introduction](#introduction)
   * [Available modules](#available-modules)
+  * [Bucket backends](#bucket-backends)
+    + [Memory](#memory)
+    + [SQLite](#sqlite)
+    + [Redis](#redis)
+    + [Custom backends](#custom-backends)
   * [Strategies](#strategies)
     + [Subscription strategies](#subscription-strategies)
     + [BucketFullException](#bucketfullexception)
@@ -28,13 +33,8 @@ The request rate limiter using Leaky-bucket algorithm
   * [Development](#development)
   * [Notes](#notes)
 
-<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
-
 ## Introduction
 This module can be used to apply rate-limit for API request. User defines window duration and the limit of function calls within such interval.
-To hold the state of the Bucket, you can use MemoryListBucket/MemoryQueueBucket as internal bucket.
-To use PyrateLimiter with Redis, redis-py is required to be installed.
-It is also possible to use your own Bucket implementation, by extending AbstractBucket from pyrate_limiter.core
 
 ## Available modules
 ```python
@@ -45,8 +45,65 @@ from pyrate_limiter import (
     Limiter,
     MemoryListBucket,
     MemoryQueueBucket,
+    SQLiteBucket,
+    RedisBucket,
+    RedisClusterBucket,
 )
 ```
+
+## Bucket backends
+A few different bucket backends are available, which can be selected using the `bucket_class`
+argument for `Limiter`. Any additional backend-specific arguments can be passed
+via `bucket_kwargs`.
+
+### Memory
+The default bucket is stored in memory, backed by a `queue.Queue`. A list implementation is also available:
+```python
+from pyrate_limiter import Limiter, MemoryListBucket
+
+limiter = Limiter(bucket_class=MemoryListBucket)
+```
+
+### SQLite
+If you need to persist the bucket state, a SQLite backend is available.
+
+By default it will store the state in the system temp directory, and you can use
+the `path` argument to use a different location:
+```python
+from pyrate_limiter import Limiter, SQLiteBucket
+
+limiter = Limiter(
+    bucket_class=SQLiteBucket,
+    bucket_kwargs={'path': '/tmp/pyrate_limiter.sqlite'},
+)
+```
+
+### Redis
+If you have a larger, distributed application, Redis is an ideal backend. This
+option requires [redis-py](https://github.com/andymccurdy/redis-py).
+
+You can use the `redis_pool` argument to pass any connection settings:
+```python
+from pyrate_limiter import Limiter, RedisBucket
+from redis import ConnectionPool
+
+redis_pool = ConnectionPool(host='localhost', port=6379, db=0)
+limiter = Limiter(
+    bucket_class=RedisBucket,
+    bucket_kwargs={'redis_pool': redis_pool},
+)
+```
+
+Redis clusters are also supported, which requires
+[redis-py-cluster](https://github.com/Grokzen/redis-py-cluster):
+```python
+from pyrate_limiter import Limiter, RedisClusterBucket
+
+limiter = Limiter(bucket_class=RedisClusterBucket)
+```
+
+### Custom backends
+If these don't suit your needs, you can also create your own bucket backend by extending `pyrate_limiter.bucket.AbstractBucket`.
 
 ## Strategies
 
@@ -109,7 +166,7 @@ limiter.try_acquire(item)
 ```
 
 ### BucketFullException
-If the Bucket is full, an exception *BucketFullException* will be raised, with meta-info about the identity it received, the rate that has raised, and the remaining time until the next request can be processed.
+If the Bucket is full, an exception `BucketFullException` will be raised, with meta-info about the identity it received, the rate that has raised, and the remaining time until the next request can be processed.
 
 ```python
 rate = RequestRate(3, 5 * Duration.SECOND)
