@@ -97,7 +97,7 @@ class LimitContextDecorator:
         """
         delay_time = err.meta_info["remaining_time"]
         logger.debug(err.meta_info)
-        logger.info(f"Rate limit reached; {delay_time} seconds remaining before next request")
+        logger.info("Rate limit reached; % seconds remaining before next request", delay_time)
         exceeded_max_delay = bool(self.max_delay) and (delay_time > self.max_delay)
         if self.delay and not exceeded_max_delay:
             return delay_time

@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "pyrate-limiter"
-version = "2.4.6"
+version = "2.4.7"
 description = "Python Rate-Limiter using Leaky-Bucket Algorimth Family"
 authors = ["vutr <me@vutr.io>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/vutran1710/PyrateLimiter"
 repository = "https://github.com/vutran1710/PyrateLimiter"
-keywords = ["rate", "rate-limiter", "rate_limiter", "ratelimiter", "leaky-bucket"]
+keywords = ["rate", "rate-limiter", "rate_limiter", "ratelimiter", "leaky-bucket", "ratelimit", "ratelimiting"]
 classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Documentation",
@@ -18,7 +18,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.6.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.4"
@@ -37,14 +37,18 @@ radon = "^4.3.2"
 flake8_polyfill = "^1.0.2"
 PyYAML = "^5.4.1"
 redis-py-cluster = "^2.1.3"
+django-redis = "^5.0.0"
+Django = "^3.2.8"
+isort = "^5.9.3"
 
 [tool.poetry.scripts]
 test = 'scripts:test'
 lint = 'scripts:lint'
 cover = 'scripts:cover'
+format = 'scripts:format'
 
 [tool.black]
-line-length = 100
+line-length = 120
 
 [tool.ipdb]
 context=7
