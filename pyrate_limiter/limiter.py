@@ -45,13 +45,12 @@ class Limiter:
         """Setup Queue for each Identity if needed
         Queue's maxsize equals the max limit of request-rates
         """
-        for id in identities:
-            if not self.bucket_group.get(id):
+        for item_id in identities:
+            if not self.bucket_group.get(item_id):
                 maxsize = self._rates[-1].limit
-                # print(self._bucket_args)
-                self.bucket_group[id] = self._bkclass(
+                self.bucket_group[item_id] = self._bkclass(
                     maxsize=maxsize,
-                    identity=id,
+                    identity=item_id,
                     **self._bucket_args,
                 )
 
@@ -61,8 +60,8 @@ class Limiter:
         now = monotonic()
 
         for idx, rate in enumerate(self._rates):
-            for id in identities:
-                bucket = self.bucket_group[id]
+            for item_id in identities:
+                bucket = self.bucket_group[item_id]
                 volume = bucket.size()
 
                 if volume < rate.limit:
@@ -73,14 +72,14 @@ class Limiter:
                 item_count, remaining_time = bucket.inspect_expired_items(start_time)
 
                 if item_count >= rate.limit:
-                    raise BucketFullException(id, rate, remaining_time)
+                    raise BucketFullException(item_id, rate, remaining_time)
 
                 if idx == len(self._rates) - 1:
                     # We remove item based on the request-rate with the max-limit
                     bucket.get(volume - item_count)
 
-        for id in identities:
-            self.bucket_group[id].put(now)
+        for item_id in identities:
+            self.bucket_group[item_id].put(now)
 
     def ratelimit(
         self,

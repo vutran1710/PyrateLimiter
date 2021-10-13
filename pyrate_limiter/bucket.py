@@ -141,7 +141,7 @@ class RedisBucket(AbstractBucket):
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
-        from redis import Redis  # noqa
+        from redis import Redis  # pylint: disable=import-outside-toplevel
 
         return Redis(connection_pool=self._pool)
 
@@ -187,6 +187,7 @@ class RedisClusterBucket(RedisBucket):
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
-        from rediscluster import RedisCluster  # noqa
+        from rediscluster import \
+            RedisCluster  # pylint: disable=import-outside-toplevel
 
         return RedisCluster(connection_pool=self._pool)
