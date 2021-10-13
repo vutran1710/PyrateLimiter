@@ -59,7 +59,6 @@ class Limiter:
         """Acquiring an item or reject it if rate-limit has been exceeded"""
         self._init_buckets(identities)
         now = monotonic()
-        print(">>>>>>>> tick tock", now)
 
         for idx, rate in enumerate(self._rates):
             for id in identities:

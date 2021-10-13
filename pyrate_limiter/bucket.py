@@ -63,7 +63,7 @@ class MemoryQueueBucket(AbstractBucket):
     """
 
     def __init__(self, maxsize=0, **_kwargs):
-        super(MemoryQueueBucket, self).__init__()
+        super().__init__()
         self._q = Queue(maxsize=maxsize)
 
     def size(self):
@@ -90,7 +90,7 @@ class MemoryListBucket(AbstractBucket):
     """
 
     def __init__(self, maxsize=0, **_kwargs):
-        super(MemoryListBucket, self).__init__(maxsize=maxsize)
+        super().__init__(maxsize=maxsize)
         self._q = []
         self._lock = RLock()
 
@@ -130,7 +130,7 @@ class RedisBucket(AbstractBucket):
         identity: str = None,
         **_kwargs,
     ):
-        super(RedisBucket, self).__init__(maxsize=maxsize)
+        super().__init__(maxsize=maxsize)
 
         if not bucket_name or not isinstance(bucket_name, str):
             msg = "keyword argument bucket-name is missing: a distict name is required"
@@ -141,7 +141,7 @@ class RedisBucket(AbstractBucket):
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
-        from redis import Redis
+        from redis import Redis  # noqa
 
         return Redis(connection_pool=self._pool)
 
@@ -187,6 +187,6 @@ class RedisClusterBucket(RedisBucket):
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
-        from rediscluster import RedisCluster
+        from rediscluster import RedisCluster  # noqa
 
         return RedisCluster(connection_pool=self._pool)

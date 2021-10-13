@@ -1,3 +1,5 @@
+"""Initialize this class to define request-rates for limiter
+"""
 from enum import Enum
 
 from .exceptions import ImmutableClassProperty
