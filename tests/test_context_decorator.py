@@ -5,7 +5,7 @@
 """
 import asyncio
 from logging import getLogger
-from time import time, sleep
+from time import sleep, time
 from uuid import uuid4
 
 import pytest

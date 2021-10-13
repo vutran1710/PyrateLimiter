@@ -1,6 +1,11 @@
 from subprocess import check_call
 
 
+def format():
+    check_call(["black", "pyrate_limiter/"])
+    check_call(["isort", "."])
+
+
 def lint() -> None:
     check_call(["flake8", "pyrate_limiter/"])
     check_call(["pylint", "pyrate_limiter/", "--rcfile=setup.cfg"])
@@ -8,7 +13,9 @@ def lint() -> None:
 
 
 def cover() -> None:
-    check_call(["coverage", "run", "-m", "--source=pyrate_limiter", "pytest", "tests", "--maxfail=1"])
+    check_call(
+        ["coverage", "run", "-m", "--source=pyrate_limiter", "pytest", "tests", "--maxfail=1"]
+    )
     check_call(["coverage", "report", "-m"])
     check_call(["radon", "mi", "-x", "A", "."])
     check_call(["coveralls"])

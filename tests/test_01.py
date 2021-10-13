@@ -2,15 +2,10 @@ from time import sleep, time
 from unittest.mock import Mock
 
 import pytest
-from pyrate_limiter import (
-    ImmutableClassProperty,
-    InvalidParams,
-    BucketFullException,
-    Duration,
-    RequestRate,
-    Limiter,
-    MemoryListBucket,
-)
+
+from pyrate_limiter import (BucketFullException, Duration,
+                            ImmutableClassProperty, InvalidParams, Limiter,
+                            MemoryListBucket, RequestRate)
 
 
 def test_sleep():

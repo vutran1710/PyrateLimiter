@@ -1,11 +1,12 @@
 """ Basic Rate-Limiter
 """
-from typing import Union, Type
 from time import monotonic
-from .exceptions import InvalidParams, BucketFullException
-from .request_rate import RequestRate
+from typing import Type, Union
+
 from .bucket import AbstractBucket, MemoryQueueBucket
+from .exceptions import BucketFullException, InvalidParams
 from .limit_context_decorator import LimitContextDecorator
+from .request_rate import RequestRate
 
 
 class Limiter:
@@ -27,6 +28,7 @@ class Limiter:
         self._bkclass = bucket_class
         self._bucket_args = bucket_kwargs or {}
         self.bucket_group = {}
+        monotonic()
 
     def _validate_rate_list(self, rates):  # pylint: disable=no-self-use
         if not rates:
@@ -57,6 +59,7 @@ class Limiter:
         """Acquiring an item or reject it if rate-limit has been exceeded"""
         self._init_buckets(identities)
         now = monotonic()
+        print(">>>>>>>> tick tock", now)
 
         for idx, rate in enumerate(self._rates):
             for id in identities:
