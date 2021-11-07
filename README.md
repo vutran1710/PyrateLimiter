@@ -222,6 +222,18 @@ async def test_ratelimit():
 asyncio.run(test_ratelimit())
 ```
 
+Limiter can be used with any custom time source. For example user may want to use
+Redis time to use same time in distributed installation. By default `time.monotonic` is
+used. To adjust time source use `time_function` parameter with any no arguments function.
+```python
+from datetime import datetime
+from pyrate_limiter import Duration, Limiter, RequestRate
+from time import time
+
+limiter_datetime = Limiter(RequestRate(5, Duration.SECOND), time_function=lambda: datetime.utcnow().timestamp())
+limiter_time = Limiter(RequestRate(5, Duration.SECOND), time_function=time)
+```
+
 ### Spam-protection strategies
 - [x] Sometimes, we need a rate-limiter to protect our API from spamming/ddos attack. Some usual strategies for this could be as
 following
