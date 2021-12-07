@@ -19,6 +19,7 @@ blocks:
             - checkout
             - pip install poetry
             - poetry install
+    dependencies: []
   - name: Test
     skip:
       when: branch = 'master'
@@ -26,7 +27,12 @@ blocks:
       jobs:
         - name: Check
           commands:
+            - checkout
+            - pip install poetry
+            - poetry install
             - poetry run cover
+    dependencies:
+      - Setup
   - name: Deploy
     run:
       when: branch = 'master'
@@ -34,8 +40,13 @@ blocks:
       jobs:
         - name: Publish
           commands:
+            - checkout
+            - pip install poetry
+            - poetry install
             - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
             - poetry build -f sdist
             - poetry publish
       secrets:
         - name: PYPI
+    dependencies:
+      - Setup
