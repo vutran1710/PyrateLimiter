@@ -16,6 +16,7 @@ blocks:
                 - '3.7'
                 - '3.8'
                 - '3.9'
+              env_var: PYTHON_VERSION
           commands:
             - sem-version python $PYTHON_VERSION
             - checkout
