@@ -5,21 +5,6 @@ agent:
     type: e1-standard-2
     os_image: ubuntu2004
 blocks:
-  - name: Setup
-    task:
-      jobs:
-        - name: Setup
-          matrix:
-            - env_var: PYTHON_VERSION
-              values:
-                - '3.8'
-                - '3.9'
-          commands:
-            - sem-version python $PYTHON_VERSION
-            - checkout
-            - pip install poetry
-            - poetry install
-    dependencies: []
   - name: Test
     skip:
       when: branch = 'master'
@@ -27,12 +12,15 @@ blocks:
       jobs:
         - name: Check
           commands:
+            - sem-version python $PYTHON_VERSION
             - checkout
             - pip install poetry
             - poetry install
             - poetry run cover
-    dependencies:
-      - Setup
+      env_vars:
+        - name: PYTHON_VERSION
+          value: '3.8'
+    dependencies: []
   - name: Deploy
     run:
       when: branch = 'master'
@@ -40,6 +28,7 @@ blocks:
       jobs:
         - name: Publish
           commands:
+            - sem-version python $PYTHON_VERSION
             - checkout
             - pip install poetry
             - poetry install
@@ -48,5 +37,7 @@ blocks:
             - poetry publish
       secrets:
         - name: PYPI
-    dependencies:
-      - Setup
+      env_vars:
+        - name: PYTHON_VERSION
+          value: '3.8'
+    dependencies: []
