@@ -1,6 +1,6 @@
 """Basic Rate-Limiter."""
 from time import monotonic
-from typing import Type, Union, Callable
+from typing import Callable, Type, Union
 
 from .bucket import AbstractBucket, MemoryQueueBucket
 from .exceptions import BucketFullException, InvalidParams
