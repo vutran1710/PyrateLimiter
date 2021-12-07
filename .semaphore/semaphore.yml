@@ -12,8 +12,8 @@ blocks:
           matrix:
             - env_var: PYTHON_VERSION
               values:
-                - '3.6'
-                - '3.7'
+                - '3.8'
+                - '3.9'
           commands:
             - sem-version python $PYTHON_VERSION
             - checkout
