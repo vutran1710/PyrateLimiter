@@ -20,6 +20,8 @@ blocks:
       env_vars:
         - name: PYTHON_VERSION
           value: '3.8'
+      secrets:
+        - name: COVERALLS
     dependencies: []
   - name: Deploy
     run:
@@ -32,11 +34,13 @@ blocks:
             - checkout
             - pip install poetry
             - poetry install
+            - poetry run cover
             - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
             - poetry build -f sdist
             - poetry publish
       secrets:
         - name: PYPI
+        - name: COVERALLS
       env_vars:
         - name: PYTHON_VERSION
           value: '3.8'
