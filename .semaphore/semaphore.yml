@@ -8,15 +8,14 @@ blocks:
   - name: Setup
     task:
       jobs:
-        - name: installing things
+        - name: Setup
           matrix:
-            - env_vars: PYTHON_VERSION
+            - env_var: PYTHON_VERSION
               values:
                 - '3.6'
                 - '3.7'
                 - '3.8'
                 - '3.9'
-              env_var: PYTHON_VERSION
           commands:
             - sem-version python $PYTHON_VERSION
             - checkout
@@ -27,7 +26,7 @@ blocks:
       when: branch = 'master'
     task:
       jobs:
-        - name: Test & Coverage
+        - name: Check
           commands:
             - poetry run cover
   - name: Deploy
@@ -35,7 +34,7 @@ blocks:
       when: branch = 'master'
     task:
       jobs:
-        - name: Nameless 1
+        - name: Publish
           commands:
             - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
             - poetry build -f sdist
