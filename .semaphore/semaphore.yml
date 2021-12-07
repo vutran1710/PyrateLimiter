@@ -1,0 +1,41 @@
+version: v1.0
+name: Python
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu2004
+blocks:
+  - name: Setup
+    task:
+      jobs:
+        - name: installing things
+          matrix:
+            - env_vars: PYTHON_VERSION
+              values:
+                - '2.7'
+                - '3.5'
+                - '3.6'
+                - '3.7'
+          commands:
+            - sem-version python $PYTHON_VERSION
+            - checkout
+            - pip install poetry
+            - poetry install
+  - name: Test
+    skip:
+      when: branch = 'master'
+    task:
+      jobs:
+        - name: Test & Coverage
+          commands:
+            - poetry run cover
+  - name: Deploy
+    run:
+      when: branch = 'master'
+    task:
+      jobs:
+        - name: ''
+          commands:
+            - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
+            - poetry build -f sdist
+            - poetry publish
