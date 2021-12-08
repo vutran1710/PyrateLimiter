@@ -59,6 +59,6 @@ def test_acquire(time_function):
         for _ in range(5):
             limiter.try_acquire("item-id")
             sleep(2)
-    except BucketFullException as e:
-        print(e.meta_info)
-        assert round(e.meta_info["remaining_time"]) == 6
+    except BucketFullException as err:
+        print(err.meta_info)
+        assert round(err.meta_info["remaining_time"]) == 6

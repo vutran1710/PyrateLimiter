@@ -1,3 +1,5 @@
+"""Basic tests, non-asynchronous
+"""
 from time import sleep, time
 from unittest.mock import Mock
 
@@ -23,9 +25,9 @@ def test_sleep(time_function):
             limiter.try_acquire("test")
             print(f"[{time() - start:07.4f}] Pushed: {i+1} items")
             sleep(0.5)
-        except BucketFullException as e:
-            print(e.meta_info)
-            track_sleep(e.meta_info["remaining_time"])
+        except BucketFullException as err:
+            print(err.meta_info)
+            track_sleep(err.meta_info["remaining_time"])
 
     print(f"Elapsed: {time() - start:07.4f} seconds")
     assert track_sleep.call_count == 2
