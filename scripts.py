@@ -18,6 +18,7 @@ def cover() -> None:
     check_call(["radon", "mi", "-x", "A", "."])
     check_call(["coverage", "run", "-m", "--source=pyrate_limiter", "pytest", "tests", "--maxfail=1"])
     check_call(["coverage", "report", "-m"])
+    check_call(["coverage", "xml"])
 
 
 def test() -> None:
