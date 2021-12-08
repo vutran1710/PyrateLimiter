@@ -10,18 +10,15 @@ blocks:
       when: branch = 'master'
     task:
       jobs:
-        - name: Check
+        - name: Setup
           commands:
             - sem-version python $PYTHON_VERSION
             - checkout
             - pip install poetry
             - poetry install
-          matrix:
-            - env_var: PYTHON_VERSION
-              values:
-                - '3.8'
-                - '3.9'
-      env_vars: []
+      env_vars:
+        - name: PYTHON_VERSION
+          value: '3.8'
       secrets:
         - name: COVERALLS
     dependencies: []
