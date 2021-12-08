@@ -29,34 +29,49 @@ blocks:
       jobs:
         - name: Publish
           commands:
+            - sem-version python $PYTHON_VERSION
+            - checkout
+            - pip install poetry
+            - poetry install
             - poetry run cover
             - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
             - poetry build -f sdist
             - poetry publish
       secrets:
         - name: PYPI
-        - name: COVERALLS
+        - name: CODECOV
       env_vars:
         - name: PYTHON_VERSION
           value: '3.8'
     dependencies:
       - setup
-  - name: Test
+  - name: Lint
     dependencies:
       - setup
-    skip:
-      when: branch = 'master'
     task:
-      secrets:
-        - name: COVERALLS
+      env_vars:
+        - name: PYTHON_VERSION
+          value: '3.8'
       jobs:
-        - name: Check
+        - name: Lint
           commands:
             - sem-version python $PYTHON_VERSION
             - checkout
             - pip install poetry
             - poetry install
-            - poetry run cover
+            - poetry run lint
+  - name: Test
+    dependencies:
+      - Lint
+    task:
       env_vars:
         - name: PYTHON_VERSION
           value: '3.8'
+      jobs:
+        - name: Test
+          commands:
+            - sem-version python $PYTHON_VERSION
+            - checkout
+            - pip install poetry
+            - poetry install
+            - poetry run test
