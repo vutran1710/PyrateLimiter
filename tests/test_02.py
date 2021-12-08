@@ -1,5 +1,4 @@
-""" Testing with RedisBucket
-"""
+"""Testing with RedisBucket"""
 from time import sleep
 
 import pytest
@@ -12,13 +11,16 @@ dummy_redis = FakeStrictRedis()
 pool = dummy_redis.connection_pool
 
 
-def test_simple_01():
+def test_simple_01(time_function):
     """Single-rate Limiter with RedisBucket"""
     rate = RequestRate(3, 5 * Duration.SECOND)
     limiter = Limiter(
         rate,
         bucket_class=RedisBucket,
-        bucket_kwargs={"redis_pool": pool, "bucket_name": "test-bucket-1"},
+        # Separate buckets used to distinct values from previous run,
+        # as time_function return value has different int part.
+        bucket_kwargs={"redis_pool": pool, "bucket_name": str(time_function)},
+        time_function=time_function,
     )
     item = "vutran_list"
 
@@ -38,7 +40,7 @@ def test_simple_01():
         limiter.try_acquire(item)
 
 
-def test_simple_02():
+def test_simple_02(time_function):
     """Multi-rates Limiter with RedisBucket"""
     rate_1 = RequestRate(5, 5 * Duration.SECOND)
     rate_2 = RequestRate(7, 9 * Duration.SECOND)
@@ -48,8 +50,11 @@ def test_simple_02():
         bucket_class=RedisBucket,
         bucket_kwargs={
             "redis_pool": pool,
-            "bucket_name": "test-bucket-2",
+            # Separate buckets used to distinct values from previous run,
+            # as time_function return value has different int part.
+            "bucket_name": str(time_function),
         },
+        time_function=time_function,
     )
     item = "redis-test-item"
 
@@ -110,7 +115,7 @@ def test_simple_02():
 
 
 def test_redis_cluster():
-    "Testing RedisClusterBucket initialization"
+    """Testing RedisClusterBucket initialization"""
     rate = RequestRate(3, 5 * Duration.SECOND)
     bucket = RedisClusterBucket(pool=pool, bucket_name="any-name", identity="id-string")
     Limiter(

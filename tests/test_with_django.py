@@ -36,21 +36,29 @@ class SCRedisBucket(RedisBucket):
 # Initialize limiter with django-redis connection
 redis_connection = django_redis.get_redis_connection("default")
 
-bucket_kwargs = {
-    "bucket_name": "my-throttles",
-    "redis_pool": redis_connection,
-}
 
 rate = RequestRate(2, 10 * Duration.SECOND)
 
-limiter = Limiter(rate, bucket_class=SCRedisBucket, bucket_kwargs=bucket_kwargs)
 
+def test_acquire(time_function):
+    # Separate buckets used to distinct values from previous run,
+    # as time_function return value has different int part.
+    bucket_kwargs = {
+        "bucket_name": str(time_function),
+        "redis_pool": redis_connection,
+    }
 
-def test_acquire():
+    limiter = Limiter(
+        rate,
+        bucket_class=SCRedisBucket,
+        bucket_kwargs=bucket_kwargs,
+        time_function=time_function,
+    )
+
     try:
         for _ in range(5):
             limiter.try_acquire("item-id")
             sleep(2)
-    except BucketFullException as e:
-        print(e.meta_info)
-        assert round(e.meta_info["remaining_time"]) == 6
+    except BucketFullException as err:
+        print(err.meta_info)
+        assert round(err.meta_info["remaining_time"]) == 6

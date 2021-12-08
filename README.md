@@ -5,7 +5,7 @@ The request rate limiter using Leaky-bucket algorithm
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
 [![PyPI - Python Versions](https://img.shields.io/pypi/pyversions/pyrate-limiter)](https://pypi.org/project/pyrate-limiter)
-[![Coverage Status](https://coveralls.io/repos/github/vutran1710/PyrateLimiter/badge.svg?branch=master)](https://coveralls.io/github/vutran1710/PyrateLimiter?branch=master)
+[![codecov](https://codecov.io/gh/vutran1710/PyrateLimiter/branch/master/graph/badge.svg?token=E0Q0YBSINS)](https://codecov.io/gh/vutran1710/PyrateLimiter)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/vutran1710/PyrateLimiter/graphs/commit-activity)
 [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/pyrate-limiter/)
 
@@ -221,6 +221,18 @@ async def test_ratelimit():
     print(f"Ran {n_requests} requests in {time() - start_time:.5f} seconds")
 
 asyncio.run(test_ratelimit())
+```
+
+Limiter can be used with any custom time source. For example user may want to use
+Redis time to use same time in distributed installation. By default `time.monotonic` is
+used. To adjust time source use `time_function` parameter with any no arguments function.
+```python
+from datetime import datetime
+from pyrate_limiter import Duration, Limiter, RequestRate
+from time import time
+
+limiter_datetime = Limiter(RequestRate(5, Duration.SECOND), time_function=lambda: datetime.utcnow().timestamp())
+limiter_time = Limiter(RequestRate(5, Duration.SECOND), time_function=time)
 ```
 
 ### Spam-protection strategies

@@ -6,4 +6,5 @@ htmlcov/
 env/
 .vim/
 .vscode/
+.idea/
 .coveralls.yml

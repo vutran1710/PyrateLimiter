@@ -1,7 +1,6 @@
-""" Basic Rate-Limiter
-"""
+"""Basic Rate-Limiter."""
 from time import monotonic
-from typing import Type, Union
+from typing import Callable, Type, Union
 
 from .bucket import AbstractBucket, MemoryQueueBucket
 from .exceptions import BucketFullException, InvalidParams
@@ -17,20 +16,27 @@ class Limiter:
         *rates: RequestRate,
         bucket_class: Type[AbstractBucket] = MemoryQueueBucket,
         bucket_kwargs=None,
+        time_function: Callable[[], float] = None,
     ):
         """Init a limiter with rates and specific bucket type
         - Bucket type can be any class that extends AbstractBucket
         - 3 kinds of Bucket are provided, being MemoryQueueBucket, MemoryListBucket and RedisBucket
-        - Opts is extra keyword-arguements for Bucket class constructor
+        - Opts is extra keyword-arguments for Bucket class constructor
+        - Optional time function, that should return float as current second.microsecond
         """
         self._validate_rate_list(rates)
         self._rates = rates
         self._bkclass = bucket_class
         self._bucket_args = bucket_kwargs or {}
         self.bucket_group = {}
-        monotonic()
+        self.time_function = monotonic
+        if time_function is not None:
+            self.time_function = time_function
+        # Call for time_function to make an anchor if required.
+        self.time_function()
 
     def _validate_rate_list(self, rates):  # pylint: disable=no-self-use
+        """Raise exception if *rates are incorrectly ordered."""
         if not rates:
             raise InvalidParams("Rate(s) must be provided")
 
@@ -57,7 +63,7 @@ class Limiter:
     def try_acquire(self, *identities) -> None:
         """Acquiring an item or reject it if rate-limit has been exceeded"""
         self._init_buckets(identities)
-        now = monotonic()
+        now = self.time_function()
 
         for idx, rate in enumerate(self._rates):
             for item_id in identities:

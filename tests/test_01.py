@@ -1,3 +1,5 @@
+"""Basic tests, non-asynchronous
+"""
 from time import sleep, time
 from unittest.mock import Mock
 
@@ -8,13 +10,13 @@ from pyrate_limiter import (BucketFullException, Duration,
                             MemoryListBucket, RequestRate)
 
 
-def test_sleep():
+def test_sleep(time_function):
     """Make requests at a rate of 6 requests per 5 seconds (avg. 1.2 requests per second).
     If each request takes ~0.5 seconds, then the bucket should be full after 6 requests.
     Run 15 requests, and expect a total of 2 delays required to stay within the rate limit.
     """
     rate = RequestRate(6, 5 * Duration.SECOND)
-    limiter = Limiter(rate)
+    limiter = Limiter(rate, time_function=time_function)
     track_sleep = Mock(side_effect=sleep)  # run time.sleep() and track the number of calls
     start = time()
 
@@ -23,9 +25,9 @@ def test_sleep():
             limiter.try_acquire("test")
             print(f"[{time() - start:07.4f}] Pushed: {i+1} items")
             sleep(0.5)
-        except BucketFullException as e:
-            print(e.meta_info)
-            track_sleep(e.meta_info["remaining_time"])
+        except BucketFullException as err:
+            print(err.meta_info)
+            track_sleep(err.meta_info["remaining_time"])
 
     print(f"Elapsed: {time() - start:07.4f} seconds")
     assert track_sleep.call_count == 2
@@ -226,11 +228,11 @@ def test_simple_04():
         limiter2.try_acquire(item)
 
 
-def test_remaining_time():
+def test_remaining_time(time_function):
     """The remaining_time metadata returned from a BucketFullException should take into account
     the time elapsed during limited calls (including values less than 1 second).
     """
-    limiter2 = Limiter(RequestRate(5, Duration.SECOND))
+    limiter2 = Limiter(RequestRate(5, Duration.SECOND), time_function=time_function)
     for _ in range(5):
         limiter2.try_acquire("item")
     sleep(0.1)
