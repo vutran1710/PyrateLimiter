@@ -69,5 +69,5 @@ blocks:
             - './codecov -t ${CODECOV_TOKEN}'
       secrets:
         - name: CODECOV
-    skip:
-      when: branch = 'master'
+    run:
+      when: pull_request = '*'
