@@ -179,7 +179,7 @@ class RedisBucket(AbstractBucket):
     def all_items(self):
         conn = self.get_connection()
         items = conn.lrange(self._bucket_name, 0, -1)
-        return [float(i.decode("utf-8")) for i in items]
+        return sorted([float(i.decode("utf-8")) for i in items])
 
 
 class RedisClusterBucket(RedisBucket):

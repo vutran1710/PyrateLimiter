@@ -16,9 +16,9 @@ from pyrate_limiter import BucketFullException, Duration, Limiter, RequestRate
 getLogger("pyrate_limiter").setLevel("DEBUG")
 
 
-def test_ratelimit__synchronous():
-    """ Test ratelimit decorator - synchronous version """
-    limiter = Limiter(RequestRate(10, Duration.SECOND))
+def test_ratelimit__synchronous(time_function):
+    """Test ratelimit decorator - synchronous version"""
+    limiter = Limiter(RequestRate(10, Duration.SECOND), time_function=time_function)
 
     @limiter.ratelimit(uuid4())
     def limited_function():
@@ -37,9 +37,9 @@ def test_ratelimit__synchronous():
             limited_function()
 
 
-def test_ratelimit__delay_synchronous():
-    """ Test ratelimit decorator with automatic delays - synchronous version """
-    limiter = Limiter(RequestRate(10, Duration.SECOND))
+def test_ratelimit__delay_synchronous(time_function):
+    """Test ratelimit decorator with automatic delays - synchronous version"""
+    limiter = Limiter(RequestRate(10, Duration.SECOND), time_function=time_function)
 
     @limiter.ratelimit(uuid4(), delay=True)
     def limited_function():
@@ -55,9 +55,9 @@ def test_ratelimit__delay_synchronous():
     assert 2 < elapsed <= 3
 
 
-def test_ratelimit__exceeds_max_delay_synchronous():
-    """ Test ratelimit decorator with automatic delays - synchronous version """
-    limiter = Limiter(RequestRate(5, Duration.MINUTE))
+def test_ratelimit__exceeds_max_delay_synchronous(time_function):
+    """Test ratelimit decorator with automatic delays - synchronous version"""
+    limiter = Limiter(RequestRate(5, Duration.MINUTE), time_function=time_function)
 
     @limiter.ratelimit(uuid4(), delay=True, max_delay=10)
     def limited_function():
@@ -69,12 +69,12 @@ def test_ratelimit__exceeds_max_delay_synchronous():
             limited_function()
 
 
-def test_ratelimit__contextmanager_synchronous():
+def test_ratelimit__contextmanager_synchronous(time_function):
     """Test ratelimit decorator with contextmanager - synchronous version
     Aside from using __enter__ and __exit__, all behavior is identical to the decorator version,
     so this only needs one test case
     """
-    limiter = Limiter(RequestRate(10, Duration.SECOND))
+    limiter = Limiter(RequestRate(10, Duration.SECOND), time_function=time_function)
     identity = uuid4()
 
     def limited_function():
@@ -95,9 +95,9 @@ def test_ratelimit__contextmanager_synchronous():
 
 
 @pytest.mark.asyncio
-async def test_ratelimit__async():
-    """ Test ratelimit decorator - async version """
-    limiter = Limiter(RequestRate(10, Duration.SECOND))
+async def test_ratelimit__async(time_function):
+    """Test ratelimit decorator - async version"""
+    limiter = Limiter(RequestRate(10, Duration.SECOND), time_function=time_function)
 
     @limiter.ratelimit(uuid4())
     async def limited_function():
@@ -117,9 +117,9 @@ async def test_ratelimit__async():
 
 
 @pytest.mark.asyncio
-async def test_ratelimit__delay_async():
-    """ Test ratelimit decorator with automatic delays - async version """
-    limiter = Limiter(RequestRate(10, Duration.SECOND))
+async def test_ratelimit__delay_async(time_function):
+    """Test ratelimit decorator with automatic delays - async version"""
+    limiter = Limiter(RequestRate(10, Duration.SECOND), time_function=time_function)
 
     @limiter.ratelimit(uuid4(), delay=True)
     async def limited_function():
@@ -136,9 +136,9 @@ async def test_ratelimit__delay_async():
 
 
 @pytest.mark.asyncio
-async def test_ratelimit__exceeds_max_delay_async():
-    """ Test ratelimit decorator with automatic delays - async version """
-    limiter = Limiter(RequestRate(5, Duration.MINUTE))
+async def test_ratelimit__exceeds_max_delay_async(time_function):
+    """Test ratelimit decorator with automatic delays - async version"""
+    limiter = Limiter(RequestRate(5, Duration.MINUTE), time_function=time_function)
 
     @limiter.ratelimit(uuid4(), delay=True, max_delay=10)
     async def limited_function():
@@ -151,12 +151,12 @@ async def test_ratelimit__exceeds_max_delay_async():
 
 
 @pytest.mark.asyncio
-async def test_ratelimit__contextmanager_async():
+async def test_ratelimit__contextmanager_async(time_function):
     """Test ratelimit decorator with contextmanager - async version
     Aside from using __aenter__ and __aexit__, all behavior is identical to the decorator version,
     so this only needs one test case
     """
-    limiter = Limiter(RequestRate(10, Duration.SECOND))
+    limiter = Limiter(RequestRate(10, Duration.SECOND), time_function=time_function)
     identity = uuid4()
 
     async def limited_function():
