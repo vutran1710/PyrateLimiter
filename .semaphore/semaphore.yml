@@ -6,8 +6,6 @@ agent:
     os_image: ubuntu2004
 blocks:
   - name: setup
-    skip:
-      when: branch = 'master'
     task:
       jobs:
         - name: Setup
@@ -22,6 +20,8 @@ blocks:
       secrets:
         - name: COVERALLS
     dependencies: []
+    run:
+      when: pull_request = '*' or branch = 'master'
   - name: Deploy
     run:
       when: branch = 'master'
