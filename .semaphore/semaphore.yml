@@ -34,6 +34,9 @@ blocks:
             - pip install poetry
             - poetry install
             - poetry run cover
+            - 'curl -Os https://uploader.codecov.io/latest/linux/codecov'
+            - chmod +x codecov
+            - './codecov -t ${CODECOV_TOKEN}'
             - poetry config http-basic.pypi $PYPI_USERNAME $PYPI_PASSWORD
             - poetry build -f sdist
             - poetry publish
