@@ -55,4 +55,11 @@ blocks:
       jobs:
         - name: Check
           commands:
+            - sem-version python $PYTHON_VERSION
+            - checkout
+            - pip install poetry
+            - poetry install
             - poetry run cover
+      env_vars:
+        - name: PYTHON_VERSION
+          value: '3.8'
