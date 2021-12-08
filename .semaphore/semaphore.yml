@@ -45,7 +45,7 @@ blocks:
           value: '3.8'
     dependencies:
       - setup
-  - name: Lint
+  - name: QA
     dependencies:
       - setup
     task:
@@ -60,18 +60,6 @@ blocks:
             - pip install poetry
             - poetry install
             - poetry run lint
-  - name: Test
-    dependencies:
-      - Lint
-    task:
-      env_vars:
-        - name: PYTHON_VERSION
-          value: '3.8'
-      jobs:
-        - name: Test
-          commands:
-            - sem-version python $PYTHON_VERSION
-            - checkout
-            - pip install poetry
-            - poetry install
-            - poetry run test
+            - poetry run cover
+    skip:
+      when: branch = 'master'
