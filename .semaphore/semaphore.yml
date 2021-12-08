@@ -21,7 +21,7 @@ blocks:
         - name: COVERALLS
     dependencies: []
     run:
-      when: pull_request = '*' or branch = 'master'
+      when: pull_request =~ '.*' or branch = 'master'
   - name: Deploy
     run:
       when: branch = 'master'
@@ -70,4 +70,4 @@ blocks:
       secrets:
         - name: CODECOV
     run:
-      when: pull_request = '*'
+      when: pull_request =~ '.*'
