@@ -61,5 +61,7 @@ blocks:
             - poetry install
             - poetry run lint
             - poetry run cover
+      secrets:
+        - name: CODECOV
     skip:
       when: branch = 'master'
