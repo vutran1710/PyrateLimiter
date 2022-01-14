@@ -4,8 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [2.6.2] - 2022-03-30
+## [2.6.3] - TBD
+### Fixed
+* Make SQLite bucket thread-safe and multiprocess-safe
 
+## [2.6.2] - 2022-03-30
 ### Fixed
 * Remove development scripts from package published on PyPI
 
@@ -16,7 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Updated
 * Replace all formatting/linting tools with *pre-commit*
 
-## [2.6.0] - TBD
+## [2.6.0] - 2021-12-08
 ### Added
 * SQLite bucket backend
 

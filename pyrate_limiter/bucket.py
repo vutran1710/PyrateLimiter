@@ -46,7 +46,11 @@ class AbstractBucket(ABC):
         """Return a list as copies of all items in the bucket"""
 
     def inspect_expired_items(self, time: float) -> Tuple[int, float]:
-        """Find how many items in bucket that have slipped out of the time-window"""
+        """Find how many items in bucket that have slipped out of the time-window
+
+        Returns:
+            The number of unexpired items, and the time until the next item will expire
+        """
         volume = self.size()
         item_count, remaining_time = 0, 0.0
 
@@ -57,6 +61,12 @@ class AbstractBucket(ABC):
                 break
 
         return item_count, remaining_time
+
+    def lock_acquire(self):
+        """Acquire a lock prior to beginning a new transaction, if needed"""
+
+    def lock_release(self):
+        """Release lock following a transaction, if needed"""
 
 
 class MemoryQueueBucket(AbstractBucket):

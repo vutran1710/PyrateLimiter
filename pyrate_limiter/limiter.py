@@ -36,7 +36,7 @@ class Limiter:
         self._rates = rates
         self._bkclass = bucket_class
         self._bucket_args = bucket_kwargs or {}
-        self.bucket_group = {}
+        self.bucket_group: Dict[str, AbstractBucket] = {}
         self.time_function = monotonic
         if time_function is not None:
             self.time_function = time_function
@@ -56,24 +56,30 @@ class Limiter:
                 raise InvalidParams(msg)
 
     def _init_buckets(self, identities) -> None:
-        """Setup Queue for each Identity if needed
-        Queue's maxsize equals the max limit of request-rates
+        """Initialize a bucket for each identity, if needed.
+        The bucket's maxsize equals the max limit of request-rates.
         """
-        for item_id in identities:
+        maxsize = self._rates[-1].limit
+        for item_id in sorted(identities):
             if not self.bucket_group.get(item_id):
-                maxsize = self._rates[-1].limit
                 self.bucket_group[item_id] = self._bkclass(
                     maxsize=maxsize,
                     identity=item_id,
                     **self._bucket_args,
                 )
+            self.bucket_group[item_id].lock_acquire()
 
-    def try_acquire(self, *identities) -> None:
-        """Acquiring an item or reject it if rate-limit has been exceeded"""
+    def _release_buckets(self, identities) -> None:
+        """Release locks after bucket transactions, if applicable"""
+        for item_id in sorted(identities):
+            self.bucket_group[item_id].lock_release()
+
+    def try_acquire(self, *identities: str) -> None:
+        """Attempt to acquire an item, or raise an error if a rate limit has been exceeded"""
         self._init_buckets(identities)
         now = self.time_function()
 
-        for idx, rate in enumerate(self._rates):
+        for rate in self._rates:
             for item_id in identities:
                 bucket = self.bucket_group[item_id]
                 volume = bucket.size()
@@ -81,19 +87,20 @@ class Limiter:
                 if volume < rate.limit:
                     continue
 
-                # Determine rate's time-window starting point
-                start_time = now - rate.interval
-                item_count, remaining_time = bucket.inspect_expired_items(start_time)
-
+                # Determine rate's starting point, and check requests made during its time window
+                item_count, remaining_time = bucket.inspect_expired_items(now - rate.interval)
                 if item_count >= rate.limit:
+                    self._release_buckets(identities)
                     raise BucketFullException(item_id, rate, remaining_time)
 
-                if idx == len(self._rates) - 1:
-                    # We remove item based on the request-rate with the max-limit
+                # Remove expired bucket items beyond the last (maximum) rate limit,
+                if rate is self._rates[-1]:
                     bucket.get(volume - item_count)
 
+        # If no buckets are full, add another item to each bucket representing the next request
         for item_id in identities:
             self.bucket_group[item_id].put(now)
+        self._release_buckets(identities)
 
     def ratelimit(
         self,
