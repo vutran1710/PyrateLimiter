@@ -4,7 +4,6 @@
 * No delay + delay + delay w/ max_delay
 """
 import asyncio
-from logging import getLogger
 from time import sleep
 from time import time
 from uuid import uuid4
@@ -15,9 +14,6 @@ from pyrate_limiter import BucketFullException
 from pyrate_limiter import Duration
 from pyrate_limiter import Limiter
 from pyrate_limiter import RequestRate
-
-# Make log messages visible on test failure (or with pytest -s)
-getLogger("pyrate_limiter").setLevel("DEBUG")
 
 
 def test_ratelimit__synchronous(time_function):
