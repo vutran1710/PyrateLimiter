@@ -8,10 +8,7 @@ def format():
 
 
 def lint() -> None:
-    check_call(["flake8", "pyrate_limiter/"])
-    check_call(["flake8", "tests/"])
-    check_call(["pylint", "pyrate_limiter/", "--rcfile=setup.cfg"])
-    check_call(["pylint", "tests/", "--rcfile=setup.cfg"])
+    check_call(["pre-commit", "run", "--all-files"])
 
 
 def cover() -> None:

@@ -4,8 +4,12 @@ from time import sleep
 import pytest
 from fakeredis import FakeStrictRedis
 
-from pyrate_limiter import (BucketFullException, Duration, Limiter,
-                            RedisBucket, RedisClusterBucket, RequestRate)
+from pyrate_limiter import BucketFullException
+from pyrate_limiter import Duration
+from pyrate_limiter import Limiter
+from pyrate_limiter import RedisBucket
+from pyrate_limiter import RedisClusterBucket
+from pyrate_limiter import RequestRate
 
 dummy_redis = FakeStrictRedis()
 pool = dummy_redis.connection_pool

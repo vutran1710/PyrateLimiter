@@ -3,6 +3,7 @@ from hashlib import sha1
 from os.path import join
 from tempfile import gettempdir
 from typing import List
+from typing import Optional
 
 from pyrate_limiter.bucket import AbstractBucket
 
@@ -16,6 +17,8 @@ class SQLiteBucket(AbstractBucket):
         path: Path to the SQLite database file; defaults to a temp file in the system temp directory
         kwargs: Additional keyword arguments for :py:func:`sqlite3.connect`
     """
+
+    _connection: Optional[sqlite3.Connection]
 
     def __init__(self, maxsize=0, identity: str = None, path: str = None, **kwargs):
         super().__init__(maxsize=maxsize)
@@ -37,11 +40,11 @@ class SQLiteBucket(AbstractBucket):
         if not self._connection:
             self.connection_kwargs.setdefault("isolation_level", None)  # Use autocommit by default
             self._connection = sqlite3.connect(self.path, **self.connection_kwargs)
+            assert self._connection
             self._connection.execute(
-                f"CREATE TABLE IF NOT EXISTS {self.table} ("
-                "idx INTEGER PRIMARY KEY AUTOINCREMENT, "
-                "value REAL)"
+                f"CREATE TABLE IF NOT EXISTS {self.table} (" "idx INTEGER PRIMARY KEY AUTOINCREMENT, " "value REAL)"
             )
+        # assert self._connection
         return self._connection
 
     def close(self):
@@ -73,9 +76,7 @@ class SQLiteBucket(AbstractBucket):
         return len(keys)
 
     def _get_keys(self, number: int = 1) -> List[float]:
-        rows = self.connection.execute(
-            f"SELECT idx FROM {self.table} ORDER BY idx LIMIT ?", (number,)
-        ).fetchall()
+        rows = self.connection.execute(f"SELECT idx FROM {self.table} ORDER BY idx LIMIT ?", (number,)).fetchall()
         return [row[0] for row in rows]
 
     def all_items(self) -> List[float]:

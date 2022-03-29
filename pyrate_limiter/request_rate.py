@@ -1,6 +1,8 @@
 """Initialize this class to define request-rates for limiter
 """
 from enum import Enum
+from typing import Any
+from typing import Dict
 
 from .exceptions import ImmutableClassProperty
 
@@ -20,7 +22,7 @@ class RequestRate:
         self._limit = limit
         self._interval = interval
         self._reset = reset
-        self._log = {}
+        self._log: Dict[Any, Any] = {}
 
     @property
     def limit(self):

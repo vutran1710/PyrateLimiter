@@ -5,12 +5,16 @@
 """
 import asyncio
 from logging import getLogger
-from time import sleep, time
+from time import sleep
+from time import time
 from uuid import uuid4
 
 import pytest
 
-from pyrate_limiter import BucketFullException, Duration, Limiter, RequestRate
+from pyrate_limiter import BucketFullException
+from pyrate_limiter import Duration
+from pyrate_limiter import Limiter
+from pyrate_limiter import RequestRate
 
 # Make log messages visible on test failure (or with pytest -s)
 getLogger("pyrate_limiter").setLevel("DEBUG")

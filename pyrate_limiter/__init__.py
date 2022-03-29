@@ -1,8 +1,6 @@
 # flake8: noqa
 """PyrateLimiter
 """
-
-
 from .bucket import *
 from .constants import *
 from .exceptions import *
