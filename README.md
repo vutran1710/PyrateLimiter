@@ -327,12 +327,13 @@ $ poetry install
 
 - Other than built-in Poetry commands, there are some custom commands defined in **scripts.py**. What you should care about are:
   - Run test with: `poetry run test`
-  - Format code base: `poetry run format`
   - To run test with coverage: `poetry run cover`
-  - Check for lint error: `poetry run lint`
+  - Format & check for lint error: `poetry run lint`
+
+- Every commit will be checked locally with *pre-commit*.
 
 ### Guideline & Notes
-We have CICD running on Travis to do the checking, testing and publishing work. So, there are few small notes when making Pull Request:
+We have GitHub Action CICD to do the checking, testing and publishing work. So, there are few small notes when making Pull Request:
 - All existing tests must pass (Of course!)
 - Reduction in *Coverage* shall result in failure. (below 98% is not accepted)
 - When you are making bug fixes, or adding more features, remember to bump the version number in **pyproject.toml**. The number should follow *semantic-versioning* rules
