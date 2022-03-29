@@ -1,13 +1,18 @@
 """Basic tests, non-asynchronous
 """
-from time import sleep, time
+from time import sleep
+from time import time
 from unittest.mock import Mock
 
 import pytest
 
-from pyrate_limiter import (BucketFullException, Duration,
-                            ImmutableClassProperty, InvalidParams, Limiter,
-                            MemoryListBucket, RequestRate)
+from pyrate_limiter import BucketFullException
+from pyrate_limiter import Duration
+from pyrate_limiter import ImmutableClassProperty
+from pyrate_limiter import InvalidParams
+from pyrate_limiter import Limiter
+from pyrate_limiter import MemoryListBucket
+from pyrate_limiter import RequestRate
 
 
 def test_sleep(time_function):

@@ -1,6 +1,7 @@
 from datetime import datetime
 from logging import getLogger
-from time import monotonic, time
+from time import monotonic
+from time import time
 
 import pytest
 

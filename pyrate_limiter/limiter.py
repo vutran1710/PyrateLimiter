@@ -1,15 +1,23 @@
 """Basic Rate-Limiter."""
 from time import monotonic
-from typing import Callable, Type, Union
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import Type
+from typing import Union
 
-from .bucket import AbstractBucket, MemoryQueueBucket
-from .exceptions import BucketFullException, InvalidParams
+from .bucket import AbstractBucket
+from .bucket import MemoryQueueBucket
+from .exceptions import BucketFullException
+from .exceptions import InvalidParams
 from .limit_context_decorator import LimitContextDecorator
 from .request_rate import RequestRate
 
 
 class Limiter:
     """Basic rate-limiter class that makes use of built-in python Queue"""
+
+    bucket_group: Dict[Any, Any]
 
     def __init__(
         self,

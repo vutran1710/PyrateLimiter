@@ -1,10 +1,12 @@
 """ Implement this class to create
 a workable bucket for Limiter to use
 """
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 from queue import Queue
 from threading import RLock
-from typing import List, Tuple
+from typing import List
+from typing import Tuple
 
 from .exceptions import InvalidParams
 
@@ -46,7 +48,7 @@ class AbstractBucket(ABC):
     def inspect_expired_items(self, time: float) -> Tuple[int, float]:
         """Find how many items in bucket that have slipped out of the time-window"""
         volume = self.size()
-        item_count, remaining_time = 0, 0
+        item_count, remaining_time = 0, 0.0
 
         for log_idx, log_item in enumerate(self.all_items()):
             if log_item > time:
@@ -141,7 +143,7 @@ class RedisBucket(AbstractBucket):
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
-        from redis import Redis  # pylint: disable=import-outside-toplevel
+        from redis import Redis  # type: ignore
 
         return Redis(connection_pool=self._pool)
 
@@ -187,7 +189,6 @@ class RedisClusterBucket(RedisBucket):
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
-        from rediscluster import \
-            RedisCluster  # pylint: disable=import-outside-toplevel
+        from rediscluster import RedisCluster  # pylint: disable=import-outside-toplevel
 
         return RedisCluster(connection_pool=self._pool)
