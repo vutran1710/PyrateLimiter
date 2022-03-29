@@ -38,7 +38,6 @@ pre-commit = "^2.17.0"
 test = 'scripts:test'
 lint = 'scripts:lint'
 cover = 'scripts:cover'
-format = 'scripts:format'
 
 [tool.black]
 line-length = 120
