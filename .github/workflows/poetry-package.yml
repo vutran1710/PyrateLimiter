@@ -25,16 +25,30 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
+    - uses: snok/install-poetry@v1.3
+      with:
+        virtualenvs-in-project: true
+
+    # Cache packages per python version, and reuse until lockfile changes
+    - name: Cache python packages
+      id: cache
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ matrix.python-version }}-latest-${{ hashFiles('poetry.lock') }}
     - name: Install dependencies
-      run: |
-        python -m pip install poetry
-        poetry install
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: poetry install -v
+
+    # Run linting, tests, and coverage
     - name: Lint
       run: |
-        poetry run nox -e lint
+        source $VENV
+        nox -e lint
     - name: Test and Coverage
       run: |
-        poetry run nox -e cover
+        source $VENV
+        nox -e cover
 
 
   coverage_update:
