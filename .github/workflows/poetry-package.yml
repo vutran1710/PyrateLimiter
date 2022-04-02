@@ -31,10 +31,10 @@ jobs:
         poetry install
     - name: Lint
       run: |
-        poetry run lint
+        poetry run nox -e lint
     - name: Test and Coverage
       run: |
-        poetry run cover
+        poetry run nox -e cover
 
 
   coverage_update:
@@ -58,7 +58,7 @@ jobs:
         poetry install
     - name: Test and Coverage
       run: |
-        poetry run cover
+        poetry run nox -e cover
         curl -Os https://uploader.codecov.io/latest/linux/codecov
         chmod +x codecov
         ./codecov -t ${{ secrets.CODECOV_TOKEN }}
