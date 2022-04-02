@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyrate-limiter"
-version = "2.6.1"
+version = "2.6.2"
 description = "Python Rate-Limiter using Leaky-Bucket Algorimth Family"
 authors = ["vutr <me@vutr.io>"]
 license = "MIT"
@@ -33,14 +33,20 @@ django-redis = "^5.0.0"
 Django = "^3.2.8"
 pre-commit = "^2.17.0"
 pytest = "^6.2"
-
-[tool.poetry.scripts]
-test = 'scripts:test'
-lint = 'scripts:lint'
-cover = 'scripts:cover'
+pytest-cov = "^3.0"
+nox = "^2022.1.7"
+nox-poetry = ">=0.8"
+pytest-xdist = "^2.5.0"
 
 [tool.black]
 line-length = 120
+
+[tool.coverage.run]
+branch = true
+source = ['pyrate_limiter']
+
+[tool.coverage.xml]
+output = 'test-reports/coverage.xml'
 
 [tool.ipdb]
 context=7

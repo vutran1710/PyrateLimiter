@@ -325,12 +325,11 @@ Then, in the repository directory...
 $ poetry install
 ```
 
-- Other than built-in Poetry commands, there are some custom commands defined in **scripts.py**. What you should care about are:
-  - Run test with: `poetry run test`
-  - To run test with coverage: `poetry run cover`
-  - Format & check for lint error: `poetry run lint`
-
-- Every commit will be checked locally with *pre-commit*.
+Some shortcuts are included for some common development tasks, using [nox](https://nox.thea.codes):
+- Run tests with: `nox -e test`
+- To run tests with coverage: `nox -e cover`
+- Format & check for lint error: `nox -e lint`
+- To run linting for every commit, run: `pre-commit install`
 
 ### Guideline & Notes
 We have GitHub Action CICD to do the checking, testing and publishing work. So, there are few small notes when making Pull Request:
