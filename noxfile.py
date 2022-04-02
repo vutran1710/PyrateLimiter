@@ -13,7 +13,7 @@ def lint(session) -> None:
 @session(python=False)
 def cover(session) -> None:
     """Run tests and generate coverage reports in both terminal output and XML (for Codecov)"""
-    session.run("pytest", "--maxfail=1", "--cov", "--cov-report=term", "--cov-report=xml")
+    session.run("pytest", "--maxfail=1", "--numprocesses=auto", "--cov", "--cov-report=term", "--cov-report=xml")
 
 
 @session(python=False)
@@ -24,4 +24,5 @@ def test(session) -> None:
         "--verbose",
         "-s",
         "--fulltrace",
+        "--numprocesses=auto",
     )

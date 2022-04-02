@@ -36,6 +36,7 @@ pytest = "^6.2"
 pytest-cov = "^3.0"
 nox = "^2022.1.7"
 nox-poetry = ">=0.8"
+pytest-xdist = "^2.5.0"
 
 [tool.black]
 line-length = 120
