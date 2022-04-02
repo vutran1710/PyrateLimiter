@@ -1,9 +1,11 @@
 .coverage
+.coverage.*
 pyrate_limiter.egg-info/
 __pycache__/
 dist/
 htmlcov/
 env/
+test-reports/
 .vim/
 .vscode/
 .idea/
