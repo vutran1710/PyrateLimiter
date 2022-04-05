@@ -1,12 +1,10 @@
-# TODO: This could be turned into either a test class or parametrized tests
-# to run for all bucket classes
 from sqlite3 import ProgrammingError
 from tempfile import gettempdir
 from time import time
 
 import pytest
 
-from pyrate_limiter.sqlite_bucket import SQLiteBucket
+from pyrate_limiter import SQLiteBucket
 
 
 def get_test_bucket():
@@ -84,4 +82,5 @@ def test_inspect_expired_items():
     # Expect 10 expired items within a time window starting 10 seconds ago
     item_count, remaining_time = bucket.inspect_expired_items(current_time - 10)
     assert item_count == 10
+    # Expect 1 second until the next item expires
     assert remaining_time == 1.0

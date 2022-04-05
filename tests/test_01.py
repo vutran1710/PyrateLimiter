@@ -17,7 +17,7 @@ from pyrate_limiter import RequestRate
 
 def test_sleep(time_function):
     """Make requests at a rate of 6 requests per 5 seconds (avg. 1.2 requests per second).
-    If each request takes ~0.5 seconds, then the bucket should be full after 6 requests.
+    If each request takes ~0.5 seconds, then the bucket should be full after 6 requests (3 seconds).
     Run 15 requests, and expect a total of 2 delays required to stay within the rate limit.
     """
     rate = RequestRate(6, 5 * Duration.SECOND)
@@ -29,7 +29,7 @@ def test_sleep(time_function):
         try:
             limiter.try_acquire("test")
             print(f"[{time() - start:07.4f}] Pushed: {i+1} items")
-            sleep(0.5)
+            sleep(0.5)  # Simulated request rate
         except BucketFullException as err:
             print(err.meta_info)
             track_sleep(err.meta_info["remaining_time"])

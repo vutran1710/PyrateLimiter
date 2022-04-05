@@ -2,6 +2,7 @@ import sqlite3
 from hashlib import sha1
 from os.path import join
 from tempfile import gettempdir
+from threading import RLock
 from typing import List
 from typing import Optional
 
@@ -11,6 +12,13 @@ from pyrate_limiter.bucket import AbstractBucket
 class SQLiteBucket(AbstractBucket):
     """Bucket backed by a SQLite database
 
+    Notes on concurrency:
+    * For thread safety, transactions are locked at the bucket level (but not at the connection or
+      database level).
+    * The default isolation level is used (deferred transactions).
+    * In other words, multitple buckets can be used in parallel, but a given bucket will only be
+      used by one thread/process at a time.
+
     Args:
         maxsize: Maximum number of items in the bucket
         identity: Bucket identity, used as the table name
@@ -18,13 +26,13 @@ class SQLiteBucket(AbstractBucket):
         kwargs: Additional keyword arguments for :py:func:`sqlite3.connect`
     """
 
-    _connection: Optional[sqlite3.Connection]
-
     def __init__(self, maxsize=0, identity: str = None, path: str = None, **kwargs):
         super().__init__(maxsize=maxsize)
-        self._connection = None
+        self._connection: Optional[sqlite3.Connection] = None
         self.connection_kwargs = kwargs
+        self._lock = RLock()
         self.path = path or join(gettempdir(), "pyrate_limiter.sqlite")
+        self._size: Optional[int] = None
 
         if not identity:
             raise ValueError("Bucket identity is required")
@@ -38,22 +46,33 @@ class SQLiteBucket(AbstractBucket):
         This is safe to leave open, but may be manually closed with :py:meth:`.close`, if needed.
         """
         if not self._connection:
-            self.connection_kwargs.setdefault("isolation_level", None)  # Use autocommit by default
+            self.connection_kwargs.setdefault("check_same_thread", False)
             self._connection = sqlite3.connect(self.path, **self.connection_kwargs)
             assert self._connection
             self._connection.execute(
-                f"CREATE TABLE IF NOT EXISTS {self.table} (" "idx INTEGER PRIMARY KEY AUTOINCREMENT, " "value REAL)"
+                f"CREATE TABLE IF NOT EXISTS {self.table} (idx INTEGER PRIMARY KEY AUTOINCREMENT, value REAL)"
             )
-        # assert self._connection
         return self._connection
+
+    def lock_acquire(self):
+        """Acquire a lock prior to beginning a new transaction"""
+        self._lock.acquire()
+
+    def lock_release(self):
+        """Release lock following a transaction"""
+        self._lock.release()
 
     def close(self):
         """Close the database connection"""
         if self._connection:
             self._connection.close()
+            self._connection = None
 
     def size(self) -> int:
-        return self.connection.execute(f"SELECT COUNT(*) FROM {self.table}").fetchone()[0]
+        """Keep bucket size in memory to avoid some unnecessary reads"""
+        if self._size is None:
+            self._size = self.connection.execute(f"SELECT COUNT(*) FROM {self.table}").fetchone()[0]
+        return self._size
 
     def put(self, item: float) -> int:
         """Put an item in the bucket.
@@ -61,6 +80,8 @@ class SQLiteBucket(AbstractBucket):
         """
         if self.size() < self.maxsize():
             self.connection.execute(f"INSERT INTO {self.table} (value) VALUES (?)", (item,))
+            self.connection.commit()
+            self._size = self.size() + 1
             return 1
         return 0
 
@@ -72,6 +93,8 @@ class SQLiteBucket(AbstractBucket):
 
         placeholders = ",".join("?" * len(keys))
         self.connection.execute(f"DELETE FROM {self.table} WHERE idx IN ({placeholders})", keys)
+        self.connection.commit()
+        self._size = self.size() - len(keys)
 
         return len(keys)
 

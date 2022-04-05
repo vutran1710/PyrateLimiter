@@ -1,12 +1,14 @@
 from datetime import datetime
-from logging import getLogger
+from logging import basicConfig
 from time import monotonic
 from time import time
 
 import pytest
 
 # Make log messages visible on test failure (or with pytest -s)
-getLogger("pyrate_limiter").setLevel("DEBUG")
+basicConfig(level="INFO")
+# Uncomment for more verbose output:
+# getLogger("pyrate_limiter").setLevel("DEBUG")
 
 
 @pytest.fixture(
