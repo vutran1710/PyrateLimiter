@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [2.6.3] - TBD
+## [2.7.0] - TBD
+### Added
+* Add `FileLockSQliteBucket` for a SQLite backend with file-based locking
+
+## [2.6.3] - 2022-04-05
 ### Fixed
 * Make SQLite bucket thread-safe and multiprocess-safe
 
@@ -21,7 +25,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [2.6.0] - 2021-12-08
 ### Added
-* SQLite bucket backend
+* Add `SQliteBucket` to persist rate limit data in a SQLite database
 
 ## [2.5.0] - 2021-12-08
 ### Added

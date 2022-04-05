@@ -72,10 +72,28 @@ the `path` argument to use a different location:
 ```python
 from pyrate_limiter import Limiter, SQLiteBucket
 
+limiter = Limiter(bucket_class=SQLiteBucket)
+```
+
+By default, the database will be stored in the system temp directory. You can specify a different
+path via `bucket_kwargs`:
+```python
 limiter = Limiter(
     bucket_class=SQLiteBucket,
-    bucket_kwargs={'path': '/tmp/pyrate_limiter.sqlite'},
+    bucket_kwargs={'path': '/path/to/db.sqlite'},
 )
+```
+
+#### Concurrency
+This backend is thread-safe, and may also be used with multiple child processes that share the same
+`Limiter` object, e.g. if created with `ProcessPoolExecutor` or `multiprocessing.Process`.
+
+If you want to use SQLite with multiple processes with no shared state, for example if created by
+running multiple scripts or by an external process, some additional protections are needed. For
+these cases, a separate `FileLockSQLiteBucket` class is available. This requires installing the
+[py-filelock](https://py-filelock.readthedocs.io) library.
+```python
+limiter = Limiter(bucket_class=FileLockSQLiteBucket)
 ```
 
 ### Redis
