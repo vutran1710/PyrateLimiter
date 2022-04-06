@@ -39,7 +39,7 @@ jobs:
         key: venv-${{ matrix.python-version }}-latest-${{ hashFiles('poetry.lock') }}
     - name: Install dependencies
       if: steps.cache.outputs.cache-hit != 'true'
-      run: poetry install -v
+      run: poetry install -v -E all
 
     # Run linting, tests, and coverage
     - name: Lint
@@ -72,10 +72,11 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
+    - uses: snok/install-poetry@v1.3
+      with:
+        virtualenvs-in-project: true
     - name: Install dependencies
-      run: |
-        python -m pip install poetry
-        poetry install
+      run: poetry install -v -E all
     - name: Publish
       run: |
         poetry config http-basic.pypi ${{ secrets.PYPI_USERNAME }} ${{ secrets.PYPI_PASSWORD }}

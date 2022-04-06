@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [2.7.0] - TBD
 ### Added
 * Add `FileLockSQliteBucket` for a SQLite backend with file-based locking
+* Add optional backend dependencies to package metadata
 
 ## [2.6.3] - 2022-04-05
 ### Fixed

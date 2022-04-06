@@ -338,9 +338,9 @@ requires the capability to `switch` the strategies instantly without re-deployin
 ### Setup & Commands
 - To setup local development,  *Poetry* and *Python 3.6* is required. Python can be installed using *Pyenv* or normal installation from binary source. To install *poetry*, follow the official guideline (https://python-poetry.org/docs/#installation).
 
-Then, in the repository directory...
+Then, in the repository directory, run the following to install all optional backend dependencies and dev dependencies:
 ```shell
-$ poetry install
+$ poetry install -E all
 ```
 
 Some shortcuts are included for some common development tasks, using [nox](https://nox.thea.codes):
