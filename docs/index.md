@@ -4,9 +4,9 @@
 :end-before: '## Contents'
 ```
 <!-- Exclude markdown ToC and use Sphinx sidebar ToC instead -->
-## Introduction
+## Features
 ```{include} ../README.md
-:start-after: '## Introduction'
+:start-after: '## Features'
 ```
 
 # Reference Documentation
