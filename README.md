@@ -344,6 +344,14 @@ Some shortcuts are included for some common development tasks, using [nox](https
 - Format & check for lint error: `nox -e lint`
 - To run linting for every commit, run: `pre-commit install`
 
+### Documentation
+Documentation is generated using [Sphinx](https://www.sphinx-doc.org) and published on readthedocs.io.
+To build this documentation locally:
+```
+poetry install -E docs
+nox -e docs
+```
+
 ### Guideline & Notes
 We have GitHub Action CICD to do the checking, testing and publishing work. So, there are few small notes when making Pull Request:
 - All existing tests must pass (Of course!)

@@ -22,3 +22,9 @@ def cover(session) -> None:
 @session(python=False)
 def test(session) -> None:
     session.run("pytest", *PYTEST_ARGS)
+
+
+@session(python=False)
+def docs(session):
+    """Build Sphinx documentation"""
+    session.run("sphinx-build", "docs", "docs/_build/html", "-j", "auto")
