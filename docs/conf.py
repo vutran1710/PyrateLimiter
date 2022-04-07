@@ -27,6 +27,8 @@ extensions = [
     "myst_parser",
 ]
 
+myst_enable_extensions = ["html_image"]
+
 # Enable automatic links to other projects' Sphinx docs
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),

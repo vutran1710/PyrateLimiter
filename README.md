@@ -89,7 +89,7 @@ come before a daily rate, etc.
 
 ### Applying rate limits
 Then, use `Limiter.try_acquire()` wherever you are making requests (or other rate-limited operations).
-This will raise a `BucketFullException` if the rate limit is exceeded.
+This will raise an exception if the rate limit is exceeded.
 
 ```python
 import requests
@@ -124,9 +124,21 @@ def request_function(user_ids):
 ## Handling exceeded limits
 When a rate limit is exceeded, you have two options: raise an exception, or add delays.
 
+### Bucket analogy
+<img height="300" align="right" src="https://upload.wikimedia.org/wikipedia/commons/c/c4/Leaky_bucket_analogy.JPG">
+
+At this point it's useful to introduce the analogy of "buckets" used for rate-limiting. Here is a
+quick summary:
+
+* This library implements the [Leaky Bucket algorithm](https://en.wikipedia.org/wiki/Leaky_bucket).
+* It is named after the idea of representing some kind of fixed capacity -- like a network or service -- as a bucket.
+* The bucket "leaks" at a constant rate. For web services, this represents the **ideal or permitted request rate**.
+* The bucket is "filled" at an intermittent, unpredicatble rate, representing the **actual rate of requests**.
+* When the bucket is "full", it will overflow, representing **canceled or delayed requests**.
+
 ### Rate limit exceptions
-If the Bucket is full, a `BucketFullException` will be raised. The error contains a
-`meta_info` attribute with the following information:
+By default, a `BucketFullException` will be raised when a rate limit is exceeded.
+The error contains a `meta_info` attribute with the following information:
 * `identity`: The identity it received
 * `rate`: The specific rate that has been exceeded
 * `remaining_time`: The remaining time until the next request can be sent
