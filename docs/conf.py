@@ -50,9 +50,13 @@ autodoc_typehints = "none"
 
 # HTML general settings
 html_show_sphinx = False
-html_static_path = ["_static"]
 pygments_style = "friendly"
 pygments_dark_style = "material"
 
 # HTML theme settings
+html_logo = "_static/logo.png"
+html_static_path = ["_static"]
 html_theme = "furo"
+html_theme_options = {
+    "sidebar_hide_name": True,
+}
