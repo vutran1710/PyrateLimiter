@@ -23,6 +23,7 @@ Full project documentation can be found at [pyrate-limiter.readthedocs.io](https
     - [Applying rate limits](#applying-rate-limits)
     - [Identities](#identities)
   - [Handling exceeded limits](#handling-exceeded-limits)
+    - [Bucket analogy](#bucket-analogy)
     - [Rate limit exceptions](#rate-limit-exceptions)
     - [Rate limit delays](#rate-limit-delays)
   - [Additional usage options](#additional-usage-options)
@@ -37,11 +38,6 @@ Full project documentation can be found at [pyrate-limiter.readthedocs.io](https
   - [Additional features](#additional-features)
     - [Time sources](#time-sources)
   - [Examples](#examples)
-  - [Development](#development)
-    - [Setup & Commands](#setup--commands)
-    - [Documentation](#documentation)
-    - [Guideline & Notes](#guideline--notes)
-  - [TODO](#todo)
 
 ## Features
 * Tracks any number of rate limits and intervals you want to define
@@ -365,40 +361,3 @@ async def test_ratelimit():
 
 asyncio.run(test_ratelimit())
 ```
-
-## Development
-
-### Setup & Commands
-- To setup local development,  *Poetry* and *Python 3.6* is required. Python can be installed using *Pyenv* or normal installation from binary source. To install *poetry*, follow the official guideline (https://python-poetry.org/docs/#installation).
-
-Then, in the repository directory, run the following to install all optional backend dependencies and dev dependencies:
-```shell
-$ poetry install -E all
-```
-
-Some shortcuts are included for some common development tasks, using [nox](https://nox.thea.codes):
-- Run tests with: `nox -e test`
-- To run tests with coverage: `nox -e cover`
-- Format & check for lint error: `nox -e lint`
-- To run linting for every commit, run: `pre-commit install`
-
-### Documentation
-Documentation is generated using [Sphinx](https://www.sphinx-doc.org) and published on readthedocs.io.
-To build this documentation locally:
-```
-poetry install -E docs
-nox -e docs
-```
-
-### Guideline & Notes
-We have GitHub Action CICD to do the checking, testing and publishing work. So, there are few small notes when making Pull Request:
-- All existing tests must pass (Of course!)
-- Reduction in *Coverage* shall result in failure. (below 98% is not accepted)
-- When you are making bug fixes, or adding more features, remember to bump the version number in **pyproject.toml**. The number should follow *semantic-versioning* rules
-
-## TODO
-Planned features:
-* A rate limit may reset on a fixed schedule, eg: every first-day of a month
-* Sometimes, we may need to apply specific rate-limiting strategies based on schedules/region or some other metrics. It
-  requires the capability to switch the strategies instantly without re-deploying the whole service.
-  * Reference: https://www.keycdn.com/support/rate-limiting#types-of-rate-limits

@@ -14,4 +14,5 @@
 :maxdepth: 2
 reference
 changelog
+contributing
 ```
