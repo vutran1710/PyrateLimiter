@@ -1,24 +1,19 @@
 """Config file for Sphinx documentation"""
-import tomlkit
+from importlib.metadata import version as pkg_version
+from pathlib import Path
 
-
-# Get project metadata from pyproject.toml
-def get_project_metadata():
-
-    with open("../pyproject.toml") as pyproject:
-        file_contents = pyproject.read()
-    return tomlkit.parse(file_contents)["tool"]["poetry"]
-
+PROJECT_DIR = Path(__file__).parent.parent.absolute()
+PACKAGE_DIR = str(PROJECT_DIR / "pyrate_limiter")
+MODULE_DOCS_DIR = "modules"
 
 # General information about the project.
-project_metadata = get_project_metadata()
 exclude_patterns = ["_build"]
 master_doc = "index"
 needs_sphinx = "4.0"
 source_suffix = [".rst", ".md"]
 templates_path = ["_templates"]
-project = str(project_metadata["name"])
-version = release = version = str(project_metadata["version"])
+project = "pyrate-limiter"
+version = release = version = pkg_version("pyrate-limiter")
 
 # Sphinx extensions
 extensions = [
@@ -28,6 +23,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
     "sphinx_copybutton",
+    "sphinxcontrib.apidoc",
     "myst_parser",
 ]
 
@@ -47,6 +43,13 @@ copybutton_prompt_is_regexp = True
 
 # Disable autodoc's built-in type hints, and use sphinx_autodoc_typehints extension instead
 autodoc_typehints = "none"
+
+# Auto-generage module docs with sphinx-apidoc
+apidoc_module_dir = PACKAGE_DIR
+apidoc_output_dir = MODULE_DOCS_DIR
+apidoc_module_first = True
+apidoc_separate_modules = True
+apidoc_toc_file = False
 
 # HTML general settings
 html_show_sphinx = False
