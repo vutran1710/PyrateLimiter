@@ -1,7 +1,9 @@
 <img align="left" width="95" height="120" src="docs/_static/logo.png">
 
 # PyrateLimiter
-The request rate limiter using Leaky-bucket algorithm
+The request rate limiter using Leaky-bucket algorithm.
+
+Full project documentation can be found at [pyrate-limiter.readthedocs.io](https://pyrate-limiter.readthedocs.io).
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
 [![PyPI - Python Versions](https://img.shields.io/pypi/pyversions/pyrate-limiter)](https://pypi.org/project/pyrate-limiter)
@@ -14,7 +16,8 @@ The request rate limiter using Leaky-bucket algorithm
 ## Contents
 - [PyrateLimiter](#pyratelimiter)
   * [Introduction](#introduction)
-  * [Available modules](#available-modules)
+  * [Installation](#installation)
+  * [Basic usage](#basic-usage)
   * [Bucket backends](#bucket-backends)
     + [Memory](#memory)
     + [SQLite](#sqlite)
@@ -26,30 +29,53 @@ The request rate limiter using Leaky-bucket algorithm
     + [Decorator](#decorator)
     + [Rate-limiting delays](#rate-limiting-delays)
     + [Contextmanager](#contextmanager)
-    + [Async decorator/contextmanager](#async-decorator-contextmanager)
+    + [Async decorator/contextmanager](#async-decoratorcontextmanager)
     + [Examples](#examples)
     + [Spam-protection strategies](#spam-protection-strategies)
     + [Throttling handling](#throttling-handling)
     + [More complex scenario](#more-complex-scenario)
   * [Development](#development)
+    + [Setup & Commands](#setup--commands)
+    + [Guideline & Notes](#guideline--notes)
   * [Notes](#notes)
 
 ## Introduction
 This module can be used to apply rate-limit for API request. User defines window duration and the limit of function calls within such interval.
 
-## Available modules
+## Installation
+Install using pip:
+```
+pip install pyrate-limiter
+```
+
+Or using conda:
+```
+conda install --channel conda-forge pyrate-limiter
+```
+
+## Basic usage
+First, define your rate limits:
 ```python
-from pyrate_limiter import (
-    BucketFullException,
-    Duration,
-    RequestRate,
-    Limiter,
-    MemoryListBucket,
-    MemoryQueueBucket,
-    SQLiteBucket,
-    RedisBucket,
-    RedisClusterBucket,
-)
+from pyrate_limiter import BucketFullException, Duration, RequestRate, Limiter
+
+hourly_rate = RequestRate(500, Duration.HOUR) # maximum 500 requests/hour
+daily_rate = RequestRate(1000, Duration.DAY) # maximum 1000 requests/day
+monthly_rate = RequestRate(10000, Duration.MONTH) # and so on
+
+limiter = Limiter(hourly_rate, daily_rate, monthly_rate)
+```
+
+Then, use `Limiter.try_acquire()` wherever you are making requests (or other rate-limited operations).
+This will raise a `BucketFullException` if the rate limit is exceeded.
+```python
+import requests
+
+def request_function():
+    limiter.try_acquire(identity)
+    requests.get('https://example.com')
+
+while True:
+    request_function()
 ```
 
 ## Bucket backends
