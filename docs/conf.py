@@ -1,11 +1,24 @@
 """Config file for Sphinx documentation"""
+import tomlkit
+
+
+# Get project metadata from pyproject.toml
+def get_project_metadata():
+
+    with open("../pyproject.toml") as pyproject:
+        file_contents = pyproject.read()
+    return tomlkit.parse(file_contents)["tool"]["poetry"]
+
+
 # General information about the project.
+project_metadata = get_project_metadata()
 exclude_patterns = ["_build"]
 master_doc = "index"
 needs_sphinx = "4.0"
-project = "pyrate-limiter"
 source_suffix = [".rst", ".md"]
 templates_path = ["_templates"]
+project = str(project_metadata["name"])
+version = release = version = str(project_metadata["version"])
 
 # Sphinx extensions
 extensions = [

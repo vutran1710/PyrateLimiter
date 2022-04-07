@@ -33,6 +33,7 @@ myst-parser = {version = ">=0.17", optional = true, python=">=3.7"}
 sphinx = { version = "^4.3.0", optional = true }
 sphinx-autodoc-typehints = { version = "^1.17", optional = true, python=">=3.7" }
 sphinx-copybutton = { version = ">=0.5", optional = true }
+tomlkit = {version = "*", optional = true, python = ">=3.7"}
 
 [tool.poetry.extras]
 all = ["filelock", "redis", "redis-py-cluster"]
