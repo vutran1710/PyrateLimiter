@@ -7,7 +7,7 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from pyrate_limiter.bucket import AbstractBucket
+from .bucket import AbstractBucket
 
 TEMP_DIR = Path(gettempdir())
 DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
@@ -18,6 +18,7 @@ class SQLiteBucket(AbstractBucket):
     """Bucket backed by a SQLite database. Will be stored in the system temp directory by default.
 
     Notes on concurrency:
+
     * Thread-safe
     * Safe for use with multiple child processes with a shared initial state and using the same
       :py:class:`.Limiter` object, e.g. if created with :py:class:`.ProcessPoolExecutor` or

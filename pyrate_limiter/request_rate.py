@@ -13,6 +13,13 @@ class ResetTypes(Enum):
 
 
 class RequestRate:
+    """Request rate definition.
+
+    Args:
+        limit: Number of requests allowed within ``interval``
+        interval: Time interval, in seconds
+    """
+
     def __init__(
         self,
         limit,

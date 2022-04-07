@@ -12,13 +12,14 @@ logger = getLogger(__name__)
 
 class LimitContextDecorator:
     """A class that can be used as a:
+
     * decorator
     * async decorator
     * contextmanager
     * async contextmanager
 
-    Mainly used via ``Limiter.ratelimit()``. Depending on arguments, calls that exceed the rate
-    limit will either raise an exception, or sleep until space is available in the bucket.
+    Intended to be used via :py:meth:`.Limiter.ratelimit`. Depending on arguments, calls that exceed
+    the rate limit will either raise an exception, or sleep until space is available in the bucket.
 
     Args:
         limiter: Limiter object

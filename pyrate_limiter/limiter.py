@@ -14,7 +14,15 @@ from .request_rate import RequestRate
 
 
 class Limiter:
-    """Basic rate-limiter class that makes use of built-in python Queue"""
+    """Main rate-limiter class
+
+    Args:
+        rates: Request rate definitions
+        bucket_class: Bucket backend to use; may be any subclass of :py:class:`.AbstractBucket`.
+            See :py:mod`pyrate_limiter.bucket` for available bucket classes.
+        bucket_kwargs: Extra keyword arguments to pass to the bucket class constructor.
+        time_function: Time function that returns the current time as a float, in seconds
+    """
 
     bucket_group: Dict[Any, Any]
 
@@ -43,7 +51,7 @@ class Limiter:
         self.time_function()
 
     def _validate_rate_list(self, rates):  # pylint: disable=no-self-use
-        """Raise exception if *rates are incorrectly ordered."""
+        """Raise exception if rates are incorrectly ordered."""
         if not rates:
             raise InvalidParams("Rate(s) must be provided")
 
@@ -74,7 +82,15 @@ class Limiter:
             self.bucket_group[item_id].lock_release()
 
     def try_acquire(self, *identities: str) -> None:
-        """Attempt to acquire an item, or raise an error if a rate limit has been exceeded"""
+        """Attempt to acquire an item, or raise an error if a rate limit has been exceeded.
+
+        Args:
+            identities: One or more identities to acquire. Typically this is the name of a service
+                or resource that is being rate-limited.
+
+        Raises:
+            :py:exc:`BucketFullException`: If the bucket is full and the item cannot be acquired
+        """
         self._init_buckets(identities)
         now = self.time_function()
 
@@ -112,10 +128,15 @@ class Limiter:
         sleep until space is available in the bucket.
 
         Args:
-            identities: Bucket identities
+            identities: One or more identities to acquire. Typically this is the name of a service
+                or resource that is being rate-limited.
             delay: Delay until the next request instead of raising an exception
             max_delay: The maximum allowed delay time (in seconds); anything over this will raise
                 an exception
+
+        Raises:
+            :py:exc:`BucketFullException`: If the rate limit is reached, and ``delay=False`` or the
+                delay exceeds ``max_delay``
         """
         return LimitContextDecorator(self, *identities, delay=delay, max_delay=max_delay)
 

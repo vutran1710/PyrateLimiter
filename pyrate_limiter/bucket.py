@@ -12,7 +12,7 @@ from .exceptions import InvalidParams
 
 
 class AbstractBucket(ABC):
-    """Documentation for AbstractBucket"""
+    """Base bucket interface"""
 
     def __init__(self, maxsize=0, **_kwargs):
         self._maxsize = maxsize
@@ -74,9 +74,7 @@ class AbstractBucket(ABC):
 
 
 class MemoryQueueBucket(AbstractBucket):
-    """A bucket that resides in memory
-    using python's built-in Queue class
-    """
+    """A bucket that resides in memory using python's built-in Queue class"""
 
     def __init__(self, maxsize=0, **_kwargs):
         super().__init__()
@@ -105,9 +103,7 @@ class MemoryQueueBucket(AbstractBucket):
 
 
 class MemoryListBucket(AbstractBucket):
-    """A bucket that resides in memory
-    using python's List
-    """
+    """A bucket that resides in memory using python's List"""
 
     def __init__(self, maxsize=0, **_kwargs):
         super().__init__(maxsize=maxsize)
@@ -141,9 +137,7 @@ class MemoryListBucket(AbstractBucket):
 
 
 class RedisBucket(AbstractBucket):
-    """A bucket with Redis
-    using List
-    """
+    """A bucket backed by a Redis instance"""
 
     def __init__(
         self,
@@ -210,7 +204,7 @@ class RedisBucket(AbstractBucket):
 
 
 class RedisClusterBucket(RedisBucket):
-    """A bucket with RedisCluster"""
+    """A bucket backed by a Redis cluster"""
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
