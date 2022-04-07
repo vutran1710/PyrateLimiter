@@ -1,23 +1,32 @@
 import sqlite3
 from hashlib import sha1
-from os.path import join
+from pathlib import Path
 from tempfile import gettempdir
 from threading import RLock
 from typing import List
 from typing import Optional
+from typing import Union
 
 from pyrate_limiter.bucket import AbstractBucket
 
+TEMP_DIR = Path(gettempdir())
+DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
+LOCK_PATH = TEMP_DIR / "pyrate_limiter.lock"
+
 
 class SQLiteBucket(AbstractBucket):
-    """Bucket backed by a SQLite database
+    """Bucket backed by a SQLite database. Will be stored in the system temp directory by default.
 
     Notes on concurrency:
-    * For thread safety, transactions are locked at the bucket level (but not at the connection or
-      database level).
-    * The default isolation level is used (deferred transactions).
-    * In other words, multitple buckets can be used in parallel, but a given bucket will only be
-      used by one thread/process at a time.
+    * Thread-safe
+    * Safe for use with multiple child processes with a shared initial state and using the same
+      :py:class:`.Limiter` object, e.g. if created with :py:class:`.ProcessPoolExecutor` or
+      :py:class:`multiprocessing.Process`.
+    * For other usage with multiple processes, see :py:class:`.FileLockSQLiteBucket`.
+    * Transactions are locked at the bucket level, but not at the connection or database level.
+    * The default isolation level is used (autocommit).
+    * Multitple buckets may be used in parallel, but a given bucket will only be used by one
+      thread/process at a time.
 
     Args:
         maxsize: Maximum number of items in the bucket
@@ -26,12 +35,20 @@ class SQLiteBucket(AbstractBucket):
         kwargs: Additional keyword arguments for :py:func:`sqlite3.connect`
     """
 
-    def __init__(self, maxsize=0, identity: str = None, path: str = None, **kwargs):
+    def __init__(
+        self,
+        maxsize=0,
+        identity: str = None,
+        path: Union[Path, str] = DEFAULT_DB_PATH,
+        **kwargs,
+    ):
         super().__init__(maxsize=maxsize)
-        self._connection: Optional[sqlite3.Connection] = None
+        kwargs.setdefault("check_same_thread", False)
         self.connection_kwargs = kwargs
+
+        self._connection: Optional[sqlite3.Connection] = None
         self._lock = RLock()
-        self.path = path or join(gettempdir(), "pyrate_limiter.sqlite")
+        self._path = Path(path)
         self._size: Optional[int] = None
 
         if not identity:
@@ -47,7 +64,7 @@ class SQLiteBucket(AbstractBucket):
         """
         if not self._connection:
             self.connection_kwargs.setdefault("check_same_thread", False)
-            self._connection = sqlite3.connect(self.path, **self.connection_kwargs)
+            self._connection = sqlite3.connect(str(self._path), **self.connection_kwargs)
             assert self._connection
             self._connection.execute(
                 f"CREATE TABLE IF NOT EXISTS {self.table} (idx INTEGER PRIMARY KEY AUTOINCREMENT, value REAL)"
@@ -71,8 +88,15 @@ class SQLiteBucket(AbstractBucket):
     def size(self) -> int:
         """Keep bucket size in memory to avoid some unnecessary reads"""
         if self._size is None:
-            self._size = self.connection.execute(f"SELECT COUNT(*) FROM {self.table}").fetchone()[0]
+            self._size = self._query_size()
         return self._size
+
+    def _query_size(self) -> int:
+        """Keep bucket size in memory to avoid some unnecessary reads"""
+        return self.connection.execute(f"SELECT COUNT(*) FROM {self.table}").fetchone()[0]
+
+    def _update_size(self, amount: int):
+        self._size = self.size() + amount
 
     def put(self, item: float) -> int:
         """Put an item in the bucket.
@@ -81,7 +105,7 @@ class SQLiteBucket(AbstractBucket):
         if self.size() < self.maxsize():
             self.connection.execute(f"INSERT INTO {self.table} (value) VALUES (?)", (item,))
             self.connection.commit()
-            self._size = self.size() + 1
+            self._update_size(1)
             return 1
         return 0
 
@@ -94,7 +118,7 @@ class SQLiteBucket(AbstractBucket):
         placeholders = ",".join("?" * len(keys))
         self.connection.execute(f"DELETE FROM {self.table} WHERE idx IN ({placeholders})", keys)
         self.connection.commit()
-        self._size = self.size() - len(keys)
+        self._update_size(0 - len(keys))
 
         return len(keys)
 
@@ -106,3 +130,35 @@ class SQLiteBucket(AbstractBucket):
         """Return a list as copies of all items in the bucket"""
         rows = self.connection.execute(f"SELECT value FROM {self.table} ORDER BY idx").fetchall()
         return [row[0] for row in rows]
+
+
+# Create file lock in module scope to reuse across buckets
+try:
+    from filelock import FileLock
+
+    FILE_LOCK = FileLock(str(LOCK_PATH))
+except ImportError:
+    pass
+
+
+class FileLockSQLiteBucket(SQLiteBucket):
+    """Bucket backed by a SQLite database and file lock. Suitable for usage from multiple processes
+    with no shared state. Requires installing [py-filelock](https://py-filelock.readthedocs.io).
+
+    The file lock is reentrant and shared across buckets, allowing a process to access multiple
+    buckets at once.
+    """
+
+    def __init__(self, **kwargs):
+        # If not installed, raise ImportError at init time instead of at module import time
+        from filelock import FileLock  # noqa: F401
+
+        super().__init__(**kwargs)
+        self._lock = FILE_LOCK
+
+    def size(self) -> int:
+        """Query current size from the database for each call instead of keeping in memory"""
+        return self._query_size()
+
+    def _update_size(self, _):
+        pass

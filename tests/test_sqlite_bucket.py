@@ -13,8 +13,8 @@ def get_test_bucket():
 
 def test_init():
     # The system temp directory should be used unless a path is provided
-    assert SQLiteBucket(identity="id").path.startswith(gettempdir())
-    assert SQLiteBucket(identity="id", path="bucket.db").path == "bucket.db"
+    assert str(SQLiteBucket(identity="id")._path).startswith(gettempdir())
+    assert str(SQLiteBucket(identity="id", path="bucket.db")._path) == "bucket.db"
 
     # The table name should be hashed
     assert SQLiteBucket(identity="id").table == "ratelimit_87ea5dfc8b8e384d848979496e706390b497e547"
