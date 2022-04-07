@@ -9,8 +9,9 @@
 :start-after: '## Introduction'
 ```
 
-## API Reference
+# Reference Documentation
 ```{toctree}
-:titlesonly: true
+:maxdepth: 2
 reference
+changelog
 ```
