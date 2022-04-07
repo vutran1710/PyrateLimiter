@@ -14,6 +14,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Documentation",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
 include = [
     "LICENSE",
@@ -66,7 +67,8 @@ source = ['pyrate_limiter']
 
 [tool.coverage.report]
 exclude_lines = [
-    "except ImportError:",  # Not testing missing optional dependencies
+    "except ImportError:",  # Used for missing optional dependencies
+    "if TYPE_CHECKING:",  # Used for type forward references
 ]
 
 [tool.coverage.xml]

@@ -22,8 +22,8 @@ class RequestRate:
 
     def __init__(
         self,
-        limit,
-        interval,
+        limit: int,
+        interval: int,
         reset: ResetTypes = ResetTypes.INTERVAL,
     ):
         self._limit = limit
@@ -32,7 +32,7 @@ class RequestRate:
         self._log: Dict[Any, Any] = {}
 
     @property
-    def limit(self):
+    def limit(self) -> int:
         return self._limit
 
     @limit.setter
@@ -40,7 +40,7 @@ class RequestRate:
         raise ImmutableClassProperty(self, "limit")
 
     @property
-    def interval(self):
+    def interval(self) -> int:
         return self._interval
 
     @interval.setter

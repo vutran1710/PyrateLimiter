@@ -1,13 +1,18 @@
 import asyncio
+from functools import partial
 from functools import wraps
 from inspect import iscoroutinefunction
 from logging import getLogger
 from time import sleep
+from typing import TYPE_CHECKING
 from typing import Union
 
 from .exceptions import BucketFullException
 
 logger = getLogger(__name__)
+
+if TYPE_CHECKING:
+    from .limiter import Limiter
 
 
 class LimitContextDecorator:
@@ -31,14 +36,14 @@ class LimitContextDecorator:
 
     def __init__(
         self,
-        limiter,
-        *identities,
+        limiter: "Limiter",
+        *identities: str,
         delay: bool = False,
         max_delay: Union[int, float] = None,
     ):
         self.delay = delay
-        self.max_delay = max_delay
-        self.try_acquire = lambda: limiter.try_acquire(*identities)
+        self.max_delay = max_delay or 0
+        self.try_acquire = partial(limiter.try_acquire, *identities)
 
     def __call__(self, func):
         """Allows usage as a decorator for both normal and async functions"""
@@ -92,11 +97,11 @@ class LimitContextDecorator:
             else:
                 break
 
-    def delay_or_reraise(self, err: BucketFullException) -> int:
+    def delay_or_reraise(self, err: BucketFullException) -> float:
         """Determine if we should delay after exceeding a rate limit. If so, return the delay time,
         otherwise re-raise the exception.
         """
-        delay_time = err.meta_info["remaining_time"]
+        delay_time = float(err.meta_info["remaining_time"])
         logger.debug(f"Rate limit reached; {delay_time:.5f} seconds remaining before next request")
         exceeded_max_delay = bool(self.max_delay) and (delay_time > self.max_delay)
         if self.delay and not exceeded_max_delay:

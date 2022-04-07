@@ -1,8 +1,8 @@
-"""Basic Rate-Limiter."""
 from time import monotonic
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import Type
 from typing import Union
 
 from .bucket import AbstractBucket
@@ -24,21 +24,13 @@ class Limiter:
         time_function: Time function that returns the current time as a float, in seconds
     """
 
-    bucket_group: Dict[Any, Any]
-
     def __init__(
         self,
         *rates: RequestRate,
-        bucket_class=MemoryQueueBucket,
-        bucket_kwargs=None,
+        bucket_class: Type[AbstractBucket] = MemoryQueueBucket,
+        bucket_kwargs: Dict[str, Any] = None,
         time_function: Callable[[], float] = None,
     ):
-        """Init a limiter with rates and specific bucket type
-        - Bucket type can be any class that extends AbstractBucket
-        - 3 kinds of Bucket are provided, being MemoryQueueBucket, MemoryListBucket and RedisBucket
-        - Opts is extra keyword-arguments for Bucket class constructor
-        - Optional time function, that should return float as current second.microsecond
-        """
         self._validate_rate_list(rates)
         self._rates = rates
         self._bkclass = bucket_class
@@ -119,7 +111,7 @@ class Limiter:
 
     def ratelimit(
         self,
-        *identities,
+        *identities: str,
         delay: bool = False,
         max_delay: Union[int, float] = None,
     ):

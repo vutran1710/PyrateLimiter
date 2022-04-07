@@ -38,7 +38,7 @@ class SQLiteBucket(AbstractBucket):
 
     def __init__(
         self,
-        maxsize=0,
+        maxsize: int = 0,
         identity: str = None,
         path: Union[Path, str] = DEFAULT_DB_PATH,
         **kwargs,
