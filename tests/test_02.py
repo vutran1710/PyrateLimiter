@@ -134,7 +134,7 @@ def test_flushing():
     for _ in range(3):
         limiter.try_acquire(item)
 
-    size = limiter.get_current_volume()
+    size = limiter.get_current_volume(item)
     assert size == 3
     assert limiter.flush_all() == 1
 
