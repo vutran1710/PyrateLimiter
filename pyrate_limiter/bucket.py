@@ -45,6 +45,10 @@ class AbstractBucket(ABC):
     def all_items(self) -> List[float]:
         """Return a list as copies of all items in the bucket"""
 
+    @abstractmethod
+    def flush(self) -> None:
+        """Flush/reset bucket"""
+
     def inspect_expired_items(self, time: float) -> Tuple[int, float]:
         """Find how many items in bucket that have slipped out of the time-window
 
@@ -95,6 +99,10 @@ class MemoryQueueBucket(AbstractBucket):
     def all_items(self):
         return list(self._q.queue)
 
+    def flush(self):
+        while not self._q.empty():
+            self._q.get()
+
 
 class MemoryListBucket(AbstractBucket):
     """A bucket that resides in memory
@@ -127,6 +135,9 @@ class MemoryListBucket(AbstractBucket):
 
     def all_items(self):
         return self._q.copy()
+
+    def flush(self):
+        self._q = list()
 
 
 class RedisBucket(AbstractBucket):
@@ -192,6 +203,10 @@ class RedisBucket(AbstractBucket):
         conn = self.get_connection()
         items = conn.lrange(self._bucket_name, 0, -1)
         return sorted([float(i.decode("utf-8")) for i in items])
+
+    def flush(self):
+        conn = self.get_connection()
+        conn.delete(self._bucket_name)
 
 
 class RedisClusterBucket(RedisBucket):
