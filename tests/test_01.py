@@ -232,6 +232,9 @@ def test_simple_04():
         # Exceed Rate-2 again
         limiter2.try_acquire(item)
 
+    assert limiter2.flush_all() == 1
+    assert limiter2.get_current_volume(item) == 0
+
 
 def test_remaining_time(time_function):
     """The remaining_time metadata returned from a BucketFullException should take into account

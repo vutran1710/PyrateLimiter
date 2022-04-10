@@ -84,3 +84,9 @@ def test_inspect_expired_items():
     assert item_count == 10
     # Expect 1 second until the next item expires
     assert remaining_time == 1.0
+
+
+def test_flushing_bucket():
+    bucket = get_test_bucket()
+    bucket.flush()
+    assert bucket.size() == 0
