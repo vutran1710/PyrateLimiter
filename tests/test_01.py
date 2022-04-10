@@ -149,6 +149,9 @@ def test_simple_02():
         # Exceed Rate-2 again
         limiter2.try_acquire(item)
 
+    assert limiter2.flush_all() == 1
+    assert limiter2.get_current_volume(item) == 0
+
 
 def test_simple_03():
     """Single-rate Limiter with MemoryListBucket"""
