@@ -204,8 +204,6 @@ except BucketFullException as err:
     # {'error': 'Bucket for vutran with Rate 3/5 is already full', 'identity': 'tranvu', 'rate': '5/5', 'remaining_time': 2}
 ```
 
-- [ ] *RequestRate may be required to `reset` on a fixed schedule, eg: every first-day of a month
-
 ### Decorator
 Rate-limiting is also available in decorator form, using `Limiter.ratelimit`. Example:
 ```python
@@ -329,9 +327,6 @@ When the number of incoming requets go beyond the limit, we can either do..
 
 ### More complex scenario
 https://www.keycdn.com/support/rate-limiting#types-of-rate-limits
-
-- [ ] *Sometimes, we may need to apply specific rate-limiting strategies based on schedules/region or some other metrics. It
-requires the capability to `switch` the strategies instantly without re-deploying the whole service.
 
 ## Development
 
