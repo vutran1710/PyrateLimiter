@@ -131,6 +131,10 @@ class SQLiteBucket(AbstractBucket):
         rows = self.connection.execute(f"SELECT value FROM {self.table} ORDER BY idx").fetchall()
         return [row[0] for row in rows]
 
+    def flush(self):
+        self.connection.execute(f"DELETE FROM {self.table}")
+        self.connection.commit()
+
 
 # Create file lock in module scope to reuse across buckets
 try:

@@ -3,7 +3,6 @@ from time import monotonic
 from typing import Any
 from typing import Callable
 from typing import Dict
-from typing import Type
 from typing import Union
 
 from .bucket import AbstractBucket
@@ -22,7 +21,7 @@ class Limiter:
     def __init__(
         self,
         *rates: RequestRate,
-        bucket_class: Type[AbstractBucket] = MemoryQueueBucket,
+        bucket_class=MemoryQueueBucket,
         bucket_kwargs=None,
         time_function: Callable[[], float] = None,
     ):
@@ -124,3 +123,12 @@ class Limiter:
         """Get current bucket volume for a specific identity"""
         bucket = self.bucket_group[identity]
         return bucket.size()
+
+    def flush_all(self) -> int:
+        cnt = 0
+
+        for _, bucket in self.bucket_group.items():
+            bucket.flush()
+            cnt += 1
+
+        return cnt
