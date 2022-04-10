@@ -123,3 +123,12 @@ class Limiter:
         """Get current bucket volume for a specific identity"""
         bucket = self.bucket_group[identity]
         return bucket.size()
+
+    def flush_all(self) -> int:
+        cnt = 0
+
+        for _, bucket in self.bucket_group.items():
+            bucket.flush()
+            cnt += 1
+
+        return cnt

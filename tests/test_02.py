@@ -118,6 +118,30 @@ def test_simple_02(time_function):
         limiter4.try_acquire(item)
 
 
+def test_flushing():
+    """Multi-rates Limiter with RedisBucket"""
+    rate_1 = RequestRate(5, 5 * Duration.SECOND)
+    limiter = Limiter(
+        rate_1,
+        bucket_class=RedisBucket,
+        bucket_kwargs={
+            "redis_pool": pool,
+            "bucket_name": "Flushing-Bucket",
+        },
+    )
+    item = "redis-test-item"
+
+    for _ in range(3):
+        limiter.try_acquire(item)
+
+    size = limiter.get_current_volume()
+    assert size == 3
+    assert limiter.flush_all() == 1
+
+    size = limiter.get_current_volume()
+    assert size == 0
+
+
 def test_redis_cluster():
     """Testing RedisClusterBucket initialization"""
     rate = RequestRate(3, 5 * Duration.SECOND)

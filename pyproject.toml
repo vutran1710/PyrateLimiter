@@ -43,6 +43,7 @@ pytest-asyncio = "^0.12"
 pytest-cov = "^3.0"
 pytest-xdist = "^2.5.0"
 PyYAML = "^5.4.1"
+schedule = "^1.1.0"
 
 [tool.black]
 line-length = 120
