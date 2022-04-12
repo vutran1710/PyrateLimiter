@@ -1,7 +1,9 @@
-<img align="left" width="95" height="120" src="https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/img/log.png">
+<img align="left" width="95" height="120" src="docs/_static/logo.png">
 
 # PyrateLimiter
-The request rate limiter using Leaky-bucket algorithm
+The request rate limiter using Leaky-bucket algorithm.
+
+Full project documentation can be found at [pyrate-limiter.readthedocs.io](https://pyrate-limiter.readthedocs.io).
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
 [![PyPI - Python Versions](https://img.shields.io/pypi/pyversions/pyrate-limiter)](https://pypi.org/project/pyrate-limiter)
@@ -11,47 +13,206 @@ The request rate limiter using Leaky-bucket algorithm
 
 <br>
 
+## Contents
 - [PyrateLimiter](#pyratelimiter)
-  * [Introduction](#introduction)
-  * [Available modules](#available-modules)
-  * [Bucket backends](#bucket-backends)
-    + [Memory](#memory)
-    + [SQLite](#sqlite)
-    + [Redis](#redis)
-    + [Custom backends](#custom-backends)
-  * [Strategies](#strategies)
-    + [Subscription strategies](#subscription-strategies)
-    + [BucketFullException](#bucketfullexception)
-    + [Decorator](#decorator)
-    + [Rate-limiting delays](#rate-limiting-delays)
-    + [Contextmanager](#contextmanager)
-    + [Async decorator/contextmanager](#async-decorator-contextmanager)
-    + [Examples](#examples)
-    + [Spam-protection strategies](#spam-protection-strategies)
-    + [Throttling handling](#throttling-handling)
-    + [More complex scenario](#more-complex-scenario)
-  * [Development](#development)
-  * [Notes](#notes)
+  - [Contents](#contents)
+  - [Features](#features)
+  - [Installation](#installation)
+  - [Basic usage](#basic-usage)
+    - [Defining rate limits](#defining-rate-limits)
+    - [Applying rate limits](#applying-rate-limits)
+    - [Identities](#identities)
+  - [Handling exceeded limits](#handling-exceeded-limits)
+    - [Bucket analogy](#bucket-analogy)
+    - [Rate limit exceptions](#rate-limit-exceptions)
+    - [Rate limit delays](#rate-limit-delays)
+  - [Additional usage options](#additional-usage-options)
+    - [Decorator](#decorator)
+    - [Contextmanager](#contextmanager)
+    - [Async decorator/contextmanager](#async-decoratorcontextmanager)
+  - [Backends](#backends)
+    - [Memory](#memory)
+    - [SQLite](#sqlite)
+    - [Redis](#redis)
+    - [Custom backends](#custom-backends)
+  - [Additional features](#additional-features)
+    - [Time sources](#time-sources)
+  - [Examples](#examples)
 
-## Introduction
-This module can be used to apply rate-limit for API request. User defines window duration and the limit of function calls within such interval.
+## Features
+* Tracks any number of rate limits and intervals you want to define
+* Independently tracks rate limits for multiple services or resources
+* Handles exceeded rate limits by either raising errors or adding delays
+* Several usage options including a normal function call, a decorator, or a contextmanager
+* Async support
+* Includes optional SQLite and Redis backends, which can be used to persist limit tracking across
+  multiple threads, processes, or application restarts
 
-## Available modules
-```python
-from pyrate_limiter import (
-    BucketFullException,
-    Duration,
-    RequestRate,
-    Limiter,
-    MemoryListBucket,
-    MemoryQueueBucket,
-    SQLiteBucket,
-    RedisBucket,
-    RedisClusterBucket,
-)
+## Installation
+Install using pip:
+```
+pip install pyrate-limiter
 ```
 
-## Bucket backends
+Or using conda:
+```
+conda install --channel conda-forge pyrate-limiter
+```
+
+## Basic usage
+
+### Defining rate limits
+Consider some public API (like LinkedIn, GitHub, etc.) that has rate limits like the following:
+```
+- 500 requests per hour
+- 1000 requests per day
+- 10000 requests per month
+```
+
+You can define these rates using the `RequestRate` class, and add them to a `Limiter`:
+``` python
+from pyrate_limiter import BucketFullException, Duration, RequestRate, Limiter
+
+hourly_rate = RequestRate(500, Duration.HOUR) # 500 requests per hour
+daily_rate = RequestRate(1000, Duration.DAY) # 1000 requests per day
+monthly_rate = RequestRate(10000, Duration.MONTH) # 10000 requests per month
+
+limiter = Limiter(hourly_rate, daily_rate, monthly_rate)
+```
+
+Note that these rates need to be ordered by interval length; in other words, an hourly rate must
+come before a daily rate, etc.
+
+### Applying rate limits
+Then, use `Limiter.try_acquire()` wherever you are making requests (or other rate-limited operations).
+This will raise an exception if the rate limit is exceeded.
+
+```python
+import requests
+
+def request_function():
+    limiter.try_acquire('identity')
+    requests.get('https://example.com')
+
+while True:
+    request_function()
+```
+
+Alternatively, you can use `Limiter.ratelimit()` as a function decorator:
+```python
+@limiter.ratelimit('identity')
+def request_function():
+    requests.get('https://example.com')
+```
+See [Additional usage options](#additional-usage-options) below for more details.
+
+### Identities
+Note that both `try_acquire()` and `ratelimit()` take one or more `identity` arguments. Typically this is
+the name of the service or resource that is being rate-limited. This allows you to track rate limits
+for these resources independently. For example, if you have a service that is rate-limited by user:
+```python
+def request_function(user_ids):
+    limiter.try_acquire(*user_ids)
+    for user_id in user_ids:
+        requests.get(f'https://example.com?user_id={user_id}')
+```
+
+## Handling exceeded limits
+When a rate limit is exceeded, you have two options: raise an exception, or add delays.
+
+### Bucket analogy
+<img height="300" align="right" src="https://upload.wikimedia.org/wikipedia/commons/c/c4/Leaky_bucket_analogy.JPG">
+
+At this point it's useful to introduce the analogy of "buckets" used for rate-limiting. Here is a
+quick summary:
+
+* This library implements the [Leaky Bucket algorithm](https://en.wikipedia.org/wiki/Leaky_bucket).
+* It is named after the idea of representing some kind of fixed capacity -- like a network or service -- as a bucket.
+* The bucket "leaks" at a constant rate. For web services, this represents the **ideal or permitted request rate**.
+* The bucket is "filled" at an intermittent, unpredicatble rate, representing the **actual rate of requests**.
+* When the bucket is "full", it will overflow, representing **canceled or delayed requests**.
+
+### Rate limit exceptions
+By default, a `BucketFullException` will be raised when a rate limit is exceeded.
+The error contains a `meta_info` attribute with the following information:
+* `identity`: The identity it received
+* `rate`: The specific rate that has been exceeded
+* `remaining_time`: The remaining time until the next request can be sent
+
+Here's an example that will raise an exception on the 4th request:
+```python
+limiter = Limiter(RequestRate(3, Duration.SECOND))
+
+for _ in range(4):
+    try:
+        limiter.try_acquire('vutran')
+    except BucketFullException as err:
+        print(err)
+        # Output: Bucket for vutran with Rate 3/5 is already full
+        print(err.meta_info)
+        # Output: {'identity': 'vutran', 'rate': '5/5', 'remaining_time': 2.9,
+        #          'error': 'Bucket for vutran with Rate 3/5 is already full'}
+```
+
+### Rate limit delays
+You may want to simply slow down your requests to stay within the rate limits instead of canceling
+them. In that case you can use the `delay` argument. Note that this is only available for
+`Limiter.ratelimit()`:
+```python
+@limiter.ratelimit('identity', delay=True)
+def my_function():
+    do_stuff()
+```
+
+If you exceed a rate limit with a long interval (daily, monthly, etc.), you may not want to delay
+that long. In this case, you can set a `max_delay` (in seconds) that you are willing to wait in
+between calls:
+```python
+@limiter.ratelimit('identity', delay=True, max_delay=360)
+def my_function():
+    do_stuff()
+```
+In this case, calls may be delayed by at most 360 seconds to stay within the rate limits; any longer
+than that, and a `BucketFullException` will be raised instead. Without specifying `max_delay`, calls
+will be delayed as long as necessary.
+
+## Additional usage options
+Besides `Limiter.try_acquire()`, some additional usage options are available using `Limiter.ratelimit()`:
+### Decorator
+`Limiter.ratelimit()` can be used as a decorator:
+```python
+@limiter.ratelimit('identity')
+def my_function():
+    do_stuff()
+```
+
+As with `Limiter.try_acquire()`, if calls to the wrapped function exceed the rate limits you
+defined, a `BucketFullException` will be raised.
+
+### Contextmanager
+`Limiter.ratelimit()` also works as a contextmanager:
+
+```python
+def my_function():
+    with limiter.ratelimit('identity', delay=True):
+        do_stuff()
+```
+
+### Async decorator/contextmanager
+`Limiter.ratelimit()` also support async functions, either as a decorator or contextmanager:
+```python
+@limiter.ratelimit('identity', delay=True)
+async def my_function():
+    await do_stuff()
+
+async def my_function():
+    async with limiter.ratelimit('identity'):
+        await do_stuff()
+```
+
+When delays are enabled for an async function, `asyncio.sleep()` will be used instead of `time.sleep()`.
+
+## Backends
 A few different bucket backends are available, which can be selected using the `bucket_class`
 argument for `Limiter`. Any additional backend-specific arguments can be passed
 via `bucket_kwargs`.
@@ -100,18 +261,29 @@ limiter = Limiter(bucket_class=FileLockSQLiteBucket)
 If you have a larger, distributed application, Redis is an ideal backend. This
 option requires [redis-py](https://github.com/andymccurdy/redis-py).
 
-You can use the `redis_pool` argument to pass any connection settings:
+Note that this backend requires a `bucket_name` argument, which will be used as a kprefix for the
+Redis keys created. This can be used to disambiguate between multiple services using the same Redis
+instance with pyrate-limiter.
+
 ```python
 from pyrate_limiter import Limiter, RedisBucket
+
+limiter = Limiter(bucket_class=RedisBucket, bucket_kwargs={'bucket_name': 'my_service'})
+```
+
+#### Connection settings
+If you need to pass additional connection settings, you can use the `redis_pool` bucket argument:
+```python
 from redis import ConnectionPool
 
 redis_pool = ConnectionPool(host='localhost', port=6379, db=0)
 limiter = Limiter(
     bucket_class=RedisBucket,
-    bucket_kwargs={'redis_pool': redis_pool},
+    bucket_kwargs={'redis_pool': redis_pool, 'bucket_name': 'my_service'},
 )
 ```
 
+#### Redis clusters
 Redis clusters are also supported, which requires
 [redis-py-cluster](https://github.com/Grokzen/redis-py-cluster):
 ```python
@@ -123,138 +295,32 @@ limiter = Limiter(bucket_class=RedisClusterBucket)
 ### Custom backends
 If these don't suit your needs, you can also create your own bucket backend by extending `pyrate_limiter.bucket.AbstractBucket`.
 
-## Strategies
 
-### Subscription strategies
+## Additional features
 
-Considering API throttling logic for usual business models of Subscription, we usually see strategies somewhat similar to these.
+### Time sources
+By default, monotonic time is used, to ensure requests are always logged in the correct order.
 
-``` shell
-Some commercial/free API (Linkedin, Github etc)
-- 500 requests/hour, and
-- 1000 requests/day, and
-- maximum 10,000 requests/month
-```
-
-- [x] `RequestRate` class is designed to describe this strategies - eg for the above strategies we have a Rate-Limiter defined
-as following
-
-``` python
-hourly_rate = RequestRate(500, Duration.HOUR) # maximum 500 requests/hour
-daily_rate = RequestRate(1000, Duration.DAY) # maximum 1000 requests/day
-monthly_rate = RequestRate(10000, Duration.MONTH) # and so on
-
-limiter = Limiter(hourly_rate, daily_rate, monthly_rate, *other_rates, bucket_class=MemoryListBucket) # default is MemoryQueueBucket
-
-# usage
-identity = user_id # or ip-address, or maybe both
-limiter.try_acquire(identity)
-```
-
-As the logic is pretty self-explainatory, note that the superior rate-limit must come after the inferiors, ie
-1000 req/day must be declared after an hourly-rate-limit, and the daily-limit must be larger than hourly-limit.
-
-- [x] `bucket_class` is the type of bucket that holds request. It could be an in-memory data structure like Python List (`MemoryListBucket`), or Queue `MemoryQueueBucket`.
-
-
-- [x] For microservices or decentralized platform, multiple rate-Limiter may share a single store for storing
-      request-rate history, ie `Redis`. This lib provides ready-to-use `RedisBucket` (`redis-py` is required), and `RedisClusterBucket` (with `redis-py-cluster` being required). The usage difference is when using Redis, a naming `prefix` must be provide so the keys can be distinct for each item's identity.
-
-``` python
-from pyrate_limiter.bucket import RedisBucket, RedisClusterBucket
-from redis import ConnectionPool
-
-redis_pool = ConnectionPool.from_url('redis://localhost:6379')
-
-rate = RequestRate(3, 5 * Duration.SECOND)
-
-bucket_kwargs = {
-    "redis_pool": redis_pool,
-    "bucket_name": "my-ultimate-bucket-prefix"
-}
-
-# so each item buckets will have a key name as
-# my-ultimate-bucket-prefix__item-identity
-
-limiter = Limiter(rate, bucket_class=RedisBucket, bucket_kwargs=bucket_kwargs)
-# or RedisClusterBucket when used with a redis cluster
-# limiter = Limiter(rate, bucket_class=RedisClusterBucket, bucket_kwargs=bucket_kwargs)
-item = 'vutran_item'
-limiter.try_acquire(item)
-```
-
-### BucketFullException
-If the Bucket is full, an exception `BucketFullException` will be raised, with meta-info about the identity it received, the rate that has raised, and the remaining time until the next request can be processed.
-
+You can specify a custom time source with the `time_function` argument. For example, you may want to
+use the current UTC time for consistency across a distributed application using a Redis backend.
 ```python
-rate = RequestRate(3, 5 * Duration.SECOND)
-limiter = Limiter(rate)
-item = 'vutran'
+from datetime import datetime
+from pyrate_limiter import Duration, Limiter, RequestRate
+from time import time
 
-has_raised = False
-try:
-    for _ in range(4):
-        limiter.try_acquire(item)
-        sleep(1)
-except BucketFullException as err:
-    has_raised = True
-    assert str(err)
-    # Bucket for vutran with Rate 3/5 is already full
-    assert isinstance(err.meta_info, dict)
-    # {'error': 'Bucket for vutran with Rate 3/5 is already full', 'identity': 'tranvu', 'rate': '5/5', 'remaining_time': 2}
+rate = RequestRate(5, Duration.SECOND)
+limiter_datetime = Limiter(rate, time_function=lambda: datetime.utcnow().timestamp())
 ```
 
-### Decorator
-Rate-limiting is also available in decorator form, using `Limiter.ratelimit`. Example:
+Or simply use the basic `time.time()` function:
 ```python
-@limiter.ratelimit(item)
-def my_function():
-    do_stuff()
+from time import time
+
+rate = RequestRate(5, Duration.SECOND)
+limiter_time = Limiter(rate, time_function=time)
 ```
 
-As with `Limiter.try_acquire`, if calls to the wrapped function exceed the rate limits you
-defined, a `BucketFullException` will be raised.
-
-### Rate-limiting delays
-In some cases, you may want to simply slow down your calls to stay within the rate limits instead of
-canceling them. In that case you can use the `delay` flag, optionally with a `max_delay`
-(in seconds) that you are willing to wait in between calls.
-
-Example:
-```python
-@limiter.ratelimit(item, delay=True, max_delay=10)
-def my_function():
-    do_stuff()
-```
-
-In this case, calls may be delayed by at most 10 seconds to stay within the rate limits; any longer
-than that, and a `BucketFullException` will be raised instead. Without specifying `max_delay`, calls
-will be delayed as long as necessary.
-
-### Contextmanager
-`Limiter.ratelimit` also works as a contextmanager:
-
-```python
-def my_function():
-    with limiter.ratelimit(item, delay=True):
-        do_stuff()
-```
-
-### Async decorator/contextmanager
-All the above features of `Limiter.ratelimit` also work on async functions:
-```python
-@limiter.ratelimit(item, delay=True)
-async def my_function():
-    await do_stuff()
-
-async def my_function():
-    async with limiter.ratelimit(item):
-        await do_stuff()
-```
-
-When delays are enabled, `asyncio.sleep` will be used instead of `time.sleep`.
-
-### Examples
+## Examples
 To prove that pyrate-limiter is working as expected, here is a complete example to demonstrate
 rate-limiting with delays:
 ```python
@@ -295,60 +361,3 @@ async def test_ratelimit():
 
 asyncio.run(test_ratelimit())
 ```
-
-Limiter can be used with any custom time source. For example user may want to use
-Redis time to use same time in distributed installation. By default `time.monotonic` is
-used. To adjust time source use `time_function` parameter with any no arguments function.
-```python
-from datetime import datetime
-from pyrate_limiter import Duration, Limiter, RequestRate
-from time import time
-
-limiter_datetime = Limiter(RequestRate(5, Duration.SECOND), time_function=lambda: datetime.utcnow().timestamp())
-limiter_time = Limiter(RequestRate(5, Duration.SECOND), time_function=time)
-```
-
-### Spam-protection strategies
-- [x] Sometimes, we need a rate-limiter to protect our API from spamming/ddos attack. Some usual strategies for this could be as
-following
-
-``` shell
-1. No more than 100 requests/minute, or
-2. 100 request per minute, and no more than 300 request per hour
-```
-
-### Throttling handling
-When the number of incoming requets go beyond the limit, we can either do..
-
-``` shell
-1. Raise a 429 Http Error, or
-2. Keep the incoming requests, wait then slowly process them one by one.
-```
-
-### More complex scenario
-https://www.keycdn.com/support/rate-limiting#types-of-rate-limits
-
-## Development
-
-### Setup & Commands
-- To setup local development,  *Poetry* and *Python 3.6* is required. Python can be installed using *Pyenv* or normal installation from binary source. To install *poetry*, follow the official guideline (https://python-poetry.org/docs/#installation).
-
-Then, in the repository directory, run the following to install all optional backend dependencies and dev dependencies:
-```shell
-$ poetry install -E all
-```
-
-Some shortcuts are included for some common development tasks, using [nox](https://nox.thea.codes):
-- Run tests with: `nox -e test`
-- To run tests with coverage: `nox -e cover`
-- Format & check for lint error: `nox -e lint`
-- To run linting for every commit, run: `pre-commit install`
-
-### Guideline & Notes
-We have GitHub Action CICD to do the checking, testing and publishing work. So, there are few small notes when making Pull Request:
-- All existing tests must pass (Of course!)
-- Reduction in *Coverage* shall result in failure. (below 98% is not accepted)
-- When you are making bug fixes, or adding more features, remember to bump the version number in **pyproject.toml**. The number should follow *semantic-versioning* rules
-
-## Notes
-Todo-items marked with (*) are planned for v3 release.

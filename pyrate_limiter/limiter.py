@@ -1,8 +1,8 @@
-"""Basic Rate-Limiter."""
 from time import monotonic
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import Type
 from typing import Union
 
 from .bucket import AbstractBucket
@@ -14,23 +14,23 @@ from .request_rate import RequestRate
 
 
 class Limiter:
-    """Basic rate-limiter class that makes use of built-in python Queue"""
+    """Main rate-limiter class
 
-    bucket_group: Dict[Any, Any]
+    Args:
+        rates: Request rate definitions
+        bucket_class: Bucket backend to use; may be any subclass of :py:class:`.AbstractBucket`.
+            See :py:mod`pyrate_limiter.bucket` for available bucket classes.
+        bucket_kwargs: Extra keyword arguments to pass to the bucket class constructor.
+        time_function: Time function that returns the current time as a float, in seconds
+    """
 
     def __init__(
         self,
         *rates: RequestRate,
-        bucket_class=MemoryQueueBucket,
-        bucket_kwargs=None,
+        bucket_class: Type[AbstractBucket] = MemoryQueueBucket,
+        bucket_kwargs: Dict[str, Any] = None,
         time_function: Callable[[], float] = None,
     ):
-        """Init a limiter with rates and specific bucket type
-        - Bucket type can be any class that extends AbstractBucket
-        - 3 kinds of Bucket are provided, being MemoryQueueBucket, MemoryListBucket and RedisBucket
-        - Opts is extra keyword-arguments for Bucket class constructor
-        - Optional time function, that should return float as current second.microsecond
-        """
         self._validate_rate_list(rates)
         self._rates = rates
         self._bkclass = bucket_class
@@ -43,7 +43,7 @@ class Limiter:
         self.time_function()
 
     def _validate_rate_list(self, rates):  # pylint: disable=no-self-use
-        """Raise exception if *rates are incorrectly ordered."""
+        """Raise exception if rates are incorrectly ordered."""
         if not rates:
             raise InvalidParams("Rate(s) must be provided")
 
@@ -74,7 +74,15 @@ class Limiter:
             self.bucket_group[item_id].lock_release()
 
     def try_acquire(self, *identities: str) -> None:
-        """Attempt to acquire an item, or raise an error if a rate limit has been exceeded"""
+        """Attempt to acquire an item, or raise an error if a rate limit has been exceeded.
+
+        Args:
+            identities: One or more identities to acquire. Typically this is the name of a service
+                or resource that is being rate-limited.
+
+        Raises:
+            :py:exc:`BucketFullException`: If the bucket is full and the item cannot be acquired
+        """
         self._init_buckets(identities)
         now = self.time_function()
 
@@ -103,7 +111,7 @@ class Limiter:
 
     def ratelimit(
         self,
-        *identities,
+        *identities: str,
         delay: bool = False,
         max_delay: Union[int, float] = None,
     ):
@@ -112,10 +120,15 @@ class Limiter:
         sleep until space is available in the bucket.
 
         Args:
-            identities: Bucket identities
+            identities: One or more identities to acquire. Typically this is the name of a service
+                or resource that is being rate-limited.
             delay: Delay until the next request instead of raising an exception
             max_delay: The maximum allowed delay time (in seconds); anything over this will raise
                 an exception
+
+        Raises:
+            :py:exc:`BucketFullException`: If the rate limit is reached, and ``delay=False`` or the
+                delay exceeds ``max_delay``
         """
         return LimitContextDecorator(self, *identities, delay=delay, max_delay=max_delay)
 

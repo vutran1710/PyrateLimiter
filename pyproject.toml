@@ -1,17 +1,20 @@
 [tool.poetry]
 name = "pyrate-limiter"
-version = "2.8.0"
-description = "Python Rate-Limiter using Leaky-Bucket Algorimth Family"
+version = "2.8.1"
+description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = ["vutr <me@vutr.io>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/vutran1710/PyrateLimiter"
 repository = "https://github.com/vutran1710/PyrateLimiter"
+documentation = "https://pyrate-limiter.readthedocs.io"
 keywords = ["rate", "rate-limiter", "rate_limiter", "ratelimiter", "leaky-bucket", "ratelimit", "ratelimiting"]
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Documentation",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
 include = [
     "LICENSE",
@@ -25,8 +28,18 @@ filelock = {optional=true, version=">=3.0"}
 redis = {optional=true, version="^3.3"}
 redis-py-cluster = {optional=true, version="^2.1.3"}
 
+# Documentation dependencies needed for Readthedocs builds
+furo = {optional=true, version="^2022.3.4"}
+myst-parser = {optional=true, version=">=0.17", python=">=3.7"}
+sphinx = {optional=true, version="^4.3.0"}
+sphinx-autodoc-typehints = {optional=true, version="^1.17", python=">=3.7"}
+sphinx-copybutton = {optional=true, version=">=0.5"}
+sphinxcontrib-apidoc = {optional=true, version="^0.3"}
+
 [tool.poetry.extras]
 all = ["filelock", "redis", "redis-py-cluster"]
+docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints",
+        "sphinx-copybutton", "sphinxcontrib-apidoc"]
 
 [tool.poetry.dev-dependencies]
 coverage = "^5.5"
@@ -54,7 +67,8 @@ source = ['pyrate_limiter']
 
 [tool.coverage.report]
 exclude_lines = [
-    "except ImportError:",  # Not testing missing optional dependencies
+    "except ImportError:",  # Used for missing optional dependencies
+    "if TYPE_CHECKING:",  # Used for type forward references
 ]
 
 [tool.coverage.xml]

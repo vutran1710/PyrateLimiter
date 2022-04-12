@@ -12,9 +12,9 @@ from .exceptions import InvalidParams
 
 
 class AbstractBucket(ABC):
-    """Documentation for AbstractBucket"""
+    """Base bucket interface"""
 
-    def __init__(self, maxsize=0, **_kwargs):
+    def __init__(self, maxsize: int = 0, **_kwargs):
         self._maxsize = maxsize
 
     def maxsize(self) -> int:
@@ -36,9 +36,9 @@ class AbstractBucket(ABC):
         """
 
     @abstractmethod
-    def get(self, number: int) -> float:
-        """Get items and remove them from the bucket in the FIFO fashion
-        Return the number of items that have been removed
+    def get(self, number: int) -> int:
+        """Get items, remove them from the bucket in the FIFO order, and return the number of items
+        that have been removed
         """
 
     @abstractmethod
@@ -74,21 +74,19 @@ class AbstractBucket(ABC):
 
 
 class MemoryQueueBucket(AbstractBucket):
-    """A bucket that resides in memory
-    using python's built-in Queue class
-    """
+    """A bucket that resides in memory using python's built-in Queue class"""
 
-    def __init__(self, maxsize=0, **_kwargs):
+    def __init__(self, maxsize: int = 0, **_kwargs):
         super().__init__()
-        self._q = Queue(maxsize=maxsize)
+        self._q: Queue = Queue(maxsize=maxsize)
 
-    def size(self):
+    def size(self) -> int:
         return self._q.qsize()
 
-    def put(self, item):
+    def put(self, item: float):
         return self._q.put(item)
 
-    def get(self, number):
+    def get(self, number: int) -> int:
         counter = 0
         for _ in range(number):
             self._q.get()
@@ -96,7 +94,7 @@ class MemoryQueueBucket(AbstractBucket):
 
         return counter
 
-    def all_items(self):
+    def all_items(self) -> List[float]:
         return list(self._q.queue)
 
     def flush(self):
@@ -105,26 +103,24 @@ class MemoryQueueBucket(AbstractBucket):
 
 
 class MemoryListBucket(AbstractBucket):
-    """A bucket that resides in memory
-    using python's List
-    """
+    """A bucket that resides in memory using python's List"""
 
-    def __init__(self, maxsize=0, **_kwargs):
+    def __init__(self, maxsize: int = 0, **_kwargs):
         super().__init__(maxsize=maxsize)
-        self._q = []
+        self._q: List[float] = []
         self._lock = RLock()
 
-    def size(self):
+    def size(self) -> int:
         return len(self._q)
 
-    def put(self, item):
+    def put(self, item: float):
         with self._lock:
             if self.size() < self.maxsize():
                 self._q.append(item)
                 return 1
             return 0
 
-    def get(self, number):
+    def get(self, number: int) -> int:
         with self._lock:
             counter = 0
             for _ in range(number):
@@ -133,7 +129,7 @@ class MemoryListBucket(AbstractBucket):
 
             return counter
 
-    def all_items(self):
+    def all_items(self) -> List[float]:
         return self._q.copy()
 
     def flush(self):
@@ -141,9 +137,7 @@ class MemoryListBucket(AbstractBucket):
 
 
 class RedisBucket(AbstractBucket):
-    """A bucket with Redis
-    using List
-    """
+    """A bucket backed by a Redis instance"""
 
     def __init__(
         self,
@@ -174,11 +168,11 @@ class RedisBucket(AbstractBucket):
         pipeline = conn.pipeline()
         return pipeline
 
-    def size(self):
+    def size(self) -> int:
         conn = self.get_connection()
         return conn.llen(self._bucket_name)
 
-    def put(self, item):
+    def put(self, item: float):
         conn = self.get_connection()
         current_size = conn.llen(self._bucket_name)
 
@@ -188,7 +182,7 @@ class RedisBucket(AbstractBucket):
 
         return 0
 
-    def get(self, number):
+    def get(self, number: int) -> int:
         pipeline = self.get_pipeline()
         counter = 0
 
@@ -199,7 +193,7 @@ class RedisBucket(AbstractBucket):
         pipeline.execute()
         return counter
 
-    def all_items(self):
+    def all_items(self) -> List[float]:
         conn = self.get_connection()
         items = conn.lrange(self._bucket_name, 0, -1)
         return sorted([float(i.decode("utf-8")) for i in items])
@@ -210,7 +204,7 @@ class RedisBucket(AbstractBucket):
 
 
 class RedisClusterBucket(RedisBucket):
-    """A bucket with RedisCluster"""
+    """A bucket backed by a Redis cluster"""
 
     def get_connection(self):
         """Obtain a connection from redis pool"""

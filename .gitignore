@@ -3,6 +3,9 @@
 pyrate_limiter.egg-info/
 __pycache__/
 dist/
+docs/_build/
+docs/modules/
+examples/
 htmlcov/
 env/
 test-reports/

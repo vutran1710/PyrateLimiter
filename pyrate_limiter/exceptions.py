@@ -1,8 +1,18 @@
 # pylint: disable=C0114,C0115
+from typing import Any
+from typing import Dict
+from typing import TYPE_CHECKING
+from typing import Union
+
+
+if TYPE_CHECKING:
+    from .request_rate import RequestRate
+
+
 class BucketFullException(Exception):
-    def __init__(self, identity, rate, remaining_time):
+    def __init__(self, identity: str, rate: "RequestRate", remaining_time: float):
         error = f"Bucket for {identity} with Rate {rate} is already full"
-        self.meta_info = {
+        self.meta_info: Dict[str, Union[str, float]] = {
             "error": error,
             "identity": identity,
             "rate": str(rate),
@@ -18,7 +28,7 @@ class InvalidParams(Exception):
 
 
 class ImmutableClassProperty(Exception):
-    def __init__(self, class_instance, prop: str):
+    def __init__(self, class_instance: Any, prop: str):
         """Mutating class property is forbidden"""
         self.message = f"{class_instance}.{prop} must not be mutated"
         super().__init__(self.message)

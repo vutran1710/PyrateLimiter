@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [2.7.0] - TBD
+## [2.8.1] - 2022-04-11
+### Added
+* Add Sphinx config
+* Add documentation site: https://pyrate-limiter.readthedocs.io
+* Add some missing type hints
+* Add package metadata to indicate PEP-561 compliance
+
+## [2.8.0] - 2022-04-10
+### Added
+* Add `flush()` method to all bucket classes
+
+## [2.7.0] - 2022-04-06
 ### Added
 * Add `FileLockSQliteBucket` for a SQLite backend with file-based locking
 * Add optional backend dependencies to package metadata
