@@ -3,7 +3,7 @@
 # PyrateLimiter
 The request rate limiter using Leaky-bucket algorithm.
 
-Full project documentation can be found at [pyrate-limiter.readthedocs.io](https://pyrate-limiter.readthedocs.io).
+Full project documentation can be found at [pyratelimiter.readthedocs.io](https://pyratelimiter.readthedocs.io).
 
 [![PyPI version](https://badge.fury.io/py/pyrate-limiter.svg)](https://badge.fury.io/py/pyrate-limiter)
 [![PyPI - Python Versions](https://img.shields.io/pypi/pyversions/pyrate-limiter)](https://pypi.org/project/pyrate-limiter)
