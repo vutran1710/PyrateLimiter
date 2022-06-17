@@ -148,11 +148,14 @@ for _ in range(4):
         limiter.try_acquire('vutran')
     except BucketFullException as err:
         print(err)
-        # Output: Bucket for vutran with Rate 3/5 is already full
+        # Output: Bucket for vutran with Rate 3/1 is already full
         print(err.meta_info)
-        # Output: {'identity': 'vutran', 'rate': '5/5', 'remaining_time': 2.9,
-        #          'error': 'Bucket for vutran with Rate 3/5 is already full'}
+        # Output: {'identity': 'vutran', 'rate': '3/1', 'remaining_time': 2.9,
+        #          'error': 'Bucket for vutran with Rate 3/1 is already full'}
 ```
+
+The rate part of the output is constructed as: `limit / interval`. On the above example, the limit
+is 3 and the interval is 1, hence the `Rate 3/1`.
 
 ### Rate limit delays
 You may want to simply slow down your requests to stay within the rate limits instead of canceling
