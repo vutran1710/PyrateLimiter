@@ -71,13 +71,27 @@ Consider some public API (like LinkedIn, GitHub, etc.) that has rate limits like
 
 You can define these rates using the `RequestRate` class, and add them to a `Limiter`:
 ``` python
-from pyrate_limiter import BucketFullException, Duration, RequestRate, Limiter
+from pyrate_limiter import Duration, RequestRate, Limiter
 
 hourly_rate = RequestRate(500, Duration.HOUR) # 500 requests per hour
 daily_rate = RequestRate(1000, Duration.DAY) # 1000 requests per day
 monthly_rate = RequestRate(10000, Duration.MONTH) # 10000 requests per month
 
 limiter = Limiter(hourly_rate, daily_rate, monthly_rate)
+```
+
+or
+
+``` python
+from pyrate_limiter import Duration, RequestRate, Limiter
+
+rate_limits = (
+      RequestRate(500, Duration.HOUR), # 500 requests per hour
+      RequestRate(1000, Duration.DAY), # 1000 requests per day
+      RequestRate(10000, Duration.MONTH), # 10000 requests per month
+)
+
+limiter = Limiter(*rate_limits)
 ```
 
 Note that these rates need to be ordered by interval length; in other words, an hourly rate must
@@ -141,7 +155,11 @@ The error contains a `meta_info` attribute with the following information:
 
 Here's an example that will raise an exception on the 4th request:
 ```python
-limiter = Limiter(RequestRate(3, Duration.SECOND))
+from pyrate_limiter import (Duration, RequestRate,
+                            Limiter, BucketFullException)
+
+rate = RequestRate(3, Duration.SECOND)
+limiter = Limiter(rate)
 
 for _ in range(4):
     try:
@@ -271,7 +289,11 @@ instance with pyrate-limiter.
 ```python
 from pyrate_limiter import Limiter, RedisBucket
 
-limiter = Limiter(bucket_class=RedisBucket, bucket_kwargs={'bucket_name': 'my_service'})
+limiter = Limiter(
+    bucket_class=RedisBucket,
+    bucket_kwargs={'bucket_name': 'my_service'},
+)
+
 ```
 
 #### Connection settings
@@ -309,7 +331,6 @@ use the current UTC time for consistency across a distributed application using 
 ```python
 from datetime import datetime
 from pyrate_limiter import Duration, Limiter, RequestRate
-from time import time
 
 rate = RequestRate(5, Duration.SECOND)
 limiter_datetime = Limiter(rate, time_function=lambda: datetime.utcnow().timestamp())
@@ -340,6 +361,7 @@ def limited_function(start_time):
 start_time = time()
 for _ in range(n_requests):
     limited_function(start_time)
+
 print(f"Ran {n_requests} requests in {time() - start_time:.5f} seconds")
 ```
 
