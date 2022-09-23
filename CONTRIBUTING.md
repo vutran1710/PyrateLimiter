@@ -2,7 +2,7 @@
 Here are some basic instructions for local development setup and contributing to the project.
 
 ## Setup & Commands
-To setup local development,  *Poetry* and *Python 3.6* is required. Python can be installed using *Pyenv* or normal installation from binary source. To install *poetry*, follow the official guideline (https://python-poetry.org/docs/#installation).
+To setup local development, *Poetry* and *Python 3.7+* are required. Python can be installed using *Pyenv* or normal installation from binary source. To install *poetry*, follow the official guideline (https://python-poetry.org/docs/#installation).
 
 Then, in the repository directory, run the following to install all optional backend dependencies and dev dependencies:
 ```shell
