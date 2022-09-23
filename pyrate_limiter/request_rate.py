@@ -3,6 +3,7 @@
 from enum import Enum
 from typing import Any
 from typing import Dict
+from typing import Union
 
 from .exceptions import ImmutableClassProperty
 
@@ -23,7 +24,7 @@ class RequestRate:
     def __init__(
         self,
         limit: int,
-        interval: int,
+        interval: Union[int, float],
         reset: ResetTypes = ResetTypes.INTERVAL,
     ):
         self._limit = limit
@@ -40,7 +41,7 @@ class RequestRate:
         raise ImmutableClassProperty(self, "limit")
 
     @property
-    def interval(self) -> int:
+    def interval(self) -> Union[int, float]:
         return self._interval
 
     @interval.setter
