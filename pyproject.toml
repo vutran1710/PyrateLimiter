@@ -37,6 +37,8 @@ sphinxcontrib-apidoc = {optional=true, version="^0.3"}
 
 [tool.poetry.extras]
 all = ["filelock", "redis"]
+sqlite = ["filelock"]
+redis = ["redis"]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints",
         "sphinx-copybutton", "sphinxcontrib-apidoc"]
 

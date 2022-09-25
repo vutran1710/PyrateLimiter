@@ -1053,11 +1053,13 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [extras]
 all = ["filelock", "redis"]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints", "sphinx-copybutton", "sphinxcontrib-apidoc"]
+redis = ["redis"]
+sqlite = ["filelock"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "1288fe13d9513e7c4959131f2690588da7fc1e6db805cc5df1bff91a86f14229"
+content-hash = "d8c944d1862f3271e8912297de635c0030789f8da51262988b0f4211096327f4"
 
 [metadata.files]
 alabaster = [
