@@ -208,6 +208,6 @@ class RedisClusterBucket(RedisBucket):
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
-        from rediscluster import RedisCluster  # pylint: disable=import-outside-toplevel
+        from redis.cluster import RedisCluster  # pylint: disable=import-outside-toplevel
 
         return RedisCluster(connection_pool=self._pool)
