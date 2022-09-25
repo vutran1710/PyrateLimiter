@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [2.8.2] - 2022-TBD
 ### Removed
 * Python 3.6 support
+* Add millisecond interval to `Duration`
+* Update typing hinting of `RequestRate` to explicitly accept sub second intervals
 
 ## [2.8.1] - 2022-04-11
 ### Added
