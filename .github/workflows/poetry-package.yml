@@ -31,14 +31,17 @@ jobs:
         virtualenvs-in-project: true
 
     # Cache packages per python version, and reuse until lockfile changes
-    - name: Cache python packages
-      id: cache
-      uses: actions/cache@v3
-      with:
-        path: .venv
-        key: venv-${{ matrix.python-version }}-latest-${{ hashFiles('poetry.lock') }}
+    # TODO: For some strange reason, virtualenvs restored from the cache will sometimes be
+    #   missing a python interpreter. Just disabling the cache for now.
+    # - name: Cache python packages
+    #   id: cache
+    #   uses: actions/cache@v3
+    #   with:
+    #     path: .venv
+    #     key: venv-${{ matrix.python-version }}-latest-${{ hashFiles('poetry.lock') }}
+
     - name: Install dependencies
-      if: steps.cache.outputs.cache-hit != 'true'
+      # if: steps.cache.outputs.cache-hit != 'true'
       run: poetry install -v -E all
 
     # Run linting, tests, and coverage
