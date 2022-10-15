@@ -59,10 +59,12 @@ class Limiter:
         The bucket's maxsize equals the max limit of request-rates.
         """
         maxsize = self._rates[-1].limit
+        maxinterval = self._rates[-1].interval
         for item_id in sorted(identities):
             if not self.bucket_group.get(item_id):
                 self.bucket_group[item_id] = self._bkclass(
                     maxsize=maxsize,
+                    maxinterval=maxinterval,
                     identity=item_id,
                     **self._bucket_args,
                 )
