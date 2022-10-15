@@ -14,21 +14,14 @@ from .exceptions import InvalidParams
 class AbstractBucket(ABC):
     """Base bucket interface"""
 
-    def __init__(self, maxsize: int = 0, maxinterval: int = 0, **_kwargs):
+    def __init__(self, maxsize: int = 0, **_kwargs):
         self._maxsize = maxsize
-        self._maxinterval = maxinterval
 
     def maxsize(self) -> int:
         """Return the maximum size of the bucket,
         ie the maximum number of item this bucket can hold
         """
         return self._maxsize
-
-    def maxinterval(self) -> int:
-        """Return the maximum interval of the bucket,
-        ie the maximum duration the bucket has to persist
-        """
-        return self._maxinterval
 
     @abstractmethod
     def size(self) -> int:
@@ -149,13 +142,14 @@ class RedisBucket(AbstractBucket):
     def __init__(
         self,
         maxsize=0,
-        maxinterval=0,
+        maxinterval: int = None,
         redis_pool=None,
         bucket_name: str = None,
         identity: str = None,
         **_kwargs,
     ):
-        super().__init__(maxsize=maxsize, maxinterval=maxinterval)
+        super().__init__(maxsize=maxsize)
+        self._maxinterval = maxinterval
 
         if not bucket_name or not isinstance(bucket_name, str):
             msg = "keyword argument bucket-name is missing: a distict name is required"
@@ -186,7 +180,7 @@ class RedisBucket(AbstractBucket):
 
         if current_size < self.maxsize():
             conn.rpush(self._bucket_name, item)
-            conn.expire(self._bucket_name, self.maxinterval())
+            conn.expire(self._bucket_name, self._maxinterval) if self._maxinterval else None
             return 1
 
         return 0
