@@ -19,7 +19,7 @@ class AbstractBucket(ABC):
 
     def maxsize(self) -> int:
         """Return the maximum size of the bucket,
-        ie the maxinum number of item this bucket can hold
+        ie the maximum number of item this bucket can hold
         """
         return self._maxsize
 
@@ -145,6 +145,7 @@ class RedisBucket(AbstractBucket):
         redis_pool=None,
         bucket_name: str = None,
         identity: str = None,
+        expire_time: int = None,
         **_kwargs,
     ):
         super().__init__(maxsize=maxsize)
@@ -155,6 +156,7 @@ class RedisBucket(AbstractBucket):
 
         self._pool = redis_pool
         self._bucket_name = f"{bucket_name}___{identity}"
+        self._expire_time = expire_time
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
@@ -177,7 +179,13 @@ class RedisBucket(AbstractBucket):
         current_size = conn.llen(self._bucket_name)
 
         if current_size < self.maxsize():
-            conn.rpush(self._bucket_name, item)
+            pipeline = self.get_pipeline()
+            pipeline.rpush(self._bucket_name, item)
+
+            if self._expire_time is not None:
+                pipeline.expire(self._bucket_name, self._expire_time)
+
+            pipeline.execute()
             return 1
 
         return 0
