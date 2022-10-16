@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [2.8.3] - 2022-10-17
-### Removed
+### Added
 * Add option to expire redis key when using RedisBucket
 
 ## [2.8.2] - 2022-TBD

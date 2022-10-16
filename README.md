@@ -286,7 +286,7 @@ Note that this backend requires a `bucket_name` argument, which will be used as 
 Redis keys created. This can be used to disambiguate between multiple services using the same Redis
 instance with pyrate-limiter.
 
-**Important**: another thing you might want to consider to `expire_time` for each buckets. In a scenario where some `identity` produces a request rate that is too sparsed, it is a good practice to expire the bucket which holds such identity's info to save memory.
+**Important**: you might want to consider adding `expire_time` for each buckets. In a scenario where some `identity` produces a request rate that is too sparsed, it is a good practice to expire the bucket which holds such identity's info to save memory.
 
 ```python
 from pyrate_limiter import Limiter, RedisBucket, Duration, RequestRate
