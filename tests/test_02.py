@@ -18,12 +18,19 @@ pool = dummy_redis.connection_pool
 def test_simple_01(time_function):
     """Single-rate Limiter with RedisBucket"""
     rate = RequestRate(3, 5 * Duration.SECOND)
+    expire_time = rate.interval * rate.limit
     limiter = Limiter(
         rate,
         bucket_class=RedisBucket,
         # Separate buckets used to distinct values from previous run,
         # as time_function return value has different int part.
-        bucket_kwargs={"redis_pool": pool, "bucket_name": str(time_function)},
+        bucket_kwargs={
+            "redis_pool": pool,
+            "bucket_name": str(time_function),
+            # After the set time, the bucket key in Redis should expire
+            # to prevent unneccessary memory cost
+            "expire_time": expire_time,
+        },
         time_function=time_function,
     )
     item = "vutran_list"
@@ -42,6 +49,11 @@ def test_simple_01(time_function):
 
     with pytest.raises(BucketFullException):
         limiter.try_acquire(item)
+
+    # After expire-time, bucket should expires
+    assert limiter.get_current_volume(item) > 0
+    sleep(expire_time)
+    assert limiter.get_current_volume(item) == 0
 
 
 def test_simple_02(time_function):
