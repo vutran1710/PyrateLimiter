@@ -282,16 +282,28 @@ limiter = Limiter(bucket_class=FileLockSQLiteBucket)
 If you have a larger, distributed application, Redis is an ideal backend. This
 option requires [redis-py](https://github.com/andymccurdy/redis-py).
 
-Note that this backend requires a `bucket_name` argument, which will be used as a kprefix for the
+Note that this backend requires a `bucket_name` argument, which will be used as a prefix for the
 Redis keys created. This can be used to disambiguate between multiple services using the same Redis
 instance with pyrate-limiter.
 
+**Important**: another thing you might want to consider to `expire_time` for each buckets. In a scenario where some `identity` produces a request rate that is too sparsed, it is a good practice to expire the bucket which holds such identity's info to save memory.
+
 ```python
-from pyrate_limiter import Limiter, RedisBucket
+from pyrate_limiter import Limiter, RedisBucket, Duration, RequestRate
+
+rates = [
+    RequestRate(5, 10 * Duration.SECOND),
+    RequestRate(8, 20 * Duration.SECOND),
+]
 
 limiter = Limiter(
+    *rates
     bucket_class=RedisBucket,
-    bucket_kwargs={'bucket_name': 'my_service'},
+    bucket_kwargs={
+        'bucket_name':
+        'my_service',
+        'expire_time': rates[-1].interval,
+    },
 )
 
 ```
@@ -302,7 +314,11 @@ If you need to pass additional connection settings, you can use the `redis_pool`
 from redis import ConnectionPool
 
 redis_pool = ConnectionPool(host='localhost', port=6379, db=0)
+
+rate = RequestRate(5, 10 * Duration.SECOND)
+
 limiter = Limiter(
+    rate,
     bucket_class=RedisBucket,
     bucket_kwargs={'redis_pool': redis_pool, 'bucket_name': 'my_service'},
 )
