@@ -70,7 +70,7 @@ def test_simple_01():
         print(err)
         assert str(err)
         assert isinstance(err.meta_info, dict)
-        assert 1.9 < err.meta_info["remaining_time"] < 2.0
+        assert 1.9 < float(err.meta_info["remaining_time"]) < 2.0
 
     assert has_raised
 
@@ -248,9 +248,11 @@ def test_remaining_time(time_function):
         limiter2.try_acquire("item")
     sleep(0.1)
 
+    delay_time = 0
+
     try:
         limiter2.try_acquire("item")
     except BucketFullException as err:
         delay_time = err.meta_info["remaining_time"]
 
-    assert 0.8 < delay_time < 0.9
+    assert 0.8 < float(delay_time) < 0.9
