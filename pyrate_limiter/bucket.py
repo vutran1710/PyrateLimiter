@@ -142,14 +142,13 @@ class RedisBucket(AbstractBucket):
     def __init__(
         self,
         maxsize=0,
-        maxinterval: int = None,
         redis_pool=None,
         bucket_name: str = None,
         identity: str = None,
+        expire_time: int = None,
         **_kwargs,
     ):
         super().__init__(maxsize=maxsize)
-        self._maxinterval = maxinterval
 
         if not bucket_name or not isinstance(bucket_name, str):
             msg = "keyword argument bucket-name is missing: a distict name is required"
@@ -157,6 +156,7 @@ class RedisBucket(AbstractBucket):
 
         self._pool = redis_pool
         self._bucket_name = f"{bucket_name}___{identity}"
+        self._expire_time = expire_time
 
     def get_connection(self):
         """Obtain a connection from redis pool"""
@@ -179,8 +179,13 @@ class RedisBucket(AbstractBucket):
         current_size = conn.llen(self._bucket_name)
 
         if current_size < self.maxsize():
-            conn.rpush(self._bucket_name, item)
-            conn.expire(self._bucket_name, self._maxinterval) if self._maxinterval else None
+            pipeline = self.get_pipeline()
+            pipeline.rpush(self._bucket_name, item)
+
+            if self._expire_time is not None:
+                pipeline.expire(self._bucket_name, self._expire_time)
+
+            pipeline.execute()
             return 1
 
         return 0
