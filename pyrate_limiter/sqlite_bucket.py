@@ -3,7 +3,7 @@ from hashlib import sha1
 from pathlib import Path
 from tempfile import gettempdir
 from threading import RLock
-from typing import List
+from typing import List, Iterable, Iterator
 from typing import Optional
 from typing import Union
 
@@ -115,11 +115,12 @@ class SQLiteBucket(AbstractBucket):
         Return the number of items that have been removed.
         """
         keys = [str(key) for key in self._get_keys(number)]
-
-        placeholders = ",".join("?" * len(keys))
-        self.connection.execute(f"DELETE FROM {self.table} WHERE idx IN ({placeholders})", keys)
-        self.connection.commit()
-        self._update_size(0 - len(keys))
+        keys_chunks = self.chunkify(keys, 50)
+        for single_chunk in keys_chunks:
+            placeholders = ",".join("?" * len(single_chunk))
+            self.connection.execute(f"DELETE FROM {self.table} WHERE idx IN ({placeholders})", single_chunk)
+            self.connection.commit()
+            self._update_size(0 - len(single_chunk))
 
         return len(keys)
 
@@ -135,6 +136,12 @@ class SQLiteBucket(AbstractBucket):
     def flush(self):
         self.connection.execute(f"DELETE FROM {self.table}")
         self.connection.commit()
+
+    def chunkify(iterable: Iterable, max_size: int) -> Iterator[List]:
+        """Split an iterable into chunks of a max size"""
+        iterable = list(iterable)
+        for index in range(0, len(iterable), max_size):
+            yield iterable[index: index + max_size]
 
 
 # Create file lock in module scope to reuse across buckets
