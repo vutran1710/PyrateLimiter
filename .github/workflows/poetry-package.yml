@@ -80,5 +80,5 @@ jobs:
     - name: Publish
       run: |
         poetry config http-basic.pypi ${{ secrets.PYPI_USERNAME }} ${{ secrets.PYPI_PASSWORD }}
-        poetry build -f sdist
+        poetry build
         poetry publish
