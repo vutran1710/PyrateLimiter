@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.8.4] - 2022-11-23
+### Fixed
+* Build both `wheel` and `sdist` on publish
+
 ## [2.8.3] - 2022-10-17
 ### Added
 * Add option to expire redis key when using RedisBucket
