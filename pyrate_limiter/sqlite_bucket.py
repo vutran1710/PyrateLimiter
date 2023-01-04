@@ -3,6 +3,8 @@ from hashlib import sha1
 from pathlib import Path
 from tempfile import gettempdir
 from threading import RLock
+from typing import Iterable
+from typing import Iterator
 from typing import List
 from typing import Optional
 from typing import Union
@@ -12,6 +14,7 @@ from .bucket import AbstractBucket
 TEMP_DIR = Path(gettempdir())
 DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
 LOCK_PATH = TEMP_DIR / "pyrate_limiter.lock"
+SQLITE_MAX_VARIABLE_NUMBER = 999
 
 
 class SQLiteBucket(AbstractBucket):
@@ -115,12 +118,12 @@ class SQLiteBucket(AbstractBucket):
         Return the number of items that have been removed.
         """
         keys = [str(key) for key in self._get_keys(number)]
+        for chunk in chunkify(keys, SQLITE_MAX_VARIABLE_NUMBER):
+            placeholders = ",".join("?" * len(chunk))
+            self.connection.execute(f"DELETE FROM {self.table} WHERE idx IN ({placeholders})", chunk)
+            self.connection.commit()
 
-        placeholders = ",".join("?" * len(keys))
-        self.connection.execute(f"DELETE FROM {self.table} WHERE idx IN ({placeholders})", keys)
-        self.connection.commit()
         self._update_size(0 - len(keys))
-
         return len(keys)
 
     def _get_keys(self, number: int = 1) -> List[float]:
@@ -135,6 +138,13 @@ class SQLiteBucket(AbstractBucket):
     def flush(self):
         self.connection.execute(f"DELETE FROM {self.table}")
         self.connection.commit()
+
+
+def chunkify(iterable: Iterable, max_size: int) -> Iterator[List]:
+    """Split an iterable into chunks of a max size"""
+    iterable = list(iterable)
+    for index in range(0, len(iterable), max_size):
+        yield iterable[index : index + max_size]
 
 
 # Create file lock in module scope to reuse across buckets

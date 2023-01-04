@@ -7,8 +7,8 @@ import pytest
 from pyrate_limiter import SQLiteBucket
 
 
-def get_test_bucket():
-    return SQLiteBucket(identity="id", path=":memory:", maxsize=1000)
+def get_test_bucket(maxsize: int = 1000):
+    return SQLiteBucket(identity="id", path=":memory:", maxsize=maxsize)
 
 
 def test_init():
@@ -52,6 +52,16 @@ def test_put_get_size():
     next_key = bucket._get_keys()[0]
     assert next_key == 21
     assert bucket.size() == 980
+
+
+def test_chunked_get():
+    bucket = get_test_bucket(maxsize=3000)
+    for i in range(2000):
+        bucket.put(i)
+
+    n_items = bucket.get(2000)
+    assert n_items == 2000
+    assert bucket.size() == 0
 
 
 def test_maxsize():
