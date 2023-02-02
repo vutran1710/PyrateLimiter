@@ -23,10 +23,7 @@ class SQLiteBucket(AbstractBucket):
     Notes on concurrency:
 
     * Thread-safe
-    * Safe for use with multiple child processes with a shared initial state and using the same
-      :py:class:`.Limiter` object, e.g. if created with :py:class:`.ProcessPoolExecutor` or
-      :py:class:`multiprocessing.Process`.
-    * For other usage with multiple processes, see :py:class:`.FileLockSQLiteBucket`.
+    * For usage with multiprocessing, see :py:class:`.FileLockSQLiteBucket`.
     * Transactions are locked at the bucket level, but not at the connection or database level.
     * The default isolation level is used (autocommit).
     * Multitple buckets may be used in parallel, but a given bucket will only be used by one

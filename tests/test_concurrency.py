@@ -1,5 +1,4 @@
 """Multithreaded and multiprocess stress tests"""
-from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from logging import getLogger
@@ -30,16 +29,15 @@ logger = getLogger("pyrate_limiter.tests")
 # TODO: This test could potentially be run for all bucket classes
 # @pytest.mark.parametrize("bucket_class", [SQLiteBucket, MemoryListBucket, MemoryQueueBucket, RedisBucket])
 @pytest.mark.parametrize("bucket_class", [SQLiteBucket])
-@pytest.mark.parametrize("executor_class", [ThreadPoolExecutor, ProcessPoolExecutor])
-def test_concurrency(executor_class, bucket_class):
+def test_concurrency(bucket_class):
     """Make a fixed number of concurrent requests using a shared Limiter, and check the total time
     they take to run
     """
-    logger.info(f"Testing {bucket_class.__name__} with {executor_class.__name__}")
+    logger.info(f"Testing {bucket_class.__name__}")
 
     # Set up limiter
     bucket_kwargs = {
-        "path": join(gettempdir(), f"test_{executor_class.__name__}.sqlite"),
+        "path": join(gettempdir(), "test_concurrency.sqlite"),
     }
     limiter = Limiter(
         RequestRate(LIMIT_REQUESTS_PER_SECOND, Duration.SECOND),
@@ -48,20 +46,19 @@ def test_concurrency(executor_class, bucket_class):
     )
 
     # Set up request function
-    bucket_ids = [f"{executor_class.__name__}_bucket_{i}" for i in range(N_BUCKETS)]
+    bucket_ids = [f"bucket_{i}" for i in range(N_BUCKETS)]
     start_time = perf_counter()
     request_func = partial(_send_request, limiter, bucket_ids, start_time)
 
     # Distribute requests across workers
-    with executor_class(max_workers=N_WORKERS) as executor:
+    with ThreadPoolExecutor(max_workers=N_WORKERS) as executor:
         list(executor.map(request_func, range(N_REQUESTS), timeout=300))
 
     # Check total time, with debug logging
     elapsed = perf_counter() - start_time
     expected_min_time = (N_REQUESTS - 1) / LIMIT_REQUESTS_PER_SECOND
-    worker_type = "threads" if executor_class is ThreadPoolExecutor else "processes"
     logger.info(
-        f"Ran {N_REQUESTS} requests with {N_WORKERS} {worker_type} in {elapsed:.2f} seconds\n"
+        f"Ran {N_REQUESTS} requests with {N_WORKERS} threads in {elapsed:.2f} seconds\n"
         f"With a rate limit of {LIMIT_REQUESTS_PER_SECOND}/second, expected at least "
         f"{expected_min_time} seconds"
     )

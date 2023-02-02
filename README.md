@@ -267,11 +267,9 @@ limiter = Limiter(
 ```
 
 #### Concurrency
-This backend is thread-safe, and may also be used with multiple child processes that share the same
-`Limiter` object, e.g. if created with `ProcessPoolExecutor` or `multiprocessing.Process`.
+This backend is thread-safe.
 
-If you want to use SQLite with multiple processes with no shared state, for example if created by
-running multiple scripts or by an external process, some additional protections are needed. For
+If you want to use SQLite with multiprocessing, some additional protections are needed. For
 these cases, a separate `FileLockSQLiteBucket` class is available. This requires installing the
 [py-filelock](https://py-filelock.readthedocs.io) library.
 ```python
