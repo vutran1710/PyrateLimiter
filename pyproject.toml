@@ -18,6 +18,8 @@ classifiers = [
 ]
 include = [
     { path = "LICENSE", format = "sdist" },
+    { path = "docs", format = "sdist" },
+    { path = "tests", format = "sdist" },
 ]
 
 [tool.poetry.dependencies]
