@@ -17,7 +17,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 include = [
-    "LICENSE",
+    { path = "LICENSE", format = "sdist" },
 ]
 
 [tool.poetry.dependencies]
