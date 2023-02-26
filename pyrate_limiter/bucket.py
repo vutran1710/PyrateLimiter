@@ -150,8 +150,11 @@ class RedisBucket(AbstractBucket):
     ):
         super().__init__(maxsize=maxsize)
 
-        if not bucket_name or not isinstance(bucket_name, str):
-            msg = "keyword argument bucket-name is missing: a distict name is required"
+        if not redis_pool:
+            raise InvalidParams("Missing Redis connection pool")
+
+        if not isinstance(bucket_name, str):
+            msg = "keyword argument `bucket-name` is missing: a distict name is required"
             raise InvalidParams(msg)
 
         self._pool = redis_pool

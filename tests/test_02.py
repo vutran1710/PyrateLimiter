@@ -10,9 +10,38 @@ from pyrate_limiter import Limiter
 from pyrate_limiter import RedisBucket
 from pyrate_limiter import RedisClusterBucket
 from pyrate_limiter import RequestRate
+from pyrate_limiter.exceptions import InvalidParams
 
 dummy_redis = FakeStrictRedis()
 pool = dummy_redis.connection_pool
+
+
+def test_bucket_initialization():
+    rate = RequestRate(3, 5 * Duration.SECOND)
+
+    try:
+        Limiter(
+            rate,
+            bucket_class=RedisBucket,
+            bucket_kwargs={
+                "bucket_name": "some-name",
+            },
+        )
+        assert False
+    except InvalidParams:
+        pass
+
+    try:
+        Limiter(
+            rate,
+            bucket_class=RedisBucket,
+            bucket_kwargs={
+                "redis_pool": pool,
+            },
+        )
+        assert False
+    except InvalidParams:
+        pass
 
 
 def test_simple_01(time_function):
@@ -157,7 +186,7 @@ def test_flushing():
 def test_redis_cluster():
     """Testing RedisClusterBucket initialization"""
     rate = RequestRate(3, 5 * Duration.SECOND)
-    bucket = RedisClusterBucket(pool=pool, bucket_name="any-name", identity="id-string")
+    bucket = RedisClusterBucket(redis_pool=pool, bucket_name="any-name", identity="id-string")
     Limiter(
         rate,
         bucket_class=RedisClusterBucket,

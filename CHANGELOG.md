@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.10.0] - 2023-02-26
+### Updates
+* Add change log to sdist
+* Improve test coverage
+* Force check some bucket-keyword arguments
+
+## [2.9.1] - 2023-02-26
+### Fixed
+* Fix unit test to make test results stable
+* Fix remaining-time calculation using exact 3 decimals only
+* Increase test intesity to ensure correctness
+
 ## [2.8.5] - TBD
 ### Fixed
 * Fix SQLite OperationalError when getting more items than SQLite variable limit
