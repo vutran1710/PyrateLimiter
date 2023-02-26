@@ -32,9 +32,12 @@ class Limiter:
         time_function: Callable[[], float] = None,
     ):
         self._validate_rate_list(rates)
+
         self._rates = rates
         self._bkclass = bucket_class
         self._bucket_args = bucket_kwargs or {}
+        self._validate_bucket()
+
         self.bucket_group: Dict[str, AbstractBucket] = {}
         self.time_function = monotonic
         if time_function is not None:
@@ -53,6 +56,11 @@ class Limiter:
             if invalid:
                 msg = f"{prev_rate} cannot come before {rate}"
                 raise InvalidParams(msg)
+
+    def _validate_bucket(self):
+        """Try initialize a bucket to check if ok"""
+        bucket = self._bkclass(maxsize=self._rates[-1].limit, identity="_", **self._bucket_args)
+        del bucket
 
     def _init_buckets(self, identities) -> None:
         """Initialize a bucket for each identity, if needed.
