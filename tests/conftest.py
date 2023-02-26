@@ -17,7 +17,7 @@ basicConfig(level="INFO")
         monotonic,
         time,
         lambda: datetime.utcnow().timestamp(),
-    ]
+    ] * 2
 )
 def time_function(request):
     """Parametrization for different time functions."""
