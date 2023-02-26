@@ -84,7 +84,7 @@ class Limiter:
             :py:exc:`BucketFullException`: If the bucket is full and the item cannot be acquired
         """
         self._init_buckets(identities)
-        now = round(self.time_function(), 2)
+        now = round(self.time_function(), 3)
 
         for rate in self._rates:
             for item_id in identities:
