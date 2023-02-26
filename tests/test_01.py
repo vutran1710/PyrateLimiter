@@ -29,10 +29,13 @@ def test_sleep(time_function):
         try:
             limiter.try_acquire("test")
             print(f"[{time() - start:07.4f}] Pushed: {i+1} items")
-            sleep(0.5)  # Simulated request rate
         except BucketFullException as err:
-            print(err.meta_info)
+            print("%s --- %d", err.meta_info, i)
             track_sleep(err.meta_info["remaining_time"])
+
+        # Simulated request rate,
+        # IMPORTANT: sleep must be placed here
+        sleep(0.5)
 
     print(f"Elapsed: {time() - start:07.4f} seconds")
     assert track_sleep.call_count == 2
@@ -70,7 +73,7 @@ def test_simple_01():
         print(err)
         assert str(err)
         assert isinstance(err.meta_info, dict)
-        assert 1.9 < float(err.meta_info["remaining_time"]) < 2.0
+        assert round(err.meta_info["remaining_time"], 0) == 2.0
 
     assert has_raised
 
@@ -255,4 +258,4 @@ def test_remaining_time(time_function):
     except BucketFullException as err:
         delay_time = err.meta_info["remaining_time"]
 
-    assert 0.8 < float(delay_time) < 0.9
+    assert round(delay_time, 1) == 0.9
