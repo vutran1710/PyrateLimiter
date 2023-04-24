@@ -55,7 +55,7 @@ class SimpleListBucket(AbstractBucket):
         self.items.append(item)
 
     def load(self) -> List[RateItem]:
-        return self.items.copy()
+        return self.items
 
 
 class DefaultBucketFactory(BucketFactory):
