@@ -3,6 +3,7 @@ a workable bucket for Limiter to use
 """
 from abc import ABC
 from abc import abstractmethod
+from threading import Lock
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -44,6 +45,7 @@ class BucketFactory(ABC):
 class SimpleListBucket(AbstractBucket):
     def __init__(self):
         self.items = []
+        self.lock = Lock()
 
     def binary_search(self, items: List[RateItem], lower: int) -> Optional[int]:
         if not items:
@@ -86,9 +88,7 @@ class SimpleListBucket(AbstractBucket):
         return 0
 
     def put(self, item: RateItem, rates: List[Rate]) -> None:
-        from threading import Lock
-
-        with Lock():
+        with self.lock:
             for rate in rates:
                 count = self.count(self.items, item.timestamp, rate.interval)
                 if not count <= (rate.limit - item.weight):
@@ -102,10 +102,12 @@ class DefaultBucketFactory(BucketFactory):
 
     def __init__(self):
         self.buckets = dict()
+        self.lock = Lock()
 
     def get(self, item: RateItem) -> SimpleListBucket:
-        if item.name not in self.buckets:
-            bucket = SimpleListBucket()
-            self.buckets.update({item.name: bucket})
+        with self.lock:
+            if item.name not in self.buckets:
+                bucket = SimpleListBucket()
+                self.buckets.update({item.name: bucket})
 
-        return self.buckets[item.name]
+            return self.buckets[item.name]
