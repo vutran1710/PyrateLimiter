@@ -1,12 +1,20 @@
 from inspect import iscoroutinefunction
-from typing import Callable, List, NewType, Optional, Type, Union
+from typing import Callable
+from typing import List
+from typing import NewType
+from typing import Optional
+from typing import Type
+from typing import Union
 
-from .bucket import AbstractBucket, BucketFactory
-from .exceptions import BucketFullException, InvalidParams
+from .bucket import AbstractBucket
+from .bucket import BucketFactory
+from .exceptions import BucketFullException
+from .exceptions import InvalidParams
 from .limit_context_decorator import LimitContextDecorator
-from .rate import Rate, RateItem
+from .rate import Rate
+from .rate import RateItem
 
-TimeFunction = NewType('TimeFunction', Callable[[], int])
+TimeFunction = NewType("TimeFunction", Callable[[], int])
 
 
 def validate_rate_list(rates: List[Rate]):
@@ -32,11 +40,7 @@ class Limiter:
     fall back to DefaultBucketFactory if not provided
     """
 
-    def __init__(
-        self,
-        *rates: Rate,
-        bucket_factory: Optional[Type[BucketFactory]] = None
-    ):
+    def __init__(self, *rates: Rate, bucket_factory: Optional[Type[BucketFactory]] = None):
         validate_rate_list(rates)
         self._rates = rates
         self._bucket_factory = bucket_factory if bucket_factory is not None else BucketFactory()

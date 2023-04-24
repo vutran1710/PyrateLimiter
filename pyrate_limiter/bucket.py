@@ -1,8 +1,11 @@
 """ Implement this class to create
 a workable bucket for Limiter to use
 """
-from abc import ABC, abstractmethod
-from typing import List, Type, Union
+from abc import ABC
+from abc import abstractmethod
+from typing import List
+from typing import Type
+from typing import Union
 
 from .rate import RateItem
 
@@ -12,8 +15,7 @@ class AbstractBucket(ABC):
 
     @abstractmethod
     def put(self, item: RateItem) -> None:
-        """Put an item (typically the current time) in the bucket
-        """
+        """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
     def load(self) -> List[RateItem]:
@@ -25,8 +27,7 @@ class AbstractAsyncBucket(ABC):
 
     @abstractmethod
     async def put(self, item: RateItem) -> None:
-        """Put an item (typically the current time) in the bucket
-        """
+        """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
     async def load(self) -> List[RateItem]:

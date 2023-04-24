@@ -1,7 +1,8 @@
 """Initialize this class to define rates for limiter
 """
 from time import time
-from typing import List, Optional
+from typing import List
+from typing import Optional
 
 from .exceptions import ImmutableClassProperty
 

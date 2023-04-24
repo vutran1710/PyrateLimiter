@@ -1,9 +1,11 @@
 import asyncio
-from functools import partial, wraps
+from functools import partial
+from functools import wraps
 from inspect import iscoroutinefunction
 from logging import getLogger
 from time import sleep
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
+from typing import Union
 
 from .exceptions import BucketFullException
 from .rate import RateItem

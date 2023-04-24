@@ -1,5 +1,7 @@
-from time import sleep, time
-from typing import List, Optional
+from time import sleep
+from time import time
+from typing import List
+from typing import Optional
 
 from pyrate_limiter.constants import Duration
 
@@ -99,7 +101,7 @@ def test_with_very_large_stream():
     now = int(time() * 1000)
 
     for num in range(2_000_000):
-        item = RateItem('item')
+        item = RateItem("item")
         item.timestamp += num - 1000000
 
         if item.timestamp > now:
