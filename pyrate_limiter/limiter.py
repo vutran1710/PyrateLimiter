@@ -8,6 +8,7 @@ from typing import Union
 
 from .bucket import AbstractBucket
 from .bucket import BucketFactory
+from .bucket import DefaultBucketFactory
 from .exceptions import BucketFullException
 from .exceptions import InvalidParams
 from .limit_context_decorator import LimitContextDecorator
@@ -43,7 +44,7 @@ class Limiter:
     def __init__(self, *rates: Rate, bucket_factory: Optional[Type[BucketFactory]] = None):
         validate_rate_list(rates)
         self._rates = rates
-        self._bucket_factory = bucket_factory if bucket_factory is not None else BucketFactory()
+        self._bucket_factory = bucket_factory if bucket_factory is not None else DefaultBucketFactory()
 
     def try_acquire(self, item: RateItem):
         bucket = self._bucket_factory.get(item)

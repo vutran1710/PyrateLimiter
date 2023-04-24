@@ -3,6 +3,7 @@ a workable bucket for Limiter to use
 """
 from abc import ABC
 from abc import abstractmethod
+from typing import Dict
 from typing import List
 from typing import Type
 from typing import Union
@@ -43,3 +44,29 @@ class BucketFactory(ABC):
     @abstractmethod
     def get(self, item: RateItem) -> Union[Type[AbstractBucket], Type[AbstractAsyncBucket]]:
         """Init or get the corresponding bucket to this item"""
+
+
+# Default implementation of Bucket, in-memory list
+class SimpleListBucket(AbstractBucket):
+    def __init__(self):
+        self.items = []
+
+    def put(self, item: RateItem) -> None:
+        self.items.append(item)
+
+    def load(self) -> List[RateItem]:
+        return self.items.copy()
+
+
+class DefaultBucketFactory(BucketFactory):
+    buckets: Dict[str, SimpleListBucket]
+
+    def __init__(self):
+        self.buckets = dict()
+
+    def get(self, item: RateItem) -> SimpleListBucket:
+        if item.name not in self.buckets:
+            bucket = SimpleListBucket()
+            self.buckets.update({item.name: bucket})
+
+        return self.buckets.get(item.name)
