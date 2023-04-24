@@ -1,13 +1,12 @@
 import asyncio
-from functools import partial
-from functools import wraps
+from functools import partial, wraps
 from inspect import iscoroutinefunction
 from logging import getLogger
 from time import sleep
-from typing import TYPE_CHECKING
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 from .exceptions import BucketFullException
+from .rate import RateItem
 
 logger = getLogger(__name__)
 
@@ -28,7 +27,7 @@ class LimitContextDecorator:
 
     Args:
         limiter: Limiter object
-        identities: Bucket identities
+        item: rate-item
         delay: Delay until the next request instead of raising an exception
         max_delay: The maximum allowed delay time (in seconds); anything over this will raise
             an exception
@@ -37,13 +36,13 @@ class LimitContextDecorator:
     def __init__(
         self,
         limiter: "Limiter",
-        *identities: str,
+        item: RateItem,
         delay: bool = False,
         max_delay: Union[int, float] = None,
     ):
         self.delay = delay
         self.max_delay = max_delay or 0
-        self.try_acquire = partial(limiter.try_acquire, *identities)
+        self.try_acquire = partial(limiter.try_acquire, item)
 
     def __call__(self, func):
         """Allows usage as a decorator for both normal and async functions"""

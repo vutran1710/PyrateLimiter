@@ -1,8 +1,9 @@
 from time import monotonic
-from typing import Callable, NewType, Optional, Type
+from typing import Callable, NewType, Optional, Type, Union
 
 from .bucket import BucketFactory
 from .exceptions import BucketFullException, InvalidParams
+from .limit_context_decorator import LimitContextDecorator
 from .rate import Rate, RateItem
 
 TimeFunction = NewType('TimeFunction', Callable[[], int])
@@ -57,3 +58,16 @@ class Limiter:
                 raise BucketFullException(item.name, rate, 0.0)
 
         bucket.put(item)
+
+    def ratelimit(
+        self,
+        item: RateItem,
+        delay: bool = False,
+        max_delay: Union[int, float] = None,
+    ) -> LimitContextDecorator:
+        return LimitContextDecorator(
+            self,
+            item,
+            delay=delay,
+            max_delay=max_delay,
+        )
