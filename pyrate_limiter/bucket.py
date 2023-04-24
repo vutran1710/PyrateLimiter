@@ -90,7 +90,8 @@ class SimpleListBucket(AbstractBucket):
 
         with Lock():
             for rate in rates:
-                if not self.count(self.items, item.timestamp, rate.interval) <= (rate.limit - item.weight):
+                count = self.count(self.items, item.timestamp, rate.interval)
+                if not count <= (rate.limit - item.weight):
                     raise BucketFullException(item.name, rate, -1)
 
             self.items.append(item)
