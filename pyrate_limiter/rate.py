@@ -100,5 +100,5 @@ class Rate:
     def __str__(self):
         return f"{self.limit}/{self.interval}"
 
-    def can_accquire(self, items: List[RateItem]) -> bool:
-        return self.window.count(items) < self.limit
+    def can_accquire(self, items: List[RateItem], space_required: int = 1) -> bool:
+        return self.window.count(items) <= self.limit - space_required
