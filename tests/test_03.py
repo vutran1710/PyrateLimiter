@@ -9,10 +9,10 @@ class RateItem:
     timestamp: int
     weight: int
 
-    def __init__(self, name: str, weight: int = 1):
+    def __init__(self, name: str, weight: int = 1, timestamp: Optional[int] = None):
         self.name = name
         self.weight = weight
-        self.timestamp = int(time() * 1000)
+        self.timestamp = int(time() * 1000) if timestamp is None else timestamp
 
 
 class TimeWindow:
@@ -64,8 +64,7 @@ def test_binary_search():
     items = []
 
     for n in range(10):
-        item = RateItem(n)
-        item.timestamp = n * 2
+        item = RateItem(n, timestamp=n * 2)
         items.append(item)
 
     window = TimeWindow(Duration.SECOND)
