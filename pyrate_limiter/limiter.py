@@ -1,6 +1,7 @@
+from inspect import iscoroutinefunction
 from typing import Callable, List, NewType, Optional, Type, Union
 
-from .bucket import BucketFactory
+from .bucket import AbstractBucket, BucketFactory
 from .exceptions import BucketFullException, InvalidParams
 from .limit_context_decorator import LimitContextDecorator
 from .rate import Rate, RateItem
@@ -40,8 +41,15 @@ class Limiter:
         self._rates = rates
         self._bucket_factory = bucket_factory if bucket_factory is not None else BucketFactory()
 
-    def try_acquire(self, item: RateItem) -> None:
+    def try_acquire(self, item: RateItem):
         bucket = self._bucket_factory.get(item)
+
+        if iscoroutinefunction(bucket.get):
+            return self._acquire_async(bucket, item)
+
+        return self._acquire_sync(bucket, item)
+
+    def _acquire_sync(self, bucket: Type[AbstractBucket], item: RateItem) -> None:
         bucket_items = bucket.load()
 
         for rate in self._rates:
@@ -51,6 +59,17 @@ class Limiter:
                 raise BucketFullException(item.name, rate, 0.0)
 
         bucket.put(item)
+
+    async def _acquire_async(self, bucket: Type[AbstractBucket], item: RateItem) -> None:
+        bucket_items = await bucket.load()
+
+        for rate in self._rates:
+            check = rate.can_accquire(bucket_items, space_required=item.weight)
+
+            if check is False:
+                raise BucketFullException(item.name, rate, 0.0)
+
+        await bucket.put(item)
 
     def ratelimit(
         self,
