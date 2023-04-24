@@ -2,13 +2,13 @@
 a workable bucket for Limiter to use
 """
 from abc import ABC, abstractmethod
-from typing import List, Type
+from typing import List, Type, Union
 
 from .rate import RateItem
 
 
 class AbstractBucket(ABC):
-    """Base bucket interface"""
+    """Base bucket `SYNCHRONOUS` interface"""
 
     @abstractmethod
     def put(self, item: RateItem) -> None:
@@ -19,9 +19,18 @@ class AbstractBucket(ABC):
     def load(self) -> List[RateItem]:
         """Return a list as copies of all items in the bucket"""
 
+
+class AbstractAsyncBucket(ABC):
+    """Base bucket `ASYNCHRONOUS` interface"""
+
     @abstractmethod
-    def flush(self) -> None:
-        """Flush/reset bucket"""
+    async def put(self, item: RateItem) -> None:
+        """Put an item (typically the current time) in the bucket
+        """
+
+    @abstractmethod
+    async def load(self) -> List[RateItem]:
+        """Return a list as copies of all items in the bucket"""
 
 
 class BucketFactory(ABC):
@@ -31,5 +40,5 @@ class BucketFactory(ABC):
     """
 
     @abstractmethod
-    def get(self, item: RateItem) -> Type[AbstractBucket]:
+    def get(self, item: RateItem) -> Union[Type[AbstractBucket], Type[AbstractAsyncBucket]]:
         """Init or get the corresponding bucket to this item"""
