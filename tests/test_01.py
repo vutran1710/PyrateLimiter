@@ -92,7 +92,7 @@ def test_simple_list_bucket_using_time_clock_02():
 
         before = time()
         is_ok = bucket.put(RateItem("item"))
-        cost = (time() - before) * 1000
+        processing_time = (time() - before) * 1000
 
         if is_ok:
             success.append(True)
@@ -101,7 +101,7 @@ def test_simple_list_bucket_using_time_clock_02():
             assert len(success) == 50
             failure.append(False)
 
-        print(f"completed: {nth} -> OK={len(success)}, Fail={len(failure)}, cost={cost}")
+        print(f"completed: {nth} -> OK={len(success)}, Fail={len(failure)}, processing_time={processing_time}ms")
 
     with ThreadPoolExecutor() as executor:
         for _future in executor.map(put, list(range(100))):
