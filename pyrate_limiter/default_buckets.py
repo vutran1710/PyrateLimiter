@@ -11,6 +11,13 @@ from .utils import LocalClock
 
 
 class SimpleListBucket(AbstractBucket):
+    """Simple In-memory Bucket using native list
+    Clock can be either `time.time` or `time.monotonic`
+    Pros: fast, safe, and precise
+    Cons: since it resides in local memory, the data is not persistent, nor scalable
+    Usecase: small applications, simple logic
+    """
+
     items: List[RateItem]
     rate_at_limit: Optional[Rate]
     _clock: LocalClock
