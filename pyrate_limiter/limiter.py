@@ -68,11 +68,11 @@ class Limiter:
         # Anchor the monotonic clock if needed
         self._timefn()
 
-    def try_acquire(self, item: str, weight: int = 1, override_timestamp: int = None):
+    def try_acquire(self, item: str, weight: int = 1, timestamp: Optional[int] = None):
         rate_item = RateItem(
             name=item,
             weight=weight,
-            timestamp=override_timestamp or self._timefn(),
+            timestamp=self._timefn() if timestamp is None else timestamp,
         )
         bucket = self._bucket_factory.get(rate_item)
         return bucket.put(rate_item, self._rates)
