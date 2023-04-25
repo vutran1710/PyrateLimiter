@@ -1,3 +1,4 @@
+from enum import Enum
 from time import monotonic
 from time import time
 from typing import List
@@ -11,6 +12,11 @@ def local_time_clock() -> int:
 
 def local_monotonic_clock() -> int:
     return int(1000 * monotonic())
+
+
+class LocalClock(Enum):
+    TIME = local_time_clock
+    MONOTONIC = local_monotonic_clock
 
 
 def binary_search(items: List[RateItem], value: int) -> int:

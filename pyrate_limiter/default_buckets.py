@@ -1,4 +1,3 @@
-from enum import Enum
 from threading import Lock
 from threading import Thread
 from typing import List
@@ -8,13 +7,7 @@ from .bucket import AbstractBucket
 from .rate import Rate
 from .rate import RateItem
 from .utils import binary_search
-from .utils import local_monotonic_clock
-from .utils import local_time_clock
-
-
-class LocalClock(Enum):
-    TIME = local_time_clock
-    MONOTONIC = local_monotonic_clock
+from .utils import LocalClock
 
 
 class SimpleListBucket(AbstractBucket):
