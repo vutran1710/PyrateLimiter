@@ -1,5 +1,8 @@
+from concurrent.futures import ThreadPoolExecutor
 from pprint import pprint
+from random import randint
 from time import sleep
+from time import time
 from typing import List
 
 from pyrate_limiter.default_buckets import binary_search
@@ -40,7 +43,7 @@ def test_binary_search():
 
 
 def test_simple_list_bucket_using_time_clock_01():
-    """SimpleListBucket with 1 rate, `time()` clock"""
+    """SimpleListBucket with 1 rate, using `time()` clock"""
     rates = [Rate(5, 200)]
 
     bucket = SimpleListBucket(rates)
@@ -73,3 +76,36 @@ def test_simple_list_bucket_using_time_clock_01():
     # Putting an item with excessive weight is not possible
     assert bucket.put(RateItem("item", weight=6)) is False
     debug_rate_items(bucket.items, from_idx=5)
+
+
+def test_simple_list_bucket_using_time_clock_02():
+    """SimpleListBucket in thread-safe
+    Confirm the bucket works without race-condition
+    """
+    rates = [Rate(50, 100 * 1000)]
+    bucket = SimpleListBucket(rates)
+
+    success, failure = [], []
+
+    def put(nth: int):
+        sleep(randint(1, 10) / 100)
+
+        before = time()
+        is_ok = bucket.put(RateItem("item"))
+        cost = (time() - before) * 1000
+
+        if is_ok:
+            success.append(True)
+        else:
+            # Before failing, the bucket must be filled first
+            assert len(success) == 50
+            failure.append(False)
+
+        print(f"completed: {nth} -> OK={len(success)}, Fail={len(failure)}, cost={cost}")
+
+    with ThreadPoolExecutor() as executor:
+        for _future in executor.map(put, list(range(100))):
+            pass
+
+    # All the timestamps are in a asc-sorted order
+    assert sorted(bucket.items, key=lambda x: x.timestamp) == bucket.items
