@@ -43,7 +43,7 @@ class Limiter:
         bucket_factory: A specific implementation of BucketFactory Class,
     fall back to DefaultBucketFactory if not provided
         time_function: a function that calculates time, precise to milisecs,
-    default monotonic clock
+    default system time
     """
 
     _bucket_factory: BucketFactory
@@ -64,7 +64,7 @@ class Limiter:
         else:
             self._bucket_factory = DefaultBucketFactory()
 
-        self._timefn = int_monotonic if time_function is None else time_function
+        self._timefn = simple_int_time if time_function is None else time_function
         # Anchor the monotonic clock if needed
         self._timefn()
 

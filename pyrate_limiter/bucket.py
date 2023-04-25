@@ -69,7 +69,8 @@ class SimpleListBucket(AbstractBucket):
             return self.binary_search(items[:pivot_idx], lower)
 
         if right < lower:
-            return pivot_idx + self.binary_search(items[pivot_idx:], lower)
+            next_idx = self.binary_search(items[pivot_idx:], lower)
+            return pivot_idx + next_idx if next_idx is not None else None
 
         # NOTE: code will not reach here, but must refactor
         return -1
