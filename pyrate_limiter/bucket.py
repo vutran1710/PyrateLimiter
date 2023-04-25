@@ -102,7 +102,7 @@ class DefaultBucketFactory(BucketFactory):
     buckets: Dict[str, SimpleListBucket]
 
     def __init__(self):
-        self.buckets = dict()
+        self.buckets = {}
         self.lock = Lock()
 
     def get(self, item: RateItem) -> SimpleListBucket:
