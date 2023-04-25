@@ -4,9 +4,12 @@ a workable bucket for Limiter to use
 from abc import ABC
 from abc import abstractmethod
 from threading import Lock
+from threading import Thread
+from time import sleep
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Union
 
 from .exceptions import BucketFullException
@@ -51,9 +54,18 @@ class BucketFactory(ABC):
 
 # Default implementation of Bucket, in-memory list
 class SimpleListBucket(AbstractBucket):
+    leak_from_idx: int = 0
+    leak_task: Thread
+
     def __init__(self):
         self.items = []
         self.lock = Lock()
+        self.leak_task = Thread(target=self._leak_until_empty)
+
+    def _leak_until_empty(self):
+        while self.items:
+            sleep(10)
+            self.leak()
 
     def binary_search(self, items: List[RateItem], lower: int) -> Optional[int]:
         if not items:
@@ -83,7 +95,7 @@ class SimpleListBucket(AbstractBucket):
         # NOTE: code will not reach here, but must refactor
         return -1
 
-    def count(self, items: List[RateItem], upper: int, window_length: int) -> int:
+    def count(self, items: List[RateItem], upper: int, window_length: int) -> Tuple[int, int]:
         """Count how many items within the window"""
         lower = upper - window_length
         counter = 0
@@ -92,21 +104,30 @@ class SimpleListBucket(AbstractBucket):
 
         if idx is not None:
             counter = len(items) - idx
-            return counter
+            return counter, idx
 
-        return 0
+        assert False
 
     def put(self, item: RateItem, rates: List[Rate]) -> None:
         with self.lock:
-            for rate in rates:
-                count = self.count(self.items, item.timestamp, rate.interval)
+            for rate_idx, rate in enumerate(rates):
+                count, idx = self.count(self.items, item.timestamp, rate.interval)
                 if not count <= (rate.limit - item.weight):
                     raise BucketFullException(item.name, rate, -1)
 
+                if rate_idx == len(rates) - 1:
+                    self.leak_from_idx = idx
+
             self.items.append(item)
 
+            if not self.leak_task.is_alive():
+                print("start leaking...")
+                self.leak_task.start()
+
     def leak(self) -> int:
-        return 1
+        with self.lock:
+            self.items = self.items[self.leak_from_idx :]
+            return self.leak_from_idx
 
 
 class DefaultBucketFactory(BucketFactory):
