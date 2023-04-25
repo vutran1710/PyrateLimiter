@@ -3,6 +3,7 @@ from time import monotonic
 from time import time
 from typing import List
 
+from .rate import Rate
 from .rate import RateItem
 
 
@@ -43,3 +44,18 @@ def binary_search(items: List[RateItem], value: int) -> int:
         return pivot + binary_search(items[pivot:], value)
 
     return pivot
+
+
+def validate_rate_list(rates: List[Rate]) -> bool:
+    """Raise false if rates are incorrectly ordered."""
+    if not rates:
+        return False
+
+    for idx, rate in enumerate(rates[1:]):
+        prev_rate = rates[idx]
+        invalid = rate.limit <= prev_rate.limit or rate.interval <= prev_rate.interval
+
+        if invalid:
+            return False
+
+    return True
