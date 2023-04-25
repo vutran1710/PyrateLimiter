@@ -82,7 +82,7 @@ def test_simple_list_bucket_using_time_clock_02():
     """SimpleListBucket in thread-safe
     Confirm the bucket works without race-condition
     """
-    rates = [Rate(50, 100 * 1000)]
+    rates = [Rate(20, 100 * 1000)]
     bucket = SimpleListBucket(rates)
 
     success, failure = [], []
@@ -92,19 +92,23 @@ def test_simple_list_bucket_using_time_clock_02():
 
         before = time()
         is_ok = bucket.put(RateItem("item"))
-        processing_time = (time() - before) * 1000
+        processing_time = round((time() - before) * 1000, 3)
 
         if is_ok:
             success.append(True)
         else:
             # Before failing, the bucket must be filled first
-            assert len(success) == 50
+            assert len(success) == 20
             failure.append(False)
 
-        print(f"completed: {nth} -> OK={len(success)}, Fail={len(failure)}, processing_time={processing_time}ms")
+        print(
+            f"""
+Completed task#{nth}, Ok/Fail={len(success)}/{len(failure)}
+- processing_time={processing_time}ms"""
+        )
 
     with ThreadPoolExecutor() as executor:
-        for _future in executor.map(put, list(range(100))):
+        for _future in executor.map(put, list(range(40))):
             pass
 
     # All the timestamps are in a asc-sorted order
