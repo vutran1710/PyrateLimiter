@@ -1,84 +1,62 @@
+from enum import Enum
 from threading import Lock
-from time import time
+from threading import Thread
 from typing import List
 from typing import Optional
-from typing import Tuple
 
 from .bucket import AbstractBucket
 from .rate import Rate
 from .rate import RateItem
+from .utils import binary_search
+from .utils import local_monotonic_clock
+from .utils import local_time_clock
+
+
+class LocalClock(Enum):
+    TIME = local_time_clock
+    MONOTONIC = local_monotonic_clock
 
 
 class SimpleListBucket(AbstractBucket):
     items: List[RateItem]
+    rate_at_limit: Optional[Rate]
+    _clock: LocalClock
 
-    def __init__(self, rates: List[Rate]):
+    def __init__(
+        self,
+        rates: List[Rate],
+        clock: LocalClock = LocalClock.TIME,
+    ):
         self.rates = sorted(rates, key=lambda r: r.interval)
+        self._clock = clock
+
         self.items = []
         self.lock = Lock()
+        self.leak_task = Thread(target=self.leak)
 
-    def binary_search(self, items: List[RateItem], lower: int) -> Optional[int]:
-        if not items:
-            return None
-
-        if items[0].timestamp > lower:
-            return 0
-
-        if items[-1].timestamp < lower:
-            return None
-
-        pivot_idx = int(len(items) / 2)
-
-        left = items[pivot_idx - 1].timestamp
-        right = items[pivot_idx].timestamp
-
-        if left < lower <= right:
-            return pivot_idx
-
-        if left >= lower:
-            return self.binary_search(items[:pivot_idx], lower)
-
-        if right < lower:
-            next_idx = self.binary_search(items[pivot_idx:], lower)
-            return pivot_idx + next_idx if next_idx is not None else None
-
-        # NOTE: code will not reach here, but must refactor
-        return -1
-
-    def count(self, items: List[RateItem], upper: int, window_length: int) -> Tuple[int, int]:
-        """Count how many items within the window"""
-        lower = upper - window_length
-        counter = 0
-
-        idx = self.binary_search(items, lower)
-
-        if idx is not None:
-            counter = len(items) - idx
-            return counter, idx
-
-        return 0, 0
+    def clock(self) -> int:
+        return self._clock()  # type: ignore
 
     def put(self, item: RateItem) -> bool:
         with self.lock:
-            for rate_idx, rate in enumerate(self.rates):
-                count, idx = self.count(self.items, item.timestamp, rate.interval)
-                if not count <= (rate.limit - item.weight):
+            for rate in self.rates:
+                lower_bound_value = self.clock() - rate.interval
+                lower_bound_idx = binary_search(self.items, lower_bound_value)
+
+                if lower_bound_idx >= 0:
+                    count_existing_items = len(self.items) - lower_bound_idx
+                    space_available = rate.limit - count_existing_items
+                else:
+                    space_available = rate.limit
+
+                if space_available < item.weight:
+                    self.rate_at_limit = rate
                     return False
 
+            self.rate_at_limit = None
+            item.timestamp = self.clock()
             self.items.append(item)
             return True
 
-    def clock(self) -> int:
-        return int(1000 * time())
-
     def leak(self) -> int:
-        with self.lock:
-            now = self.clock()
-            window_lower_bound = now - self.rates[-1].interval - 1
-            idx = self.binary_search(self.items, window_lower_bound)
-
-            if idx is not None and idx > 0:
-                self.items = self.items[idx:]
-                return idx
-
-            return 0
+        return -1

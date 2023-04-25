@@ -5,10 +5,10 @@ from .exceptions import ImmutableClassProperty
 
 class RateItem:
     name: str
-    timestamp: int
     weight: int
+    timestamp: int
 
-    def __init__(self, name: str, timestamp: int, weight: int = 1):
+    def __init__(self, name: str, timestamp: int = 0, weight: int = 1):
         self.name = name
         self.timestamp = timestamp
         self.weight = weight
