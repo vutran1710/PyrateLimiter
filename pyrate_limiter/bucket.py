@@ -21,6 +21,10 @@ class AbstractBucket(ABC):
     def put(self, item: RateItem, rates: List[Rate]) -> None:
         """Put an item (typically the current time) in the bucket"""
 
+    @abstractmethod
+    def leak(self) -> int:
+        """Schedule a leak and run in a task"""
+
 
 class AbstractAsyncBucket(ABC):
     """Base bucket `ASYNCHRONOUS` interface"""
@@ -28,6 +32,10 @@ class AbstractAsyncBucket(ABC):
     @abstractmethod
     async def put(self, item: RateItem, rates: List[Rate]) -> None:
         """Put an item (typically the current time) in the bucket"""
+
+    @abstractmethod
+    async def leak(self) -> int:
+        """Schedule a leak and run in a task"""
 
 
 class BucketFactory(ABC):
@@ -96,6 +104,9 @@ class SimpleListBucket(AbstractBucket):
                     raise BucketFullException(item.name, rate, -1)
 
             self.items.append(item)
+
+    def leak(self) -> int:
+        return 1
 
 
 class DefaultBucketFactory(BucketFactory):
