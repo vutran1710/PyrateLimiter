@@ -4,13 +4,12 @@ from typing import Dict
 from typing import TYPE_CHECKING
 from typing import Union
 
-
 if TYPE_CHECKING:
-    from .request_rate import RequestRate
+    from .rate import Rate
 
 
 class BucketFullException(Exception):
-    def __init__(self, identity: str, rate: "RequestRate", remaining_time: float):
+    def __init__(self, identity: str, rate: "Rate", remaining_time: float):
         error = f"Bucket for {identity} with Rate {rate} is already full"
         self.meta_info: Dict[str, Union[str, float]] = {
             "error": error,
