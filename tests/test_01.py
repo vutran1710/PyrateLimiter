@@ -46,7 +46,7 @@ def test_binary_search():
 
 
 def test_simple_list_bucket_using_time_clock_01(clock: Union[MonotonicClock, TimeClock]):
-    """SimpleListBucket with 1 rate, using `time()` clock"""
+    """SimpleListBucket with 1 rate, using synchronous clock"""
     rates = [Rate(5, 200)]
 
     bucket = SimpleListBucket(rates)
