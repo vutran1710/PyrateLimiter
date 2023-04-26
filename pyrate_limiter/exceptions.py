@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from typing import Union
 
 if TYPE_CHECKING:
-    from .rate import Rate
+    from .abstracts import Rate
 
 
 class BucketFullException(Exception):

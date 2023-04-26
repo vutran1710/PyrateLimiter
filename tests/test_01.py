@@ -5,10 +5,13 @@ from time import sleep
 from time import time
 from typing import List
 
+from pyrate_limiter.abstracts import Rate
+from pyrate_limiter.abstracts import RateItem
+from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.default_buckets import binary_search
 from pyrate_limiter.default_buckets import SimpleListBucket
-from pyrate_limiter.rate import Rate
-from pyrate_limiter.rate import RateItem
+
+clock = TimeClock()
 
 
 def debug_rate_items(items: List[RateItem], from_idx=0):
@@ -22,7 +25,7 @@ def hr_divider():
 def test_binary_search():
     """Testing binary-search that find item in array"""
     # Normal list of items
-    items = [RateItem("item", timestamp=nth * 2) for nth in range(5)]
+    items = [RateItem("item", nth * 2) for nth in range(5)]
     debug_rate_items(items)
 
     assert binary_search(items, 0) == 0
@@ -52,11 +55,11 @@ def test_simple_list_bucket_using_time_clock_01():
         # Putting 10 items into the bucket instantly
         # The items has the same timestamp
         if nth < 5:
-            assert bucket.put(RateItem("item")) is True
+            assert bucket.put(RateItem("item", clock.now())) is True
             assert bucket.rate_at_limit is None
 
         if nth >= 6:
-            assert bucket.put(RateItem("item")) is False
+            assert bucket.put(RateItem("item", clock.now())) is False
             assert bucket.rate_at_limit == rates[0]
 
         debug_rate_items(bucket.items)
@@ -66,7 +69,7 @@ def test_simple_list_bucket_using_time_clock_01():
     # After sleeping for 200msec, the limit is gone
     # because all the existing items have the same timestamp
     for _ in range(5):
-        assert bucket.put(RateItem("item")) is True
+        assert bucket.put(RateItem("item", clock.now())) is True
         assert bucket.rate_at_limit is None
         debug_rate_items(bucket.items, from_idx=5)
 
@@ -74,7 +77,7 @@ def test_simple_list_bucket_using_time_clock_01():
     hr_divider()
     # After sleeping for another 200msec, the limit is gone
     # Putting an item with excessive weight is not possible
-    assert bucket.put(RateItem("item", weight=6)) is False
+    assert bucket.put(RateItem("item", clock.now(), weight=6)) is False
     debug_rate_items(bucket.items, from_idx=5)
 
 
@@ -91,7 +94,7 @@ def test_simple_list_bucket_using_time_clock_02():
         sleep(randint(1, 10) / 100)
 
         before = time()
-        is_ok = bucket.put(RateItem("item"))
+        is_ok = bucket.put(RateItem("item", clock.now()))
         processing_time = round((time() - before) * 1000, 3)
 
         if is_ok:

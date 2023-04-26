@@ -3,11 +3,10 @@ from threading import Thread
 from typing import List
 from typing import Optional
 
-from .bucket import AbstractBucket
-from .rate import Rate
-from .rate import RateItem
+from .abstracts import AbstractBucket
+from .abstracts import Rate
+from .abstracts import RateItem
 from .utils import binary_search
-from .utils import LocalClock
 
 
 class SimpleListBucket(AbstractBucket):
@@ -20,27 +19,18 @@ class SimpleListBucket(AbstractBucket):
 
     items: List[RateItem]
     rate_at_limit: Optional[Rate]
-    _clock: LocalClock
 
-    def __init__(
-        self,
-        rates: List[Rate],
-        clock: LocalClock = LocalClock.TIME,
-    ):
+    def __init__(self, rates: List[Rate]):
         self.rates = sorted(rates, key=lambda r: r.interval)
-        self._clock = clock
 
         self.items = []
         self.lock = Lock()
         self.leak_task = Thread(target=self.leak)
 
-    def clock(self) -> int:
-        return self._clock()  # type: ignore
-
     def put(self, item: RateItem) -> bool:
         with self.lock:
             for rate in self.rates:
-                lower_bound_value = self.clock() - rate.interval
+                lower_bound_value = item.timestamp - rate.interval
                 lower_bound_idx = binary_search(self.items, lower_bound_value)
 
                 if lower_bound_idx >= 0:
@@ -54,7 +44,6 @@ class SimpleListBucket(AbstractBucket):
                     return False
 
             self.rate_at_limit = None
-            item.timestamp = self.clock()
             self.items.append(item)
             return True
 

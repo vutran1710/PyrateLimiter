@@ -16,10 +16,6 @@ class AbstractBucket(ABC):
     rates: List[Rate]
 
     @abstractmethod
-    def clock(self) -> int:
-        """Get time"""
-
-    @abstractmethod
     def put(self, item: RateItem) -> bool:
         """Put an item (typically the current time) in the bucket"""
 
@@ -32,10 +28,6 @@ class AbstractAsyncBucket(ABC):
     """Base bucket `ASYNCHRONOUS` interface"""
 
     rates: List[Rate]
-
-    @abstractmethod
-    async def clock(self) -> int:
-        """Get clock time, can be remote server clock"""
 
     @abstractmethod
     async def put(self, item: RateItem) -> bool:
