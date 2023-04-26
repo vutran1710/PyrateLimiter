@@ -6,6 +6,8 @@ from abc import abstractmethod
 from typing import List
 from typing import Union
 
+from .clock import AsyncClock
+from .clock import SyncClock
 from .rate import Rate
 from .rate import RateItem
 
@@ -20,7 +22,7 @@ class AbstractBucket(ABC):
         """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
-    def leak(self) -> int:
+    def leak(self, clock: SyncClock) -> int:
         """Schedule a leak and run in a task"""
 
 
@@ -34,7 +36,7 @@ class AbstractAsyncBucket(ABC):
         """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
-    async def leak(self) -> int:
+    async def leak(self, clock: AsyncClock) -> int:
         """Schedule a leak and run in a task"""
 
 

@@ -122,3 +122,24 @@ Completed task#{nth}, Ok/Fail={len(success)}/{len(failure)}
 
     # All the timestamps are in a asc-sorted order
     assert sorted(bucket.items, key=lambda x: x.timestamp) == bucket.items
+
+
+def test_simple_list_bucket_leak_task(clock):
+    """Test SimpleListBucket should leak item periodically"""
+    rates = [Rate(50, 1000)]
+    bucket = SimpleListBucket(rates)
+
+    for _ in range(50):
+        bucket.put(RateItem("item", clock.now()))
+
+    # Leaking have no effect because all items are within the window
+    assert len(bucket.items) == 50
+    bucket.leak(clock)
+    assert len(bucket.items) == 50
+
+    # Sleeping 1sec, leak now will discard all items
+    sleep(1.001)
+
+    assert len(bucket.items) == 50
+    bucket.leak(clock)
+    assert len(bucket.items) == 0
