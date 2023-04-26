@@ -4,14 +4,14 @@ from random import randint
 from time import sleep
 from time import time
 from typing import List
+from typing import Union
 
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
+from pyrate_limiter.clocks import MonotonicClock
 from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.default_buckets import binary_search
 from pyrate_limiter.default_buckets import SimpleListBucket
-
-clock = TimeClock()
 
 
 def debug_rate_items(items: List[RateItem], from_idx=0):
@@ -45,7 +45,7 @@ def test_binary_search():
     assert binary_search(items, 3) == 0
 
 
-def test_simple_list_bucket_using_time_clock_01():
+def test_simple_list_bucket_using_time_clock_01(clock: Union[MonotonicClock, TimeClock]):
     """SimpleListBucket with 1 rate, using `time()` clock"""
     rates = [Rate(5, 200)]
 
@@ -81,7 +81,7 @@ def test_simple_list_bucket_using_time_clock_01():
     debug_rate_items(bucket.items, from_idx=5)
 
 
-def test_simple_list_bucket_using_time_clock_02():
+def test_simple_list_bucket_using_time_clock_02(clock: Union[MonotonicClock, TimeClock]):
     """SimpleListBucket in thread-safe
     Confirm the bucket works without race-condition
     """

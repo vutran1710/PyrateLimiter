@@ -1,9 +1,9 @@
-from datetime import datetime
 from logging import basicConfig
-from time import monotonic
-from time import time
 
 import pytest
+
+from pyrate_limiter.clocks import MonotonicClock
+from pyrate_limiter.clocks import TimeClock
 
 # Make log messages visible on test failure (or with pytest -s)
 basicConfig(level="INFO")
@@ -11,15 +11,10 @@ basicConfig(level="INFO")
 # getLogger("pyrate_limiter").setLevel("DEBUG")
 
 
-time_functions_params = [
-    None,
-    monotonic,
-    time,
-    lambda: datetime.utcnow().timestamp(),
-]
+clocks = [MonotonicClock(), TimeClock()]
 
 
-@pytest.fixture(params=time_functions_params * 2)
-def time_function(request):
+@pytest.fixture(params=clocks)
+def clock(request):
     """Parametrization for different time functions."""
     return request.param
