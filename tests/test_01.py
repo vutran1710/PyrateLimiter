@@ -45,7 +45,7 @@ def test_binary_search():
     assert binary_search(items, 3) == 0
 
 
-def test_simple_list_bucket_using_time_clock_01(clock: Union[MonotonicClock, TimeClock]):
+def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
     """SimpleListBucket with 1 rate, using synchronous clock"""
     rates = [Rate(5, 200)]
 
@@ -77,11 +77,17 @@ def test_simple_list_bucket_using_time_clock_01(clock: Union[MonotonicClock, Tim
     hr_divider()
     # After sleeping for another 200msec, the limit is gone
     # Putting an item with excessive weight is not possible
-    assert bucket.put(RateItem("item", clock.now(), weight=6)) is False
-    debug_rate_items(bucket.items, from_idx=5)
+    before_bucket_size = len(bucket.items)
+
+    item = RateItem("item", clock.now(), weight=6)
+    assert bucket.put(item) is False
+
+    item = RateItem("item", clock.now(), weight=5)
+    assert bucket.put(item) is True
+    assert before_bucket_size == len(bucket.items) - item.weight
 
 
-def test_simple_list_bucket_using_time_clock_02(clock: Union[MonotonicClock, TimeClock]):
+def test_simple_list_bucket_thread_safe_02(clock: Union[MonotonicClock, TimeClock]):
     """SimpleListBucket in thread-safe
     Confirm the bucket works without race-condition
     """

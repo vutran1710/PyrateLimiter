@@ -44,7 +44,7 @@ class SimpleListBucket(AbstractBucket):
                     return False
 
             self.rate_at_limit = None
-            self.items.append(item)
+            self.items.extend(item.weight * [item])
             return True
 
     def leak(self) -> int:
