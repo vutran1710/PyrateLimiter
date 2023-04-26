@@ -8,10 +8,10 @@ from typing import Union
 
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
+from pyrate_limiter.buckets import SimpleListBucket
 from pyrate_limiter.clocks import MonotonicClock
 from pyrate_limiter.clocks import TimeClock
-from pyrate_limiter.default_buckets import binary_search
-from pyrate_limiter.default_buckets import SimpleListBucket
+from pyrate_limiter.utils import binary_search
 
 
 def debug_rate_items(items: List[RateItem], from_idx=0):
