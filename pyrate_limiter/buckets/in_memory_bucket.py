@@ -2,14 +2,14 @@ from threading import Lock
 from typing import List
 from typing import Optional
 
-from .abstracts import AbstractBucket
-from .abstracts import Rate
-from .abstracts import RateItem
-from .abstracts import SyncClock
-from .utils import binary_search
+from ..abstracts import AbstractBucket
+from ..abstracts import Rate
+from ..abstracts import RateItem
+from ..abstracts import SyncClock
+from ..utils import binary_search
 
 
-class SimpleListBucket(AbstractBucket):
+class InMemoryBucket(AbstractBucket):
     """Simple In-memory Bucket using native list
     Clock can be either `time.time` or `time.monotonic`
     Pros: fast, safe, and precise

@@ -8,7 +8,7 @@ from typing import Union
 
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
-from pyrate_limiter.buckets import SimpleListBucket
+from pyrate_limiter.buckets import InMemoryBucket
 from pyrate_limiter.clocks import MonotonicClock
 from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.utils import binary_search
@@ -46,10 +46,10 @@ def test_binary_search():
 
 
 def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
-    """SimpleListBucket with 1 rate, using synchronous clock"""
+    """InMemoryBucket with 1 rate, using synchronous clock"""
     rates = [Rate(5, 200)]
 
-    bucket = SimpleListBucket(rates)
+    bucket = InMemoryBucket(rates)
 
     for nth in range(10):
         # Putting 10 items into the bucket instantly
@@ -88,11 +88,11 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
 
 
 def test_simple_list_bucket_thread_safe_02(clock: Union[MonotonicClock, TimeClock]):
-    """SimpleListBucket in thread-safe
+    """InMemoryBucket in thread-safe
     Confirm the bucket works without race-condition
     """
     rates = [Rate(20, 100 * 1000)]
-    bucket = SimpleListBucket(rates)
+    bucket = InMemoryBucket(rates)
 
     success, failure = [], []
 
@@ -125,9 +125,9 @@ Completed task#{nth}, Ok/Fail={len(success)}/{len(failure)}
 
 
 def test_simple_list_bucket_leak_task(clock):
-    """Test SimpleListBucket should leak item periodically"""
+    """Test InMemoryBucket should leak item periodically"""
     rates = [Rate(50, 1000)]
-    bucket = SimpleListBucket(rates)
+    bucket = InMemoryBucket(rates)
 
     for _ in range(50):
         bucket.put(RateItem("item", clock.now()))
