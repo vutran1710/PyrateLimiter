@@ -26,9 +26,12 @@ class Queries:
     PUT_ITEM = """
     INSERT INTO '{table}' (name) VALUES %s
     """
-    REMOVE_ITEMS = """
+    LEAK = """
     DELETE FROM '{table}'
     WHERE item_timestamp < (strftime('%s','now') || substr(strftime('%f','now'),4)) - {interval}
+    """
+    FLUSH = """
+    DELETE FROM '{table}'
     """
 
 
@@ -77,10 +80,15 @@ class SQLiteBucket(AbstractBucket):
     def leak(self, clock: Optional[SyncClock] = None) -> int:
         """Leaking/clean up bucket"""
         with self.lock:
-            query = Queries.REMOVE_ITEMS.format(
+            query = Queries.LEAK.format(
                 table=self.table,
                 interval=self.rates[-1].interval,
             )
             self.conn.execute(query)
             self.conn.commit()
             return 0
+
+    def flush(self) -> None:
+        with self.lock:
+            self.conn.execute(Queries.FLUSH.format(table=self.table))
+            self.conn.commit()

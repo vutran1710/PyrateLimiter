@@ -71,3 +71,7 @@ class InMemoryBucket(AbstractBucket):
                 return idx
 
             return 0
+
+    def flush(self) -> None:
+        with self.lock:
+            self.items = []

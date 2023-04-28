@@ -26,6 +26,10 @@ class AbstractBucket(ABC):
     def leak(self, clock: Optional[SyncClock] = None) -> int:
         """Schedule a leak and run in a task"""
 
+    @abstractmethod
+    def flush(self) -> None:
+        """Flush the whole bucket"""
+
 
 class AbstractAsyncBucket(ABC):
     """Base bucket `ASYNCHRONOUS` interface"""
@@ -39,6 +43,10 @@ class AbstractAsyncBucket(ABC):
     @abstractmethod
     async def leak(self, clock: Optional[AsyncClock] = None) -> int:
         """Schedule a leak and run in a task"""
+
+    @abstractmethod
+    async def flush(self) -> None:
+        """Flush the whole bucket"""
 
 
 class BucketFactory(ABC):
