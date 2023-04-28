@@ -68,12 +68,13 @@ class SQLiteBucket(AbstractBucket):
                     return False
 
             items = ", ".join(["('%s')" % name for name in [item.name] * item.weight])
-            self.conn.execute(Queries.PUT_ITEM.format(table=self.table) % items)
+            query = Queries.PUT_ITEM.format(table=self.table) % items
+            self.conn.execute(query)
             self.conn.commit()
             return True
 
     def leak(self, clock: Optional[SyncClock] = None) -> int:
-        """Schedule a leak and run in a task"""
+        """Leaking/clean up bucket"""
         with self.lock:
             query = Queries.REMOVE_ITEMS.format(
                 table=self.table,
