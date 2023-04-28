@@ -17,7 +17,7 @@ class Queries:
     CREATE_INDEX_ON_TIMESTAMP = """
     CREATE INDEX IF NOT EXISTS '{index_name}' ON '{table_name}' (timestamp)
     """
-    PUT_ITEMS = """
+    PUT_ITEM = """
     INSERT INTO '{table}' (name) VALUES %s
     """
     REMOVE_ITEMS = """
@@ -39,11 +39,10 @@ class SQLiteBucket(AbstractBucket):
         self.table = table
 
     def put(self, item: RateItem) -> bool:
-        """Put an item (typically the current time) in the bucket"""
         self.conn.isolation_level = "EXCLUSIVE"
         self.conn.execute("BEGIN EXCLUSIVE")
         items = ", ".join(["('%s')" % name for name in [item.name] * item.weight])
-        self.conn.execute(Queries.PUT_ITEMS.format(table=self.table) % items)
+        self.conn.execute(Queries.PUT_ITEM.format(table=self.table) % items)
         self.conn.commit()
         return True
 
