@@ -49,7 +49,8 @@ class InMemoryBucket(AbstractBucket):
             self.items.extend(item.weight * [item])
             return True
 
-    def leak(self, clock: SyncClock) -> int:
+    def leak(self, clock: Optional[SyncClock] = None) -> int:
+        assert clock is not None
         with self.lock:
             if self.items:
                 max_interval = self.rates[-1].interval

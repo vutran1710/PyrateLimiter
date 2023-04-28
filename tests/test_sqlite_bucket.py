@@ -56,8 +56,18 @@ def test_bucket_init():
     sleep(1)
     for ntn in range(21):
         is_ok = bucket.put(RateItem("my-item", 0))
+        sleep(0.01)
 
         if ntn == 20:
             assert is_ok is False
+
+    bucket.leak()
+    count = conn.execute(
+        SQLiteQueries.COUNT_BEFORE_INSERT.format(
+            table=table_name,
+            interval=100,
+        )
+    ).fetchone()[0]
+    assert count == 10
 
     conn.close()

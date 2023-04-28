@@ -1,6 +1,7 @@
 import sqlite3
 from threading import Lock
 from typing import List
+from typing import Optional
 
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
@@ -68,6 +69,6 @@ class SQLiteBucket(AbstractBucket):
             self.conn.commit()
             return True
 
-    def leak(self, clock: SyncClock) -> int:
+    def leak(self, clock: Optional[SyncClock] = None) -> int:
         """Schedule a leak and run in a task"""
         pass

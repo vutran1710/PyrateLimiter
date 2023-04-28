@@ -4,6 +4,7 @@ a workable bucket for Limiter to use
 from abc import ABC
 from abc import abstractmethod
 from typing import List
+from typing import Optional
 from typing import Union
 
 from .clock import AsyncClock
@@ -22,7 +23,7 @@ class AbstractBucket(ABC):
         """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
-    def leak(self, clock: SyncClock) -> int:
+    def leak(self, clock: Optional[SyncClock] = None) -> int:
         """Schedule a leak and run in a task"""
 
 
@@ -36,7 +37,7 @@ class AbstractAsyncBucket(ABC):
         """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
-    async def leak(self, clock: AsyncClock) -> int:
+    async def leak(self, clock: Optional[AsyncClock] = None) -> int:
         """Schedule a leak and run in a task"""
 
 
