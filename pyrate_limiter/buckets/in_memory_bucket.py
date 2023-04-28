@@ -12,6 +12,7 @@ from ..utils import binary_search
 class InMemoryBucket(AbstractBucket):
     """Simple In-memory Bucket using native list
     Clock can be either `time.time` or `time.monotonic`
+    When leak, clock is required
     Pros: fast, safe, and precise
     Cons: since it resides in local memory, the data is not persistent, nor scalable
     Usecase: small applications, simple logic
