@@ -23,10 +23,11 @@ class Queries:
 
 class SQLiteBucket(AbstractBucket):
     conn: sqlite3.Connection
+    table: str
 
     def __init__(self, conn: sqlite3.Connection, table: str):
         self.conn = conn
-        self.table = str
+        self.table = table
 
     def put(self, item: RateItem) -> bool:
         """Put an item (typically the current time) in the bucket"""
