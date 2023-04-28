@@ -20,7 +20,7 @@ class InMemoryBucket(AbstractBucket):
 
     items: List[RateItem]
     lock: Lock
-    rate_at_limit: Optional[Rate]
+    failing_rate: Optional[Rate]
 
     def __init__(self, rates: List[Rate]):
         self.rates = sorted(rates, key=lambda r: r.interval)
@@ -43,10 +43,10 @@ class InMemoryBucket(AbstractBucket):
                     space_available = rate.limit
 
                 if space_available < item.weight:
-                    self.rate_at_limit = rate
+                    self.failing_rate = rate
                     return False
 
-            self.rate_at_limit = None
+            self.failing_rate = None
             self.items.extend(item.weight * [item])
             return True
 

@@ -38,6 +38,7 @@ class SQLiteBucket(AbstractBucket):
     """
 
     rates: List[Rate]
+    failing_rate: Optional[Rate]
     lock: Lock
     conn: sqlite3.Connection
     table: str
@@ -64,7 +65,7 @@ class SQLiteBucket(AbstractBucket):
                 space_available = rate.limit - count
 
                 if space_available < item.weight:
-                    self.rate_at_limit = rate
+                    self.failing_rate = rate
                     return False
 
             items = ", ".join(["('%s')" % name for name in [item.name] * item.weight])
