@@ -27,7 +27,8 @@ class Queries:
     INSERT INTO '{table}' (name) VALUES %s
     """
     REMOVE_ITEMS = """
-    -- remove items here
+    DELETE FROM '{table}'
+    WHERE item_timestamp < (strftime('%s','now') || substr(strftime('%f','now'),4)) - {interval}
     """
 
 
@@ -49,7 +50,6 @@ class SQLiteBucket(AbstractBucket):
 
     def put(self, item: RateItem) -> bool:
         with self.lock:
-            self.conn.execute("BEGIN EXCLUSIVE")
             # Check before insert
             # NOTE: this part can be rewritten using pure SQL, but its kinda complex,
             # so I leave it as room for improvement
@@ -61,7 +61,10 @@ class SQLiteBucket(AbstractBucket):
                     )
                 ).fetchone()[0]
 
-                if count >= rate.limit:
+                space_available = rate.limit - count
+
+                if space_available < item.weight:
+                    self.rate_at_limit = rate
                     return False
 
             items = ", ".join(["('%s')" % name for name in [item.name] * item.weight])
@@ -71,4 +74,11 @@ class SQLiteBucket(AbstractBucket):
 
     def leak(self, clock: Optional[SyncClock] = None) -> int:
         """Schedule a leak and run in a task"""
-        pass
+        with self.lock:
+            query = Queries.REMOVE_ITEMS.format(
+                table=self.table,
+                interval=self.rates[-1].interval,
+            )
+            self.conn.execute(query)
+            self.conn.commit()
+            return 0
