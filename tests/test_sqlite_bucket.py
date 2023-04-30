@@ -1,4 +1,6 @@
 import sqlite3
+from pathlib import Path
+from tempfile import gettempdir
 from time import sleep
 
 import pytest
@@ -8,7 +10,8 @@ from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import SQLiteBucket
 from pyrate_limiter.buckets import SQLiteQueries as Queries
 
-file_path = "/Users/vutran/pyrate-limiter.sqlite"
+TEMP_DIR = Path(gettempdir())
+DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
 table_name = "pyrate-test-bucket"
 index_name = table_name + "__timestamp_index"
 
@@ -20,7 +23,7 @@ def count_all(conn: sqlite3.Connection) -> int:
 
 @pytest.fixture
 def conn():
-    db_conn = sqlite3.connect(file_path, isolation_level="EXCLUSIVE")
+    db_conn = sqlite3.connect(DEFAULT_DB_PATH, isolation_level="EXCLUSIVE")
     drop_table_query = Queries.DROP_TABLE.format(table=table_name)
     drop_index_query = Queries.DROP_INDEX.format(index=index_name)
     create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=table_name)
