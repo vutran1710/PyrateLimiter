@@ -44,6 +44,7 @@ class Queries:
     FROM '{table}'
     ORDER BY item_timestamp
     ASC
+    LIMIT 1
     )
     """
 

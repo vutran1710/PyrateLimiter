@@ -85,14 +85,15 @@ def test_leaking(conn):
 
     for n in range(20):
         bucket.put(RateItem(f"item={n}", 0))
-        sleep(0.03)
+        sleep(0.04)
 
     assert count_all(conn) == 10
 
     def sleep_past_first_item():
         lag = conn.execute(Queries.GET_LAG.format(table=table_name)).fetchone()[0]
-        sleep(1 - lag / 1000 + 0.005)
-        return lag / 1000
+        time_remain = 1 - lag / 1000
+        print("remaining time util first item can be removed:", time_remain)
+        sleep(time_remain)
 
     sleep_past_first_item()
     bucket.leak()
