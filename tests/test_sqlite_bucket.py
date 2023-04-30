@@ -115,3 +115,17 @@ def test_leaking(conn):
     assert count_all(conn) == 0
 
     conn.close()
+
+
+def test_flush(conn):
+    rates = [Rate(10, 1000)]
+    bucket = SQLiteBucket(conn, TABLE_NAME, rates)
+
+    assert count_all(conn) == 0
+
+    for n in range(30):
+        bucket.put(RateItem(f"item={n}", 0))
+
+    assert count_all(conn) == 10
+    bucket.flush()
+    assert count_all(conn) == 0
