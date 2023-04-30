@@ -12,29 +12,29 @@ from pyrate_limiter.buckets import SQLiteQueries as Queries
 
 TEMP_DIR = Path(gettempdir())
 DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
-table_name = "pyrate-test-bucket"
-index_name = table_name + "__timestamp_index"
+TABLE_NAME = "pyrate-test-bucket"
+INDEX_NAME = TABLE_NAME + "__timestamp_index"
 
 
 def count_all(conn: sqlite3.Connection) -> int:
-    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
+    count = conn.execute(Queries.COUNT_ALL.format(table=TABLE_NAME)).fetchone()[0]
     return count
 
 
 @pytest.fixture
 def conn():
     db_conn = sqlite3.connect(DEFAULT_DB_PATH, isolation_level="EXCLUSIVE")
-    drop_table_query = Queries.DROP_TABLE.format(table=table_name)
-    drop_index_query = Queries.DROP_INDEX.format(index=index_name)
-    create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=table_name)
+    drop_table_query = Queries.DROP_TABLE.format(table=TABLE_NAME)
+    drop_index_query = Queries.DROP_INDEX.format(index=INDEX_NAME)
+    create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=TABLE_NAME)
 
     db_conn.execute(drop_table_query)
     db_conn.execute(drop_index_query)
     db_conn.execute(create_table_query)
 
     create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
-        index_name=index_name,
-        table_name=table_name,
+        index_name=INDEX_NAME,
+        table_name=TABLE_NAME,
     )
 
     db_conn.execute(create_idx_query)
@@ -46,7 +46,7 @@ def conn():
 
 def test_bucket_init(conn):
     rates = [Rate(20, 1000)]
-    bucket = SQLiteBucket(conn, table_name, rates)
+    bucket = SQLiteBucket(conn, TABLE_NAME, rates)
     assert bucket is not None
 
     bucket.put(RateItem("my-item", 0))
@@ -58,7 +58,7 @@ def test_bucket_init(conn):
 
     count = conn.execute(
         Queries.COUNT_BEFORE_INSERT.format(
-            table=table_name,
+            table=TABLE_NAME,
             interval=1000,
         )
     ).fetchone()[0]
@@ -82,7 +82,7 @@ def test_bucket_init(conn):
 
 def test_leaking(conn):
     rates = [Rate(10, 1000)]
-    bucket = SQLiteBucket(conn, table_name, rates)
+    bucket = SQLiteBucket(conn, TABLE_NAME, rates)
 
     assert count_all(conn) == 0
 
@@ -93,7 +93,7 @@ def test_leaking(conn):
     assert count_all(conn) == 10
 
     def sleep_past_first_item():
-        lag = conn.execute(Queries.GET_LAG.format(table=table_name)).fetchone()[0]
+        lag = conn.execute(Queries.GET_LAG.format(table=TABLE_NAME)).fetchone()[0]
         time_remain = 1 - lag / 1000
         print("remaining time util first item can be removed:", time_remain)
         sleep(time_remain)
