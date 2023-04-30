@@ -59,22 +59,19 @@ class RedisSyncBucket(AbstractBucket):
         self.hasher = hashlib.sha1()
 
     def _check_before_insert(self, item: RateItem) -> Optional[Rate]:
-        idx = self.redis.execute_command(
-            "EVAL",
-            LuaScript.CHECK_BEFORE_INSERT,
-            # number of keys
-            len(self.rates) + 3,
-            # KEYS
+        keys = [
             "timestamp",
             "weight",
             "bucket",
             *[rate.interval for rate in self.rates],
-            # ARGVS
+        ]
+        args = [
             item.timestamp,
             item.weight,
             self.bucket_key,
             *[rate.limit for rate in self.rates],
-        )
+        ]
+        idx = self.redis.execute_command("EVAL", LuaScript.CHECK_BEFORE_INSERT, len(keys), *keys, *args)
 
         if idx < 0:
             return None
