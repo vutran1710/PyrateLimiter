@@ -28,3 +28,4 @@ def test_01(db, clock):
         assert is_ok == (n < 10)
 
     assert db.zcard(BUCKET_KEY) == 20
+    assert bucket.failing_rate is rates[0]
