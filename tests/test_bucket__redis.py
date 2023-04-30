@@ -4,8 +4,9 @@ from redis import Redis
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import RedisSyncBucket
+from pyrate_limiter.utils import id_generator
 
-BUCKET_KEY = "test-bucket"
+BUCKET_KEY = f"test-bucket/{id_generator()}"
 
 
 @pytest.fixture

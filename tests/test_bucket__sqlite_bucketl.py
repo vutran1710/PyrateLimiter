@@ -9,10 +9,11 @@ from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import SQLiteBucket
 from pyrate_limiter.buckets import SQLiteQueries as Queries
+from pyrate_limiter.utils import id_generator
 
 TEMP_DIR = Path(gettempdir())
 DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
-TABLE_NAME = "pyrate-test-bucket"
+TABLE_NAME = f"pyrate-test-bucket-{id_generator()}"
 INDEX_NAME = TABLE_NAME + "__timestamp_index"
 
 
