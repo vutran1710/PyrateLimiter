@@ -17,8 +17,14 @@ def db():
 
 
 def test_01(db, clock):
-    rates = [Rate(5, 1000)]
+    rates = [Rate(20, 1000)]
     bucket = RedisSyncBucket(rates, db, BUCKET_KEY)
-    bucket.flush()
-    bucket.put(RateItem("item", 0, weight=10))
+
+    bucket.put(RateItem("item", clock.now(), weight=10))
     assert db.zcard(BUCKET_KEY) == 10
+
+    for n in range(20):
+        is_ok = bucket.put(RateItem("zzzzzzzz", clock.now()))
+        assert is_ok == (n < 10)
+
+    assert db.zcard(BUCKET_KEY) == 20

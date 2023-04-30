@@ -1,3 +1,4 @@
+import hashlib
 from threading import RLock as Lock
 from typing import List
 from typing import Optional
@@ -8,11 +9,33 @@ from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from ..abstracts import SyncClock
+from ..utils import id_generator
 
 
 class LuaScript:
+    """Scripts that deal with bucket operations"""
+
+    CHECK_BEFORE_INSERT = """
+    local now = ARGV[1]
+    local space_required = tonumber(ARGV[2])
+    local bucket = ARGV[3]
+    for idx, key in ipairs(KEYS) do
+        if idx > 3 then
+            local interval = tonumber(key)
+            local limit = tonumber(ARGV[idx])
+            local count = redis.call('ZCOUNT', bucket, now - interval, now)
+            local space_available = limit - tonumber(count)
+            if space_available < space_required then
+                return idx - 4
+            end
+        end
+    end
+    return -1
+    """
     PUT_ITEM = """
-    for i=1,ARGV[4] do redis.call('ZADD', ARGV[1], ARGV[2], ARGV[3]..i); end
+    for i=1,ARGV[4] do
+        redis.call('ZADD', ARGV[1], ARGV[2], ARGV[3]..i)
+    end
     """
 
 
@@ -24,6 +47,7 @@ class RedisSyncBucket(AbstractBucket):
     """
 
     rates: List[Rate]
+    failing_rate: Optional[Rate]
     lock: Lock
     bucket_key: str
 
@@ -32,6 +56,30 @@ class RedisSyncBucket(AbstractBucket):
         self.lock = Lock()
         self.redis = redis
         self.bucket_key = bucket_key
+        self.hasher = hashlib.sha1()
+
+    def _check_before_insert(self, item: RateItem) -> Optional[Rate]:
+        idx = self.redis.execute_command(
+            "EVAL",
+            LuaScript.CHECK_BEFORE_INSERT,
+            # number of keys
+            len(self.rates) + 3,
+            # KEYS
+            "timestamp",
+            "weight",
+            "bucket",
+            *[rate.interval for rate in self.rates],
+            # ARGVS
+            item.timestamp,
+            item.weight,
+            self.bucket_key,
+            *[rate.limit for rate in self.rates],
+        )
+
+        if idx < 0:
+            return None
+
+        return self.rates[idx]
 
     def _put_item_with_script(self, item: RateItem):
         self.redis.execute_command(
@@ -40,14 +88,21 @@ class RedisSyncBucket(AbstractBucket):
             0,  # No key
             self.bucket_key,
             item.timestamp,
-            item.name,
+            f"{item.name}:{id_generator()}:",  # this is to avoid key collision since we are using ZSET
             item.weight,
         )
 
-    def put(self, item: RateItem):
+    def put(self, item: RateItem) -> bool:
         """Add item to key"""
         with self.lock:
+            failing_rate = self._check_before_insert(item)
+
+            if failing_rate:
+                self.failing_rate = failing_rate
+                return False
+
             self._put_item_with_script(item)
+            return True
 
     def leak(self, clock: Optional[SyncClock] = None) -> int:
         assert clock
