@@ -4,7 +4,7 @@ from time import sleep
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import SQLiteBucket
-from pyrate_limiter.buckets import SQLiteQueries
+from pyrate_limiter.buckets import SQLiteQueries as Queries
 
 file_path = "/Users/vutran/pyrate-limiter.sqlite"
 table_name = "pyrate-test-bucket"
@@ -12,12 +12,15 @@ index_name = table_name + "__timestamp_index"
 
 
 def setup_db(conn: sqlite3.Connection):
-    conn.execute("DROP TABLE IF EXISTS '%s'" % table_name)
-    conn.execute("DROP INDEX IF EXISTS '%s'" % index_name)
-    create_table_query = SQLiteQueries.CREATE_BUCKET_TABLE.format(table=table_name)
+    drop_table_query = Queries.DROP_TABLE.format(table=table_name)
+    drop_index_query = Queries.DROP_INDEX.format(index=index_name)
+    create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=table_name)
+
+    conn.execute(drop_table_query)
+    conn.execute(drop_index_query)
     conn.execute(create_table_query)
 
-    create_idx_query = SQLiteQueries.CREATE_INDEX_ON_TIMESTAMP.format(
+    create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
         index_name=index_name,
         table_name=table_name,
     )
@@ -37,15 +40,15 @@ def test_bucket_init():
 
     bucket.put(RateItem("my-item", 0))
 
-    count = conn.execute("SELECT COUNT(*) FROM '%s'" % table_name).fetchone()[0]
+    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
     assert count == 1
 
     bucket.put(RateItem("my-item", 0, weight=10))
-    count = conn.execute("SELECT COUNT(*) FROM '%s'" % table_name).fetchone()[0]
+    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
     assert count == 11
 
     count = conn.execute(
-        SQLiteQueries.COUNT_BEFORE_INSERT.format(
+        Queries.COUNT_BEFORE_INSERT.format(
             table=table_name,
             interval=1000,
         )
@@ -75,20 +78,18 @@ def test_leaking():
     rates = [Rate(10, 1000)]
     bucket = SQLiteBucket(conn, table_name, rates)
 
-    count = conn.execute("SELECT COUNT(*) FROM '%s'" % table_name).fetchone()[0]
+    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
     assert count == 0
 
     for n in range(20):
         bucket.put(RateItem(f"item={n}", 0))
         sleep(0.03)
 
-    count = conn.execute("SELECT COUNT(*) FROM '%s'" % table_name).fetchone()[0]
+    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
     assert count == 10
 
     def get_first_item_timestamp() -> int:
-        name, tick = conn.execute(
-            "SELECT name, item_timestamp FROM '%s' ORDER BY item_timestamp ASC" % table_name,
-        ).fetchone()
+        name, tick = conn.execute(Queries.GET_FIRST_ITEM.format(table=table_name)).fetchone()
         print("-------- earliest item:", name, tick)
         return tick
 
@@ -99,7 +100,7 @@ def test_leaking():
         return lag / 1000
 
     def count_items() -> int:
-        count = conn.execute("SELECT COUNT(*) FROM '%s'" % table_name).fetchone()[0]
+        count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
         return count
 
     sleep(1 - get_lag(get_first_item_timestamp()))

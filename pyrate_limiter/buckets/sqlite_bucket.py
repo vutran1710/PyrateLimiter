@@ -33,6 +33,11 @@ class Queries:
     FLUSH = """
     DELETE FROM '{table}'
     """
+    # The below sqls are for testing only
+    DROP_TABLE = "DROP TABLE IF EXISTS '{table}'"
+    DROP_INDEX = "DROP INDEX IF EXISTS '{index}'"
+    COUNT_ALL = "SELECT COUNT(*) FROM '{table}'"
+    GET_FIRST_ITEM = "SELECT name, item_timestamp FROM '{table}' ORDER BY item_timestamp ASC"
 
 
 class SQLiteBucket(AbstractBucket):
@@ -71,7 +76,7 @@ class SQLiteBucket(AbstractBucket):
                     self.failing_rate = rate
                     return False
 
-            items = ", ".join(["('%s')" % name for name in [item.name] * item.weight])
+            items = ", ".join([f"('{name}')" for name in [item.name] * item.weight])
             query = Queries.PUT_ITEM.format(table=self.table) % items
             self.conn.execute(query)
             self.conn.commit()
