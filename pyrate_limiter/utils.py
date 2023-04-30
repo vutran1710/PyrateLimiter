@@ -1,3 +1,5 @@
+import random
+import string
 from typing import List
 
 from .abstracts import Rate
@@ -43,3 +45,10 @@ def validate_rate_list(rates: List[Rate]) -> bool:
             return False
 
     return True
+
+
+def id_generator(
+    size=6,
+    chars=string.ascii_uppercase + string.digits + string.ascii_lowercase,
+) -> str:
+    return "".join(random.choice(chars) for _ in range(size))
