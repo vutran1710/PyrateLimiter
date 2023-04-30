@@ -56,11 +56,11 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
         # The items has the same timestamp
         if nth < 5:
             assert bucket.put(RateItem("item", clock.now())) is True
-            assert bucket.rate_at_limit is None
+            assert bucket.failing_rate is None
 
         if nth >= 6:
             assert bucket.put(RateItem("item", clock.now())) is False
-            assert bucket.rate_at_limit == rates[0]
+            assert bucket.failing_rate == rates[0]
 
         debug_rate_items(bucket.items)
 
@@ -70,7 +70,7 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
     # because all the existing items have the same timestamp
     for _ in range(5):
         assert bucket.put(RateItem("item", clock.now())) is True
-        assert bucket.rate_at_limit is None
+        assert bucket.failing_rate is None
         debug_rate_items(bucket.items, from_idx=5)
 
     sleep(0.2)
@@ -122,6 +122,10 @@ Completed task#{nth}, Ok/Fail={len(success)}/{len(failure)}
 
     # All the timestamps are in a asc-sorted order
     assert sorted(bucket.items, key=lambda x: x.timestamp) == bucket.items
+
+    # Flushing
+    bucket.flush()
+    assert len(bucket.items) == 0
 
 
 def test_simple_list_bucket_leak_task(clock):
