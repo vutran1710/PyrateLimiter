@@ -1,6 +1,8 @@
 import sqlite3
 from time import sleep
 
+import pytest
+
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import SQLiteBucket
@@ -11,41 +13,45 @@ table_name = "pyrate-test-bucket"
 index_name = table_name + "__timestamp_index"
 
 
-def setup_db(conn: sqlite3.Connection):
+def count_all(conn: sqlite3.Connection) -> int:
+    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
+    return count
+
+
+@pytest.fixture
+def conn():
+    db_conn = sqlite3.connect(file_path, isolation_level="EXCLUSIVE")
     drop_table_query = Queries.DROP_TABLE.format(table=table_name)
     drop_index_query = Queries.DROP_INDEX.format(index=index_name)
     create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=table_name)
 
-    conn.execute(drop_table_query)
-    conn.execute(drop_index_query)
-    conn.execute(create_table_query)
+    db_conn.execute(drop_table_query)
+    db_conn.execute(drop_index_query)
+    db_conn.execute(create_table_query)
 
     create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
         index_name=index_name,
         table_name=table_name,
     )
 
-    conn.execute(create_idx_query)
+    db_conn.execute(create_idx_query)
 
-    conn.commit()
+    db_conn.commit()
+
+    yield db_conn
 
 
-def test_bucket_init():
-    conn = sqlite3.connect(file_path, isolation_level="EXCLUSIVE")
-    setup_db(conn)
-
+def test_bucket_init(conn):
     rates = [Rate(20, 1000)]
     bucket = SQLiteBucket(conn, table_name, rates)
     assert bucket is not None
 
     bucket.put(RateItem("my-item", 0))
 
-    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
-    assert count == 1
+    assert count_all(conn) == 1
 
     bucket.put(RateItem("my-item", 0, weight=10))
-    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
-    assert count == 11
+    assert count_all(conn) == 11
 
     count = conn.execute(
         Queries.COUNT_BEFORE_INSERT.format(
@@ -71,52 +77,37 @@ def test_bucket_init():
     conn.close()
 
 
-def test_leaking():
-    conn = sqlite3.connect(file_path, isolation_level="EXCLUSIVE")
-    setup_db(conn)
-
+def test_leaking(conn):
     rates = [Rate(10, 1000)]
     bucket = SQLiteBucket(conn, table_name, rates)
 
-    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
-    assert count == 0
+    assert count_all(conn) == 0
 
     for n in range(20):
         bucket.put(RateItem(f"item={n}", 0))
         sleep(0.03)
 
-    count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
-    assert count == 10
+    assert count_all(conn) == 10
 
-    def get_first_item_timestamp() -> int:
-        name, tick = conn.execute(Queries.GET_FIRST_ITEM.format(table=table_name)).fetchone()
-        print("-------- earliest item:", name, tick)
-        return tick
-
-    def get_lag(tick: int) -> float:
-        lag = conn.execute(
-            "select (strftime('%s','now') || substr(strftime('%f','now'),4)) - {}".format(tick),
-        ).fetchone()[0]
+    def sleep_past_first_item():
+        lag = conn.execute(Queries.GET_LAG.format(table=table_name)).fetchone()[0]
+        sleep(1 - lag / 1000 + 0.005)
         return lag / 1000
 
-    def count_items() -> int:
-        count = conn.execute(Queries.COUNT_ALL.format(table=table_name)).fetchone()[0]
-        return count
-
-    sleep(1 - get_lag(get_first_item_timestamp()))
+    sleep_past_first_item()
     bucket.leak()
-    assert count_items() == 9
+    assert count_all(conn) == 9
 
-    sleep(1 - get_lag(get_first_item_timestamp()))
+    sleep_past_first_item()
     bucket.leak()
-    assert count_items() == 8
+    assert count_all(conn) == 8
 
-    sleep(1 - get_lag(get_first_item_timestamp()))
+    sleep_past_first_item()
     bucket.leak()
-    assert count_items() == 7
+    assert count_all(conn) == 7
 
     sleep(1)
     bucket.leak()
-    assert count_items() == 0
+    assert count_all(conn) == 0
 
     conn.close()

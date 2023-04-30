@@ -38,6 +38,14 @@ class Queries:
     DROP_INDEX = "DROP INDEX IF EXISTS '{index}'"
     COUNT_ALL = "SELECT COUNT(*) FROM '{table}'"
     GET_FIRST_ITEM = "SELECT name, item_timestamp FROM '{table}' ORDER BY item_timestamp ASC"
+    GET_LAG = """
+    SELECT (strftime ('%s', 'now') || substr(strftime ('%f', 'now'), 4)) - (
+    SELECT item_timestamp
+    FROM '{table}'
+    ORDER BY item_timestamp
+    ASC
+    )
+    """
 
 
 class SQLiteBucket(AbstractBucket):
