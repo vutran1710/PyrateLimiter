@@ -37,6 +37,12 @@ class LuaScript:
         redis.call('ZADD', ARGV[1], ARGV[2], ARGV[3]..i)
     end
     """
+    LEAK_ITEMS = """
+    local bucket = ARGV[1]
+    local lowest_timestamp = ARGV[2]
+    local count = redis.call('ZCOUNT', bucket, 0, lowest_timestamp)
+    return redis.call('ZPOPMIN', bucket, tonumber(count))
+    """
 
 
 class RedisSyncBucket(AbstractBucket):
@@ -104,7 +110,17 @@ class RedisSyncBucket(AbstractBucket):
 
     def leak(self, clock: Optional[SyncClock] = None) -> int:
         assert clock
-        return 1
+        with self.lock:
+            now = clock.now()
+            lowest_timestamp = now - self.rates[-1].interval
+            removed_items = self.redis.execute_command(
+                "EVAL",
+                LuaScript.LEAK_ITEMS,
+                0,
+                self.bucket_key,
+                lowest_timestamp,
+            )
+            return int(len(removed_items) / 2)
 
     def flush(self):
         with self.lock:

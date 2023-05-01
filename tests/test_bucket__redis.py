@@ -42,3 +42,18 @@ def test_01(redis_db, clock):
     assert redis_db.zcard(BUCKET_KEY) == 30
     print("-----------> Failing rate", bucket.failing_rate)
     assert bucket.failing_rate is rates[1]
+
+
+def test_leaking(redis_db, clock):
+    rates = [Rate(50, 1000)]
+    bucket = RedisSyncBucket(rates, redis_db, BUCKET_KEY)
+
+    for nth in range(50):
+        bucket.put(RateItem("zzzzzzzz", clock.now()))
+        sleep(0.015)
+
+    assert redis_db.zcard(BUCKET_KEY) == 50
+    sleep(0.01)
+    remove_count = bucket.leak(clock)
+    print("Removed ", remove_count, " items")
+    assert redis_db.zcard(BUCKET_KEY) == 50 - remove_count
