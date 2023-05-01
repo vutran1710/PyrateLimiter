@@ -98,6 +98,7 @@ class RedisSyncBucket(AbstractBucket):
                 self.failing_rate = failing_rate
                 return False
 
+            self.failing_rate = None
             self._put_item_with_script(item)
             return True
 

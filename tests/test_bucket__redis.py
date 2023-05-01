@@ -1,3 +1,5 @@
+from time import sleep
+
 import pytest
 from redis import Redis
 
@@ -18,7 +20,7 @@ def redis_db():
 
 
 def test_01(redis_db, clock):
-    rates = [Rate(20, 1000)]
+    rates = [Rate(20, 1000), Rate(30, 2000)]
     bucket = RedisSyncBucket(rates, redis_db, BUCKET_KEY)
 
     bucket.put(RateItem("item", clock.now(), weight=10))
@@ -29,4 +31,14 @@ def test_01(redis_db, clock):
         assert is_ok == (nth < 10)
 
     assert redis_db.zcard(BUCKET_KEY) == 20
+    print("-----------> Failing rate", bucket.failing_rate)
     assert bucket.failing_rate is rates[0]
+
+    sleep(1)
+
+    for nth in range(20):
+        is_ok = bucket.put(RateItem("zzzzzzzz", clock.now()))
+
+    assert redis_db.zcard(BUCKET_KEY) == 30
+    print("-----------> Failing rate", bucket.failing_rate)
+    assert bucket.failing_rate is rates[1]

@@ -31,3 +31,6 @@ class Rate:
     ):
         self.limit = limit
         self.interval = interval
+
+    def __str__(self) -> str:
+        return f"limit={self.limit}/{self.interval}ms"
