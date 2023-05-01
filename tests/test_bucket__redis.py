@@ -10,23 +10,23 @@ BUCKET_KEY = f"test-bucket/{id_generator()}"
 
 
 @pytest.fixture
-def db():
+def redis_db():
     conn = Redis(host="localhost", port=6379, db=0)
     assert conn.ping()
     conn.flushall()
     yield conn
 
 
-def test_01(db, clock):
+def test_01(redis_db, clock):
     rates = [Rate(20, 1000)]
-    bucket = RedisSyncBucket(rates, db, BUCKET_KEY)
+    bucket = RedisSyncBucket(rates, redis_db, BUCKET_KEY)
 
     bucket.put(RateItem("item", clock.now(), weight=10))
-    assert db.zcard(BUCKET_KEY) == 10
+    assert redis_db.zcard(BUCKET_KEY) == 10
 
-    for n in range(20):
+    for nth in range(20):
         is_ok = bucket.put(RateItem("zzzzzzzz", clock.now()))
-        assert is_ok == (n < 10)
+        assert is_ok == (nth < 10)
 
-    assert db.zcard(BUCKET_KEY) == 20
+    assert redis_db.zcard(BUCKET_KEY) == 20
     assert bucket.failing_rate is rates[0]
