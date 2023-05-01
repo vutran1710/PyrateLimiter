@@ -108,7 +108,7 @@ class RedisSyncBucket(AbstractBucket):
             remove_count = self.redis.zremrangebyscore(
                 self.bucket_key,
                 0,
-                clock.now() - self.rates[-1].interval,
+                clock.now() - self.rates[-1].interval - 1,
             )
             return remove_count
 
