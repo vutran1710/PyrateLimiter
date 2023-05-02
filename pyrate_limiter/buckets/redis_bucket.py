@@ -1,4 +1,3 @@
-import hashlib
 from threading import Lock
 from typing import List
 from typing import Optional
@@ -56,7 +55,6 @@ class RedisSyncBucket(AbstractBucket):
         self.lock = Lock()
         self.redis = redis
         self.bucket_key = bucket_key
-        self.hasher = hashlib.sha1()
 
     def _check_and_insert(self, item: RateItem) -> Optional[Rate]:
         keys = [
