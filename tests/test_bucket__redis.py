@@ -1,6 +1,7 @@
 from time import sleep
 
 import pytest
+from redis import ConnectionPool
 from redis import Redis
 
 from pyrate_limiter.abstracts import Rate
@@ -10,14 +11,13 @@ from pyrate_limiter.utils import id_generator
 
 
 @pytest.fixture
-def redis_db():
-    conn = Redis(host="localhost", port=6379, db=0)
-    assert conn.ping()
-    conn.flushall()
-    yield conn
+def redis_pool():
+    pool = ConnectionPool(host="localhost", port=6379, db=0)
+    yield pool
 
 
-def test_01(redis_db, clock):
+def test_01(redis_pool, clock):
+    redis_db = Redis(connection_pool=redis_pool)
     bucket_key = f"test-bucket/{id_generator()}"
     rates = [Rate(20, 1000), Rate(30, 2000)]
     bucket = RedisSyncBucket(rates, redis_db, bucket_key)
@@ -61,7 +61,8 @@ def test_01(redis_db, clock):
     assert bucket.failing_rate is rates[1]
 
 
-def test_leaking(redis_db, clock):
+def test_leaking(redis_pool, clock):
+    redis_db = Redis(connection_pool=redis_pool)
     bucket_key = f"test-bucket/{id_generator()}"
     rates = [Rate(10, 1000)]
     bucket = RedisSyncBucket(rates, redis_db, bucket_key)
