@@ -42,6 +42,7 @@ def test_01(redis_db, clock, bucket_key):
 
     for nth in range(20):
         is_ok = bucket.put(RateItem("zzzzzzzz", clock.now()))
+        assert is_ok == (nth < 10)
 
     assert redis_db.zcard(bucket_key) == 30
     print("-----------> Failing rate", bucket.failing_rate)
