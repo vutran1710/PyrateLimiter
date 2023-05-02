@@ -85,14 +85,8 @@ class RedisSyncBucket(AbstractBucket):
     def put(self, item: RateItem) -> bool:
         """Add item to key"""
         with self.lock:
-            failing_rate = self._check_and_insert(item)
-
-            if failing_rate:
-                self.failing_rate = failing_rate
-                return False
-
-            self.failing_rate = None
-            return True
+            self.failing_rate = self._check_and_insert(item)
+            return not bool(self.failing_rate)
 
     def leak(self, current_timestamp: Optional[int] = None) -> int:
         assert current_timestamp is not None
