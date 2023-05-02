@@ -10,12 +10,6 @@ from pyrate_limiter.utils import id_generator
 
 
 @pytest.fixture
-def bucket_key():
-    random_bucket_key = f"test-bucket/{id_generator()}"
-    yield random_bucket_key
-
-
-@pytest.fixture
 def redis_db():
     conn = Redis(host="localhost", port=6379, db=0)
     assert conn.ping()
@@ -23,7 +17,8 @@ def redis_db():
     yield conn
 
 
-def test_01(redis_db, clock, bucket_key):
+def test_01(redis_db, clock):
+    bucket_key = f"test-bucket/{id_generator()}"
     rates = [Rate(20, 1000), Rate(30, 2000)]
     bucket = RedisSyncBucket(rates, redis_db, bucket_key)
 
@@ -38,18 +33,36 @@ def test_01(redis_db, clock, bucket_key):
     print("-----------> Failing rate", bucket.failing_rate)
     assert bucket.failing_rate is rates[0]
 
-    sleep(1)
+    bucket.flush()
 
-    for nth in range(20):
+    for nth in range(32):
+        count_before_put = bucket.count_bucket()
         is_ok = bucket.put(RateItem("zzzzzzzz", clock.now()))
-        assert is_ok == (nth < 10)
+
+        if nth < 20:
+            assert is_ok is True
+
+        if nth == 20:
+            assert is_ok is False
+            assert bucket.count_bucket() == 20
+            print("before sleep:", clock.now())
+            sleep(1)
+            print("after sleep:", clock.now())
+
+        if 31 > nth > 20:
+            assert bucket.count_bucket() > count_before_put
+            assert is_ok is True
+
+        if nth == 31:
+            assert is_ok is False
 
     assert redis_db.zcard(bucket_key) == 30
     print("-----------> Failing rate", bucket.failing_rate)
     assert bucket.failing_rate is rates[1]
 
 
-def test_leaking(redis_db, clock, bucket_key):
+def test_leaking(redis_db, clock):
+    bucket_key = f"test-bucket/{id_generator()}"
     rates = [Rate(10, 1000)]
     bucket = RedisSyncBucket(rates, redis_db, bucket_key)
 

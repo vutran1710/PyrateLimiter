@@ -56,6 +56,9 @@ class RedisSyncBucket(AbstractBucket):
         self.redis = redis
         self.bucket_key = bucket_key
 
+    def count_bucket(self) -> int:
+        return self.redis.zcount(self.bucket_key, 0, float("+inf"))
+
     def _check_and_insert(self, item: RateItem) -> Optional[Rate]:
         keys = [
             "timestamp",
