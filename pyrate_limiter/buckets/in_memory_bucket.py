@@ -5,7 +5,6 @@ from typing import Optional
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
-from ..abstracts import SyncClock
 from ..utils import binary_search
 
 
@@ -24,7 +23,7 @@ class InMemoryBucket(AbstractBucket):
 
     def __init__(self, rates: List[Rate]):
         self.rates = sorted(rates, key=lambda r: r.interval)
-        self.items = list()
+        self.items = []
         self.lock = Lock()
 
     def put(self, item: RateItem) -> bool:
@@ -50,13 +49,12 @@ class InMemoryBucket(AbstractBucket):
             self.items.extend(item.weight * [item])
             return True
 
-    def leak(self, clock: Optional[SyncClock] = None) -> int:
-        assert clock is not None
+    def leak(self, current_timestamp: Optional[int] = None) -> int:
+        assert current_timestamp is not None
         with self.lock:
             if self.items:
                 max_interval = self.rates[-1].interval
-                now = clock.now()
-                lower_bound = now - max_interval
+                lower_bound = current_timestamp - max_interval
 
                 if lower_bound > self.items[-1].timestamp:
                     remove_count = len(self.items)

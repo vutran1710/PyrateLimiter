@@ -8,7 +8,6 @@ from redis import Redis
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
-from ..abstracts import SyncClock
 from ..utils import id_generator
 
 
@@ -102,13 +101,13 @@ class RedisSyncBucket(AbstractBucket):
             self._put_item_with_script(item)
             return True
 
-    def leak(self, clock: Optional[SyncClock] = None) -> int:
-        assert clock
+    def leak(self, current_timestamp: Optional[int] = None) -> int:
+        assert current_timestamp is not None
         with self.lock:
             remove_count = self.redis.zremrangebyscore(
                 self.bucket_key,
                 0,
-                clock.now() - self.rates[-1].interval - 1,
+                current_timestamp - self.rates[-1].interval - 1,
             )
             return remove_count
 

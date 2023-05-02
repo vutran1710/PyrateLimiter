@@ -6,7 +6,6 @@ from typing import Optional
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
-from ..abstracts import SyncClock
 
 
 class Queries:
@@ -91,7 +90,7 @@ class SQLiteBucket(AbstractBucket):
             self.conn.commit()
             return True
 
-    def leak(self, clock: Optional[SyncClock] = None) -> int:
+    def leak(self, _: Optional[int] = None) -> int:
         """Leaking/clean up bucket"""
         with self.lock:
             query = Queries.LEAK.format(
