@@ -8,7 +8,11 @@ from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import RedisSyncBucket
 from pyrate_limiter.utils import id_generator
 
-BUCKET_KEY = f"test-bucket/{id_generator()}"
+
+@pytest.fixture
+def bucket_key():
+    random_bucket_key = f"test-bucket/{id_generator()}"
+    yield random_bucket_key
 
 
 @pytest.fixture
@@ -19,18 +23,18 @@ def redis_db():
     yield conn
 
 
-def test_01(redis_db, clock):
+def test_01(redis_db, clock, bucket_key):
     rates = [Rate(20, 1000), Rate(30, 2000)]
-    bucket = RedisSyncBucket(rates, redis_db, BUCKET_KEY)
+    bucket = RedisSyncBucket(rates, redis_db, bucket_key)
 
     bucket.put(RateItem("item", clock.now(), weight=10))
-    assert redis_db.zcard(BUCKET_KEY) == 10
+    assert redis_db.zcard(bucket_key) == 10
 
     for nth in range(20):
         is_ok = bucket.put(RateItem("zzzzzzzz", clock.now()))
         assert is_ok == (nth < 10)
 
-    assert redis_db.zcard(BUCKET_KEY) == 20
+    assert redis_db.zcard(bucket_key) == 20
     print("-----------> Failing rate", bucket.failing_rate)
     assert bucket.failing_rate is rates[0]
 
@@ -39,28 +43,29 @@ def test_01(redis_db, clock):
     for nth in range(20):
         is_ok = bucket.put(RateItem("zzzzzzzz", clock.now()))
 
-    assert redis_db.zcard(BUCKET_KEY) == 30
+    assert redis_db.zcard(bucket_key) == 30
     print("-----------> Failing rate", bucket.failing_rate)
     assert bucket.failing_rate is rates[1]
 
 
-def test_leaking(redis_db, clock):
+def test_leaking(redis_db, clock, bucket_key):
     rates = [Rate(10, 1000)]
-    bucket = RedisSyncBucket(rates, redis_db, BUCKET_KEY)
+    bucket = RedisSyncBucket(rates, redis_db, bucket_key)
 
     for nth in range(10):
         bucket.put(RateItem("zzzzzzzz", clock.now()))
         sleep(0.1)
 
-    assert redis_db.zcard(BUCKET_KEY) == 10
+    assert redis_db.zcard(bucket_key) == 10
 
+    items = redis_db.zrange(bucket_key, 0, clock.now(), withscores=True)
     lowest_timestamp = clock.now() - rates[-1].interval
-    items = redis_db.zrange(BUCKET_KEY, 0, clock.now(), withscores=True)
     items_to_remove = [i[1] for i in items if i[1] < lowest_timestamp]
+
     print("-----> less than:", lowest_timestamp)
     print("-----> items:", items)
     print("-----> items-remove:", items_to_remove)
 
-    remove_count = bucket.leak(clock)
+    remove_count = bucket.leak(clock.now())
     print("Removed ", remove_count, " items")
     assert remove_count == len(items_to_remove)
