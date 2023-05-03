@@ -40,9 +40,10 @@ class LuaScript:
 
 class RedisSyncBucket(AbstractBucket):
     """A bucket using redis for storing data
-    We are not using redis' built-in TIME since it is non-deterministic
-    In distributed context, use local server time, but beware of
+    - We are not using redis' built-in TIME since it is non-deterministic
+    - In distributed context, use local server time, but beware of
     the consistency between server instances
+    - Each bucket instance use a dedicated connection to avoid race-condition
     """
 
     rates: List[Rate]

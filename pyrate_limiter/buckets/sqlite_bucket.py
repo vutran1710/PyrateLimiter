@@ -1,5 +1,5 @@
 import sqlite3
-from threading import RLock as Lock
+from threading import Lock
 from typing import List
 from typing import Optional
 
