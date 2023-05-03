@@ -49,12 +49,20 @@ class RedisSyncBucket(AbstractBucket):
     failing_rate: Optional[Rate]
     lock: Lock
     bucket_key: str
+    script_hash: str
 
-    def __init__(self, rates: List[Rate], redis: Redis, bucket_key: str):
+    def __init__(
+        self,
+        rates: List[Rate],
+        redis: Redis,
+        bucket_key: str,
+        script_hash: Optional[str] = None,
+    ):
         self.rates = rates
         self.lock = Lock()
         self.redis = redis
         self.bucket_key = bucket_key
+        self.script_hash = script_hash or self.redis.script_load(LuaScript.PUT_ITEM)
 
     def count_bucket(self) -> int:
         """Count all items in the bucket"""
@@ -78,7 +86,7 @@ class RedisSyncBucket(AbstractBucket):
             *[rate.limit for rate in self.rates],
         ]
 
-        idx = self.redis.execute_command("EVAL", LuaScript.PUT_ITEM, len(keys), *keys, *args)
+        idx = self.redis.evalsha(self.script_hash, len(keys), *keys, *args)
 
         if idx < 0:
             return None

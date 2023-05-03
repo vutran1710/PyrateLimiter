@@ -1,4 +1,5 @@
 from time import sleep
+from time import time
 
 import pytest
 from redis import ConnectionPool
@@ -84,3 +85,38 @@ def test_leaking(redis_pool, clock):
     remove_count = bucket.leak(clock.now())
     print("Removed ", remove_count, " items")
     assert remove_count == len(items_to_remove)
+
+
+def test_with_large_items(redis_pool, clock):
+    redis_db = Redis(connection_pool=redis_pool)
+    bucket_key = f"test-bucket/{id_generator()}"
+    rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 5000)]
+    bucket = RedisSyncBucket(rates, redis_db, bucket_key)
+
+    before = time()
+
+    for nth in range(50000):
+        item = RateItem("item", clock.now())
+        bucket.put(item)
+
+        if nth == 999:
+            print("--- first 1k items cost:", time() - before, bucket.count_bucket())
+
+        if nth == 9999:
+            print("--- first 10k items cost:", time() - before, bucket.count_bucket())
+
+        if nth == 19999:
+            print("--- first 20k items cost:", time() - before, bucket.count_bucket())
+
+        if nth == 29999:
+            print("--- first 30k items cost:", time() - before, bucket.count_bucket())
+
+        if nth == 39999:
+            print("--- first 40k items cost:", time() - before, bucket.count_bucket())
+
+        if nth == 49999:
+            print("--- first 50k items cost:", time() - before, bucket.count_bucket())
+
+    after = time()
+    elapsed = after - before
+    print("---------- COST: ", elapsed, bucket.count_bucket())
