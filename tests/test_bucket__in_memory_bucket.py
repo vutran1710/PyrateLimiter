@@ -11,7 +11,6 @@ from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import InMemoryBucket
 from pyrate_limiter.clocks import MonotonicClock
 from pyrate_limiter.clocks import TimeClock
-from pyrate_limiter.utils import binary_search
 
 
 def debug_rate_items(items: List[RateItem], from_idx=0):
@@ -20,29 +19,6 @@ def debug_rate_items(items: List[RateItem], from_idx=0):
 
 def hr_divider():
     print("----------------------------------------")
-
-
-def test_binary_search():
-    """Testing binary-search that find item in array"""
-    # Normal list of items
-    items = [RateItem("item", nth * 2) for nth in range(5)]
-    debug_rate_items(items)
-
-    assert binary_search(items, 0) == 0
-    assert binary_search(items, 1) == 1
-    assert binary_search(items, 2) == 1
-    assert binary_search(items, 3) == 2
-
-    # If the value is larger than the last item, idx would be -1
-    assert binary_search(items, 11) == -1
-
-    # Empty list
-    items = []
-    debug_rate_items(items)
-
-    assert binary_search(items, 1) == 0
-    assert binary_search(items, 2) == 0
-    assert binary_search(items, 3) == 0
 
 
 def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):

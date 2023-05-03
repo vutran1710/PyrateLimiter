@@ -37,9 +37,13 @@ def validate_rate_list(rates: List[Rate]) -> bool:
     if not rates:
         return False
 
-    for idx, rate in enumerate(rates[1:]):
+    for idx, current_rate in enumerate(rates[1:]):
         prev_rate = rates[idx]
-        invalid = rate.limit <= prev_rate.limit or rate.interval <= prev_rate.interval
+
+        if current_rate.interval <= prev_rate.interval:
+            return False
+
+        invalid = (current_rate.limit / current_rate.interval) >= (prev_rate.limit / prev_rate.interval)
 
         if invalid:
             return False
