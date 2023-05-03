@@ -26,6 +26,9 @@ def test_binary_search():
 
 
 def test_rate_validator():
+    rates = []
+    assert validate_rate_list(rates) is False
+
     rates = [Rate(1, 1)]
     assert validate_rate_list(rates) is True
 
