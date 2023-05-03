@@ -17,10 +17,6 @@ def debug_rate_items(items: List[RateItem], from_idx=0):
     pprint([i.timestamp for i in items[from_idx:]])
 
 
-def hr_divider():
-    print("----------------------------------------")
-
-
 def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
     """InMemoryBucket with 1 rate, using synchronous clock"""
     rates = [Rate(5, 200)]
@@ -41,7 +37,6 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
         debug_rate_items(bucket.items)
 
     sleep(0.200)
-    hr_divider()
     # After sleeping for 200msec, the limit is gone
     # because all the existing items have the same timestamp
     for _ in range(5):
@@ -50,11 +45,10 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
         debug_rate_items(bucket.items, from_idx=5)
 
     sleep(0.2)
-    hr_divider()
     # After sleeping for another 200msec, the limit is gone
     # Putting an item with excessive weight is not possible
     before_bucket_size = len(bucket.items)
-
+    print("---------- before put:", before_bucket_size)
     item = RateItem("item", clock.now(), weight=6)
     assert bucket.put(item) is False
 
