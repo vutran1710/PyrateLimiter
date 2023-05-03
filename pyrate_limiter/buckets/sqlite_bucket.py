@@ -59,7 +59,7 @@ class SQLiteBucket(AbstractBucket):
     conn: sqlite3.Connection
     table: str
 
-    def __init__(self, conn: sqlite3.Connection, table: str, rates: List[Rate]):
+    def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str):
         self.conn = conn
         self.table = table
         self.rates = rates

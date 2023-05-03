@@ -47,7 +47,7 @@ def conn():
 
 def test_bucket_init(conn):
     rates = [Rate(20, 1000)]
-    bucket = SQLiteBucket(conn, TABLE_NAME, rates)
+    bucket = SQLiteBucket(rates, conn, TABLE_NAME)
     assert bucket is not None
 
     bucket.put(RateItem("my-item", 0))
@@ -83,7 +83,7 @@ def test_bucket_init(conn):
 
 def test_leaking(conn):
     rates = [Rate(10, 1000)]
-    bucket = SQLiteBucket(conn, TABLE_NAME, rates)
+    bucket = SQLiteBucket(rates, conn, TABLE_NAME)
 
     assert count_all(conn) == 0
 
@@ -95,7 +95,7 @@ def test_leaking(conn):
 
     def sleep_past_first_item():
         lag = conn.execute(Queries.GET_LAG.format(table=TABLE_NAME)).fetchone()[0]
-        time_remain = 1 - lag / 1000
+        time_remain = 1 - lag / 1000 + 0.01
         print("remaining time util first item can be removed:", time_remain)
         sleep(time_remain)
 
@@ -120,7 +120,7 @@ def test_leaking(conn):
 
 def test_flush(conn):
     rates = [Rate(10, 1000)]
-    bucket = SQLiteBucket(conn, TABLE_NAME, rates)
+    bucket = SQLiteBucket(rates, conn, TABLE_NAME)
 
     assert count_all(conn) == 0
 
