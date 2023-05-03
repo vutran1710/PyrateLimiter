@@ -15,6 +15,7 @@ class AbstractBucket(ABC):
     """Base bucket `SYNCHRONOUS` interface"""
 
     rates: List[Rate]
+    failing_rate: Optional[Rate]
 
     @abstractmethod
     def put(self, item: RateItem) -> bool:
@@ -33,6 +34,7 @@ class AbstractAsyncBucket(ABC):
     """Base bucket `ASYNCHRONOUS` interface"""
 
     rates: List[Rate]
+    failing_rate: Optional[Rate]
 
     @abstractmethod
     async def put(self, item: RateItem) -> bool:

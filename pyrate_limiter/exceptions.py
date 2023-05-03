@@ -1,8 +1,13 @@
 # pylint: disable=C0114,C0115
 from typing import Any
 from typing import Dict
+from typing import Type
 from typing import TYPE_CHECKING
 from typing import Union
+
+from .abstracts import AbstractAsyncBucket
+from .abstracts import AbstractBucket
+from .abstracts import BucketFactory
 
 if TYPE_CHECKING:
     from .abstracts import Rate
@@ -17,6 +22,27 @@ class BucketFullException(Exception):
             "rate": str(rate),
             "remaining_time": remaining_time,
         }
+        super().__init__(error)
+
+
+class BucketRetrievalFail(Exception):
+    def __init__(
+        self,
+        identity: str,
+        expected_bucket_class: Type[Union[AbstractBucket, AbstractAsyncBucket]],
+    ):
+        error = f"Can't retrieve bucket={expected_bucket_class} for item={identity}"
+        super().__init__(error)
+
+
+class BucketInitializationFail(Exception):
+    def __init__(
+        self,
+        identity: str,
+        factory: BucketFactory,
+        error: Any,
+    ):
+        error = f"Failed to create bucket for item={identity}, factory={BucketFactory}, err={error}"
         super().__init__(error)
 
 
