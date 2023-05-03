@@ -57,6 +57,7 @@ class RedisSyncBucket(AbstractBucket):
         self.bucket_key = bucket_key
 
     def count_bucket(self) -> int:
+        """Count all items in the bucket"""
         return self.redis.zcount(self.bucket_key, 0, float("+inf"))
 
     def _check_and_insert(self, item: RateItem) -> Optional[Rate]:
@@ -72,7 +73,8 @@ class RedisSyncBucket(AbstractBucket):
             item.timestamp,
             item.weight,
             self.bucket_key,
-            f"{item.name}:{id_generator()}:",  # this is to avoid key collision since we are using ZSET
+            # this is to avoid key collision since we are using ZSET
+            f"{item.name}:{id_generator()}:",
             *[rate.limit for rate in self.rates],
         ]
 
