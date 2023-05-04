@@ -67,6 +67,7 @@ class Limiter:
         assert weight >= 0
 
         if weight == 0:
+            # NOTE: if item is weightless, just let it go through
             return None
 
         item = self.wrap_item(name, weight)

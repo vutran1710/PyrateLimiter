@@ -75,7 +75,7 @@ class DummyBucketFactory(BucketFactory):
         pass
 
 
-clocks = [DummySyncClock(), DummyAsyncClock()]
+clocks = [DummySyncClock(), DummyAsyncClock(), None]
 
 
 @pytest.fixture(params=clocks)
@@ -115,6 +115,13 @@ async def test_limiter_02(clock):
         item = await item
 
     assert isinstance(factory.get(item), DummyAsyncBucket)
+
+    try_acquire = limiter.try_acquire("dark-matter", 0)
+
+    if iscoroutine(try_acquire):
+        try_acquire = await try_acquire
+
+    assert try_acquire is None
 
     with pytest.raises(BucketRetrievalFail):
         try_acquire = limiter.try_acquire("unknown", 1)

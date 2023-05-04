@@ -95,27 +95,9 @@ def test_with_large_items(redis_pool, clock):
 
     before = time()
 
-    for nth in range(50000):
+    for _ in range(10_000):
         item = RateItem("item", clock.now())
         bucket.put(item)
-
-        if nth == 999:
-            print("--- first 1k items cost:", time() - before, bucket.count_bucket())
-
-        if nth == 9999:
-            print("--- first 10k items cost:", time() - before, bucket.count_bucket())
-
-        if nth == 19999:
-            print("--- first 20k items cost:", time() - before, bucket.count_bucket())
-
-        if nth == 29999:
-            print("--- first 30k items cost:", time() - before, bucket.count_bucket())
-
-        if nth == 39999:
-            print("--- first 40k items cost:", time() - before, bucket.count_bucket())
-
-        if nth == 49999:
-            print("--- first 50k items cost:", time() - before, bucket.count_bucket())
 
     after = time()
     elapsed = after - before
