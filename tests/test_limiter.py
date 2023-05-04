@@ -75,45 +75,68 @@ class DummyBucketFactory(BucketFactory):
         pass
 
 
-@pytest.mark.asyncio
-async def test_limiter_01():
-    factory = DummyBucketFactory()
-    sync_clock = DummySyncClock()
-    async_clock = DummyAsyncClock()
+clocks = [DummySyncClock(), DummyAsyncClock()]
 
-    sync_limiter = Limiter(factory, sync_clock)
-    async_limiter = Limiter(factory, async_clock)
 
-    sync_item = sync_limiter.wrap_item("hello", 1)
-    async_item = await async_limiter.wrap_item("hello", 1)
-
-    assert isinstance(sync_item, RateItem)
-    assert isinstance(async_item, RateItem)
-
-    print("---> SyncItem", sync_item)
-    print("---> AsyncItem", async_item)
+@pytest.fixture(params=clocks)
+def clock(request):
+    """Parametrization for different time functions."""
+    return request.param
 
 
 @pytest.mark.asyncio
-async def test_limiter_02():
+async def test_limiter_01(clock):
     factory = DummyBucketFactory()
-    limiter = Limiter(factory, clock=None)
+    limiter = Limiter(factory, clock)
+    item = limiter.wrap_item("hello", 1)
+
+    if isinstance(clock, DummySyncClock):
+        assert isinstance(item, RateItem)
+
+    if isinstance(clock, DummyAsyncClock):
+        assert isinstance(await item, RateItem)
+
+
+@pytest.mark.asyncio
+async def test_limiter_02(clock):
+    factory = DummyBucketFactory()
+    limiter = Limiter(factory, clock)
 
     item = limiter.wrap_item("sync", 1)
+
+    if isinstance(clock, DummyAsyncClock):
+        item = await item
+
     assert isinstance(factory.get(item), DummySyncBucket)
 
     item = limiter.wrap_item("async", 1)
+
+    if isinstance(clock, DummyAsyncClock):
+        item = await item
+
     assert isinstance(factory.get(item), DummyAsyncBucket)
 
     with pytest.raises(BucketRetrievalFail):
-        limiter.try_acquire("unknown", 1)
+        try_acquire = limiter.try_acquire("unknown", 1)
 
-    assert limiter.try_acquire("sync") is None
+        if iscoroutine(try_acquire):
+            await try_acquire
+
+    try_acquire = limiter.try_acquire("sync")
+
+    if iscoroutine(try_acquire):
+        try_acquire = await try_acquire
+
+    assert try_acquire is None
+
     assert iscoroutine(limiter.try_acquire("async"))
     assert (await limiter.try_acquire("async")) is None
 
     with pytest.raises(BucketFullException):
-        limiter.try_acquire("sync", 2)
+        try_acquire = limiter.try_acquire("sync", 2)
+
+        if iscoroutine(try_acquire):
+            await try_acquire
 
     with pytest.raises(BucketFullException):
         await limiter.try_acquire("async", 2)
