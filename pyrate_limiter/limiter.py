@@ -52,7 +52,7 @@ class Limiter:
         def check_acquire(is_success: bool):
             if not is_success:
                 assert bucket.failing_rate is not None
-                raise BucketFullException(item.name, bucket.failing_rate, -1)
+                raise BucketFullException(item.name, bucket.failing_rate)
 
         async def put_async():
             check_acquire(await bucket.put(item))

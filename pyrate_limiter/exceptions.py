@@ -1,12 +1,9 @@
 # pylint: disable=C0114,C0115
 from typing import Any
 from typing import Dict
-from typing import Type
 from typing import TYPE_CHECKING
 from typing import Union
 
-from .abstracts import AbstractAsyncBucket
-from .abstracts import AbstractBucket
 from .abstracts import BucketFactory
 
 if TYPE_CHECKING:
@@ -14,24 +11,19 @@ if TYPE_CHECKING:
 
 
 class BucketFullException(Exception):
-    def __init__(self, identity: str, rate: "Rate", remaining_time: float):
+    def __init__(self, identity: str, rate: "Rate"):
         error = f"Bucket for {identity} with Rate {rate} is already full"
         self.meta_info: Dict[str, Union[str, float]] = {
             "error": error,
             "identity": identity,
             "rate": str(rate),
-            "remaining_time": remaining_time,
         }
         super().__init__(error)
 
 
 class BucketRetrievalFail(Exception):
-    def __init__(
-        self,
-        identity: str,
-        expected_bucket_class: Type[Union[AbstractBucket, AbstractAsyncBucket]],
-    ):
-        error = f"Can't retrieve bucket={expected_bucket_class} for item={identity}"
+    def __init__(self, identity: str):
+        error = f"Can't retrieve bucket for item={identity}"
         super().__init__(error)
 
 
