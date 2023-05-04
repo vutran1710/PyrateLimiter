@@ -60,5 +60,9 @@ class BucketFactory(ABC):
         """Create or get the corresponding bucket to this item"""
 
     @abstractmethod
-    def leak(self) -> None:
-        """Leak all the buckets"""
+    def schedule_leak(self) -> None:
+        """Schedule all the buckets' leak"""
+
+    @abstractmethod
+    def schedule_flush(self) -> None:
+        """Schedule all the buckets' flush"""
