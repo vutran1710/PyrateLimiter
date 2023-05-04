@@ -23,7 +23,7 @@ class InMemoryBucket(AbstractBucket):
 
     def __init__(self, rates: List[Rate]):
         self.rates = sorted(rates, key=lambda r: r.interval)
-        self.items = list()
+        self.items = []
         self.lock = Lock()
 
     def put(self, item: RateItem) -> bool:
