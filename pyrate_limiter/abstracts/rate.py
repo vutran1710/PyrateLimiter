@@ -12,6 +12,9 @@ class RateItem:
         self.timestamp = timestamp
         self.weight = weight
 
+    def __str__(self) -> str:
+        return f"RateItem(name={self.name}, weight={self.weight}, timestamp={self.timestamp})"
+
 
 class Rate:
     """Rate definition.
