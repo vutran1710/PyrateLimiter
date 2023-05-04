@@ -36,7 +36,7 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
 
         debug_rate_items(bucket.items)
 
-    sleep(0.200)
+    sleep(0.300)
     # After sleeping for 200msec, the limit is gone
     # because all the existing items have the same timestamp
     for _ in range(5):
@@ -52,6 +52,7 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
     item = RateItem("item", clock.now(), weight=6)
     assert bucket.put(item) is False
 
+    assert len(bucket.items) == before_bucket_size
     item = RateItem("item", clock.now(), weight=5)
     assert bucket.put(item) is True
     assert before_bucket_size == len(bucket.items) - item.weight
