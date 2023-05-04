@@ -12,6 +12,7 @@ from .abstracts import RateItem
 from .abstracts import SyncClock
 from .clocks import TimeClock
 from .exceptions import BucketFullException
+from .exceptions import BucketRetrievalFail
 
 LimiterClockType = Optional[Union[AsyncClock, SyncClock]]
 
@@ -62,20 +63,24 @@ class Limiter:
 
         return put_async() if iscoroutinefunction(bucket.put) else put_sync()
 
-    def try_acquire(self, identity: str, weight: int = 1) -> Union[None, Coroutine[None, None, None]]:
+    def try_acquire(self, name: str, weight: int = 1) -> Union[None, Coroutine[None, None, None]]:
         assert weight >= 0
 
         if weight == 0:
             return None
 
-        item = self.wrap_item(identity, weight)
+        item = self.wrap_item(name, weight)
 
         if iscoroutine(item):
 
             async def acquire_async():
                 nonlocal item
                 item = await item
-                bucket = self.bucket_factory.get(await item)
+                bucket = self.bucket_factory.get(item)
+
+                if bucket is None:
+                    raise BucketRetrievalFail(item.name)
+
                 result = self.handle_bucket_put(bucket, item)
                 return (await result) if iscoroutine(result) else result
 
@@ -83,4 +88,8 @@ class Limiter:
 
         assert type(item) == RateItem
         bucket = self.bucket_factory.get(item)
+
+        if not bucket:
+            raise BucketRetrievalFail(item.name)
+
         return self.handle_bucket_put(bucket, item)

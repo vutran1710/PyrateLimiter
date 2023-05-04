@@ -1,4 +1,5 @@
 from inspect import iscoroutine
+from typing import Optional
 from typing import Union
 
 import pytest
@@ -58,14 +59,14 @@ class DummyAsyncBucket(AbstractAsyncBucket):
 
 
 class DummyBucketFactory(BucketFactory):
-    def get(self, item: RateItem) -> Union[DummySyncBucket, DummyAsyncBucket]:
+    def get(self, item: RateItem) -> Optional[Union[DummySyncBucket, DummyAsyncBucket]]:
         if item.name == "sync":
             return DummySyncBucket()
 
         if item.name == "async":
             return DummyAsyncBucket()
 
-        raise BucketRetrievalFail(item.name)
+        return None
 
     def schedule_leak(self):
         pass
@@ -105,7 +106,7 @@ async def test_limiter_02():
     assert isinstance(factory.get(item), DummyAsyncBucket)
 
     with pytest.raises(BucketRetrievalFail):
-        factory.get(limiter.wrap_item("unknown-item", 1))
+        limiter.try_acquire("unknown", 1)
 
     assert limiter.try_acquire("sync") is None
     assert iscoroutine(limiter.try_acquire("async"))
