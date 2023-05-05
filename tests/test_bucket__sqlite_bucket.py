@@ -103,7 +103,9 @@ def test_leaking(conn):
         lag = conn.execute(Queries.GET_LAG.format(table=TABLE_NAME)).fetchone()[0]
         time_remain = 1 - lag / 1000 + 0.01
         print("remaining time util first item can be removed:", time_remain)
-        sleep(time_remain)
+
+        if time_remain > 0:
+            sleep(time_remain)
 
     sleep_past_first_item()
     bucket.leak()
