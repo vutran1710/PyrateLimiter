@@ -104,6 +104,8 @@ def test_simple_list_bucket_leak_task(clock):
     rates = [Rate(50, 1000)]
     bucket = InMemoryBucket(rates)
 
+    assert bucket.leak(clock.now()) == 0
+
     for _ in range(50):
         bucket.put(RateItem("item", clock.now()))
 
@@ -118,3 +120,19 @@ def test_simple_list_bucket_leak_task(clock):
     assert len(bucket.items) == 50
     bucket.leak(clock.now())
     assert len(bucket.items) == 0
+
+    # Fill the bucket again, slowly
+    before = time()
+    for _ in range(50):
+        bucket.put(RateItem("item", clock.now()))
+        sleep(0.01)
+
+    after = time()
+    elapsed = after - before
+
+    # After this sleep, leak now will discard 2 items
+    sleep(1 - elapsed + 0.02)
+
+    assert len(bucket.items) == 50
+    bucket.leak(clock.now())
+    assert len(bucket.items) == 48

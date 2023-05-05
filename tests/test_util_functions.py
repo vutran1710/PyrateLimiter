@@ -9,6 +9,9 @@ def test_binary_search():
     # Normal list of items
     items = [RateItem("item", nth * 2) for nth in range(5)]
 
+    for item in items:
+        print(item)
+
     assert binary_search(items, 0) == 0
     assert binary_search(items, 1) == 1
     assert binary_search(items, 2) == 1
