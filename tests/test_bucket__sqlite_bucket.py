@@ -1,7 +1,9 @@
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import gettempdir
 from time import sleep
+from time import time
 
 import pytest
 
@@ -24,7 +26,11 @@ def count_all(conn: sqlite3.Connection) -> int:
 
 @pytest.fixture
 def conn():
-    db_conn = sqlite3.connect(DEFAULT_DB_PATH, isolation_level="EXCLUSIVE")
+    db_conn = sqlite3.connect(
+        DEFAULT_DB_PATH,
+        isolation_level="EXCLUSIVE",
+        check_same_thread=False,
+    )
     drop_table_query = Queries.DROP_TABLE.format(table=TABLE_NAME)
     drop_index_query = Queries.DROP_INDEX.format(index=INDEX_NAME)
     create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=TABLE_NAME)
@@ -130,3 +136,23 @@ def test_flush(conn):
     assert count_all(conn) == 10
     bucket.flush()
     assert count_all(conn) == 0
+
+
+def test_stress_test(conn):
+    rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 4000), Rate(40000, 5000)]
+    bucket = SQLiteBucket(rates, conn, TABLE_NAME)
+
+    assert count_all(conn) == 0
+
+    before = time()
+
+    def put_item(nth: int):
+        bucket.put(RateItem(f"item={nth}", 0))
+
+    with ThreadPoolExecutor() as executor:
+        for _ in executor.map(put_item, list(range(30000))):
+            pass
+
+    after = time()
+    print("Cost: ", after - before)
+    print("Count: ", count_all(conn))
