@@ -1,4 +1,5 @@
 from inspect import iscoroutine
+from inspect import iscoroutinefunction
 from typing import Optional
 from typing import Union
 
@@ -59,6 +60,23 @@ class DummyAsyncBucket(AbstractAsyncBucket):
 
 
 class DummyBucketFactory(BucketFactory):
+    def __init__(self, clock=None):
+        self.clock = clock
+
+    def wrap_item(self, name: str, weight: int = 1):
+        if self.clock is None:
+            return RateItem(name, 0, weight=weight)
+
+        async def wrap_async():
+            timestamp = await self.clock.now()
+            return RateItem(name, timestamp, weight=weight)
+
+        def wrap_sycn():
+            timestamp = self.clock.now()
+            return RateItem(name, timestamp, weight=weight)
+
+        return wrap_async() if iscoroutinefunction(self.clock.now) else wrap_sycn()
+
     def get(self, item: RateItem) -> Optional[Union[DummySyncBucket, DummyAsyncBucket]]:
         if item.name == "sync":
             return DummySyncBucket()
@@ -85,10 +103,9 @@ def clock(request):
 
 
 @pytest.mark.asyncio
-async def test_limiter_01(clock):
-    factory = DummyBucketFactory()
-    limiter = Limiter(factory, clock)
-    item = limiter.wrap_item("hello", 1)
+async def test_factory_01(clock):
+    factory = DummyBucketFactory(clock)
+    item = factory.wrap_item("hello", 1)
 
     if isinstance(clock, DummySyncClock):
         assert isinstance(item, RateItem)
@@ -99,17 +116,17 @@ async def test_limiter_01(clock):
 
 @pytest.mark.asyncio
 async def test_limiter_02(clock):
-    factory = DummyBucketFactory()
-    limiter = Limiter(factory, clock)
+    factory = DummyBucketFactory(clock)
+    limiter = Limiter(factory)
 
-    item = limiter.wrap_item("sync", 1)
+    item = factory.wrap_item("sync", 1)
 
     if isinstance(clock, DummyAsyncClock):
         item = await item
 
     assert isinstance(factory.get(item), DummySyncBucket)
 
-    item = limiter.wrap_item("async", 1)
+    item = factory.wrap_item("async", 1)
 
     if isinstance(clock, DummyAsyncClock):
         item = await item

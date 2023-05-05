@@ -3,6 +3,7 @@ a workable bucket for Limiter to use
 """
 from abc import ABC
 from abc import abstractmethod
+from typing import Coroutine
 from typing import List
 from typing import Optional
 from typing import Union
@@ -54,6 +55,13 @@ class BucketFactory(ABC):
     User must implement this class should
     he wants to use a custom bucket backend
     """
+
+    @abstractmethod
+    def wrap_item(self, name: str, weight: int = 1) -> Union[RateItem, Coroutine[None, None, RateItem]]:
+        """Mark the current timestamp to the receiving item,
+        if neccessary then wrap it into a RateItem.
+        Can return either a coroutine or a RateItem instance
+        """
 
     @abstractmethod
     def get(self, item: RateItem) -> Optional[Union[AbstractBucket, AbstractAsyncBucket]]:

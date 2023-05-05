@@ -1,49 +1,23 @@
 from inspect import iscoroutine
 from inspect import iscoroutinefunction
 from typing import Coroutine
-from typing import Optional
 from typing import Union
 
 from .abstracts import AbstractAsyncBucket
 from .abstracts import AbstractBucket
-from .abstracts import AsyncClock
 from .abstracts import BucketFactory
 from .abstracts import RateItem
-from .abstracts import SyncClock
-from .clocks import TimeClock
 from .exceptions import BucketFullException
 from .exceptions import BucketRetrievalFail
 
-LimiterClockType = Optional[Union[AsyncClock, SyncClock]]
-
 
 class Limiter:
-    clock: LimiterClockType
     bucket_factory: BucketFactory
 
-    def __init__(
-        self,
-        bucket_factory: BucketFactory,
-        clock: LimiterClockType = TimeClock(),
-    ):
+    def __init__(self, bucket_factory: BucketFactory):
         self.bucket_factory = bucket_factory
-        self.clock = clock
         bucket_factory.schedule_leak()
         bucket_factory.schedule_flush()
-
-    def wrap_item(self, item_name: str, weight: int) -> Union[RateItem, Coroutine[None, None, RateItem]]:
-        if self.clock is None:
-            return RateItem(item_name, 0, weight=weight)
-
-        async def wrap_async():
-            timestamp = await self.clock.now()
-            return RateItem(item_name, timestamp, weight=weight)
-
-        def wrap_sycn():
-            timestamp = self.clock.now()
-            return RateItem(item_name, timestamp, weight=weight)
-
-        return wrap_async() if iscoroutinefunction(self.clock.now) else wrap_sycn()
 
     def handle_bucket_put(
         self,
@@ -68,9 +42,10 @@ class Limiter:
 
         if weight == 0:
             # NOTE: if item is weightless, just let it go through
+            # NOTE: this might change in the futre
             return None
 
-        item = self.wrap_item(name, weight)
+        item = self.bucket_factory.wrap_item(name, weight)
 
         if iscoroutine(item):
 
