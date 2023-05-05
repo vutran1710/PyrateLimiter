@@ -13,21 +13,20 @@ env:
 
 jobs:
   check:
-
-    with:
-      REDIS: redis
-
     runs-on: ubuntu-latest
     services:
       redis:
-        image: redis
+        image: bitnami/redis:latest
+        env:
+          ALLOW_EMPTY_PASSWORD: yes
+        ports:
+          - 6379:6379
+        # Set health checks to wait until redis has started
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        ports:
-          - 6379:6379
     strategy:
       fail-fast: true
       matrix:
@@ -63,6 +62,8 @@ jobs:
         source $VENV
         nox -e lint
     - name: Test and Coverage
+      env:
+        REDIS: redis
       run: |
         source $VENV
         nox -e cover
