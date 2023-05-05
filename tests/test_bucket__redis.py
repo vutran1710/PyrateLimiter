@@ -1,3 +1,4 @@
+from os import getenv
 from time import sleep
 from time import time
 
@@ -13,7 +14,7 @@ from pyrate_limiter.utils import id_generator
 
 @pytest.fixture
 def redis_pool():
-    pool = ConnectionPool(host="localhost", port=6379, db=0)
+    pool = ConnectionPool(host=getenv("REDIS", "localhost"), port=6379, db=0)
     yield pool
 
 
