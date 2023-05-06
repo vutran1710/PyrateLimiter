@@ -36,7 +36,7 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
 
         debug_rate_items(bucket.items)
 
-    sleep(0.300)
+    sleep(0.202)
     # After sleeping for 200msec, the limit is gone
     # because all the existing items have the same timestamp
     for _ in range(5):
@@ -44,13 +44,15 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
         assert bucket.failing_rate is None
         debug_rate_items(bucket.items, from_idx=5)
 
-    sleep(0.2)
+    sleep(0.202)
     # After sleeping for another 200msec, the limit is gone
     # Putting an item with excessive weight is not possible
     before_bucket_size = len(bucket.items)
+    assert before_bucket_size == 10
     print("---------- before put:", before_bucket_size)
     item = RateItem("item", clock.now(), weight=6)
     assert bucket.put(item) is False
+    assert before_bucket_size == 10
 
     assert len(bucket.items) == before_bucket_size
     item = RateItem("item", clock.now(), weight=5)
@@ -122,16 +124,13 @@ def test_simple_list_bucket_leak_task(clock):
     assert len(bucket.items) == 0
 
     # Fill the bucket again, slowly
-    before = time()
     for _ in range(50):
         bucket.put(RateItem("item", clock.now()))
         sleep(0.01)
 
-    after = time()
-    elapsed = after - before
-
     # After this sleep, leak now will discard 2 items
-    sleep(1 - elapsed + 0.02)
+    while clock.now() - 1000 < bucket.items[1].timestamp:
+        sleep(0.01)
 
     assert len(bucket.items) == 50
     bucket.leak(clock.now())
