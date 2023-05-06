@@ -57,7 +57,11 @@ class BucketFactory(ABC):
     """
 
     @abstractmethod
-    def wrap_item(self, name: str, weight: int = 1) -> Union[RateItem, Coroutine[None, None, RateItem]]:
+    def wrap_item(
+        self,
+        name: str,
+        weight: int = 1,
+    ) -> Union[RateItem, Coroutine[None, None, RateItem]]:
         """Mark the current timestamp to the receiving item,
         if neccessary then wrap it into a RateItem.
         Can return either a coroutine or a RateItem instance
