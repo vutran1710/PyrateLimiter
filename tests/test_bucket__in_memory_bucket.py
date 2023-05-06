@@ -1,3 +1,4 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pprint
 from random import randint
@@ -49,7 +50,7 @@ def test_simple_list_bucket(clock: Union[MonotonicClock, TimeClock]):
     # Putting an item with excessive weight is not possible
     before_bucket_size = len(bucket.items)
     assert before_bucket_size == 10
-    print("---------- before put:", before_bucket_size)
+    logging.info("---------- before put: %s", before_bucket_size)
     item = RateItem("item", clock.now(), weight=6)
     assert bucket.put(item) is False
     assert before_bucket_size == 10
@@ -83,7 +84,7 @@ def test_simple_list_bucket_thread_safe_02(clock: Union[MonotonicClock, TimeCloc
             assert len(success) == 20
             failure.append(False)
 
-        print(
+        logging.info(
             f"""
 Completed task#{nth}, Ok/Fail={len(success)}/{len(failure)}
 - processing_time={processing_time}ms"""
@@ -129,8 +130,8 @@ def test_simple_list_bucket_leak_task(clock):
         sleep(0.01)
 
     # After this sleep, leak now will discard 2 items
-    while clock.now() - 1000 < bucket.items[1].timestamp:
-        sleep(0.01)
+    while clock.now() - 1000 <= bucket.items[1].timestamp:
+        sleep(0.005)
 
     assert len(bucket.items) == 50
     bucket.leak(clock.now())

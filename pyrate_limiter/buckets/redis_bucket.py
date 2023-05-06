@@ -1,4 +1,4 @@
-from threading import Lock
+from threading import RLock as Lock
 from typing import List
 from typing import Optional
 

@@ -1,5 +1,5 @@
 import sqlite3
-from threading import Lock
+from threading import RLock as Lock
 from typing import List
 from typing import Optional
 
@@ -36,6 +36,7 @@ class Queries:
     DROP_TABLE = "DROP TABLE IF EXISTS '{table}'"
     DROP_INDEX = "DROP INDEX IF EXISTS '{index}'"
     COUNT_ALL = "SELECT COUNT(*) FROM '{table}'"
+    GET_ALL_ITEM = "SELECT * FROM '{table}' ORDER BY item_timestamp ASC"
     GET_FIRST_ITEM = "SELECT name, item_timestamp FROM '{table}' ORDER BY item_timestamp ASC"
     GET_LAG = """
     SELECT (strftime ('%s', 'now') || substr(strftime ('%f', 'now'), 4)) - (

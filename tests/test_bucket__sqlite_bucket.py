@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -93,11 +94,18 @@ def test_leaking(conn):
 
     assert count_all(conn) == 0
 
-    for n in range(20):
-        bucket.put(RateItem(f"item={n}", 0))
+    for nth in range(20):
+        bucket.put(RateItem(f"item={nth}", 0))
         sleep(0.04)
 
     assert count_all(conn) == 10
+    items = conn.execute(Queries.GET_ALL_ITEM.format(table=TABLE_NAME)).fetchall()
+    for idx, item in enumerate(items):
+        if idx == 0:
+            continue
+
+        delta = item[1] - items[idx - 1][1]
+        logging.info("-------> delta: %s", delta)
 
     def sleep_past_first_item():
         lag = conn.execute(Queries.GET_LAG.format(table=TABLE_NAME)).fetchone()[0]
