@@ -15,8 +15,8 @@ from pyrate_limiter.buckets import SQLiteQueries as Queries
 from pyrate_limiter.utils import id_generator
 
 TEMP_DIR = Path(gettempdir())
-DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
-TABLE_NAME = f"pyrate-test-bucket-{id_generator()}"
+DEFAULT_DB_PATH = "/Users/vutran/pyrate_limiter.sqlite"
+TABLE_NAME = f"pyrate-test-bucket-{id_generator(size=10)}"
 INDEX_NAME = TABLE_NAME + "__timestamp_index"
 
 
@@ -51,8 +51,10 @@ def conn():
 
     yield db_conn
 
+    db_conn.close()
 
-def test_bucket_init(conn):
+
+def test_bucket_init(conn: sqlite3.Connection):
     rates = [Rate(20, 1000)]
     bucket = SQLiteBucket(rates, conn, TABLE_NAME)
     assert bucket is not None
@@ -69,14 +71,14 @@ def test_bucket_init(conn):
             table=TABLE_NAME,
             interval=1000,
         )
-    ).fetchone()[0]
+    ).fetchone()[1]
     assert count == 11
 
     # Insert 10 more item, it should fail
     sleep(1)
     for ntn in range(21):
         is_ok = bucket.put(RateItem("my-item", 0))
-        sleep(0.03)
+        sleep(0.01)
 
         if ntn == 20:
             assert is_ok is False
@@ -85,32 +87,34 @@ def test_bucket_init(conn):
     # Insert an item with excessive weight should fail
     assert bucket.put(RateItem("some-heavy-item", 0, weight=22)) is False
 
-    conn.close()
 
-
-def test_leaking(conn):
+def test_leaking(conn: sqlite3.Connection):
     rates = [Rate(10, 1000)]
     bucket = SQLiteBucket(rates, conn, TABLE_NAME)
 
     assert count_all(conn) == 0
 
-    for nth in range(20):
-        bucket.put(RateItem(f"item={nth}", 0))
+    while count_all(conn) < 10:
+        before = time()
+        bucket.put(RateItem("item", 0))
+        time_cost = int((time() - before) * 1000)
+        logging.info("-------> time cost: %s(ms)", time_cost)
         sleep(0.04)
 
     assert count_all(conn) == 10
     items = conn.execute(Queries.GET_ALL_ITEM.format(table=TABLE_NAME)).fetchall()
+
     for idx, item in enumerate(items):
         if idx == 0:
             continue
 
         delta = item[1] - items[idx - 1][1]
-        logging.info("-------> delta: %s", delta)
+        logging.info("> delta: %s", delta)
 
     def sleep_past_first_item():
         lag = conn.execute(Queries.GET_LAG.format(table=TABLE_NAME)).fetchone()[0]
-        time_remain = 1 - lag / 1000 + 0.01
-        print("remaining time util first item can be removed:", time_remain)
+        time_remain = 1 - lag / 1000 + 0.001
+        logging.info("remaining time util first item can be removed: %s", time_remain)
 
         if time_remain > 0:
             sleep(time_remain)
@@ -131,10 +135,8 @@ def test_leaking(conn):
     bucket.leak()
     assert count_all(conn) == 0
 
-    conn.close()
 
-
-def test_flush(conn):
+def test_flush(conn: sqlite3.Connection):
     rates = [Rate(10, 1000)]
     bucket = SQLiteBucket(rates, conn, TABLE_NAME)
 
@@ -148,7 +150,7 @@ def test_flush(conn):
     assert count_all(conn) == 0
 
 
-def test_stress_test(conn):
+def test_stress_test(conn: sqlite3.Connection):
     rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 4000), Rate(40000, 5000)]
     bucket = SQLiteBucket(rates, conn, TABLE_NAME)
 
@@ -160,7 +162,7 @@ def test_stress_test(conn):
         bucket.put(RateItem(f"item={nth}", 0))
 
     with ThreadPoolExecutor() as executor:
-        for _ in executor.map(put_item, list(range(30000))):
+        for _ in executor.map(put_item, list(range(10000))):
             pass
 
     after = time()

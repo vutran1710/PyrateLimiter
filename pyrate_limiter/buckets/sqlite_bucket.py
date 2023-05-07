@@ -22,6 +22,9 @@ class Queries:
     SELECT {interval} as interval, COUNT(*) FROM '{table}'
     WHERE item_timestamp >= (strftime('%s','now') || substr(strftime('%f','now'),4)) - {interval}
     """
+    QUERY_COUNT_VIEW = """
+    SELECT * FROM '{table}_view__rate_limit_counts'
+    """
     PUT_ITEM = """
     INSERT INTO '{table}' (name) VALUES %s
     """
@@ -67,6 +70,7 @@ class SQLiteBucket(AbstractBucket):
         self.rates = rates
         self.lock = Lock()
         self.full_count_query = self._build_full_count_query()
+        self._create_limit_count_view()
 
     def _build_full_count_query(self) -> str:
         full_query: List[str] = []
@@ -82,9 +86,19 @@ class SQLiteBucket(AbstractBucket):
         join_full_query = " union ".join(full_query) if len(full_query) > 1 else full_query[0]
         return join_full_query
 
+    def _create_limit_count_view(self):
+        assert self.full_count_query
+        self.conn.execute(
+            f"""
+        CREATE VIEW IF NOT EXISTS '{self.table}_view__rate_limit_counts'
+        AS
+        {self.full_count_query}
+        """
+        )
+
     def put(self, item: RateItem) -> bool:
         with self.lock:
-            rate_limit_counts = self.conn.execute(self.full_count_query).fetchall()
+            rate_limit_counts = self.conn.execute(Queries.QUERY_COUNT_VIEW.format(table=self.table)).fetchall()
 
             for idx, result in enumerate(rate_limit_counts):
                 interval, count = result
