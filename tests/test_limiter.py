@@ -40,6 +40,9 @@ class DummySyncBucket(AbstractBucket):
     def flush(self):
         pass
 
+    def count(self):
+        return 1
+
 
 class DummyAsyncBucket(AbstractBucket):
     failing_rate = Rate(1, 100)
@@ -55,6 +58,9 @@ class DummyAsyncBucket(AbstractBucket):
 
     async def flush(self):
         pass
+
+    async def count(self):
+        return 1
 
 
 class DummyBucketFactory(BucketFactory):

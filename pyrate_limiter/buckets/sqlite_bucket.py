@@ -26,8 +26,10 @@ class Queries:
     INSERT INTO '{table}' (name, item_timestamp) VALUES %s
     """
     LEAK = """
-    DELETE FROM '{table}'
-    WHERE item_timestamp < {current_timestamp} - {interval}
+    DELETE FROM '{table}' ORDER BY item_timestamp ASC LIMIT {count}
+    """
+    COUNT_BEFORE_LEAK = """
+    SELECT COUNT(*) FROM '{table}' WHERE item_timestamp < {current_timestamp} - {interval}
     """
     FLUSH = """
     DELETE FROM '{table}'
@@ -107,14 +109,16 @@ class SQLiteBucket(AbstractBucket):
         """Leaking/clean up bucket"""
         assert current_timestamp is not None
         with self.lock:
-            query = Queries.LEAK.format(
+            query = Queries.COUNT_BEFORE_LEAK.format(
                 table=self.table,
                 interval=self.rates[-1].interval,
                 current_timestamp=current_timestamp,
             )
+            count = self.conn.execute(query).fetchone()[0]
+            query = Queries.LEAK.format(table=self.table, count=count)
             self.conn.execute(query)
             self.conn.commit()
-            return 0
+            return count
 
     def flush(self) -> None:
         with self.lock:

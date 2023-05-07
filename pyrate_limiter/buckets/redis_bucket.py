@@ -65,10 +65,6 @@ class RedisSyncBucket(AbstractBucket):
         self.bucket_key = bucket_key
         self.script_hash = script_hash or self.redis.script_load(LuaScript.PUT_ITEM)
 
-    def count_bucket(self) -> int:
-        """Count all items in the bucket"""
-        return self.redis.zcount(self.bucket_key, 0, float("+inf"))
-
     def _check_and_insert(self, item: RateItem) -> Optional[Rate]:
         keys = [
             "timestamp",
@@ -106,7 +102,7 @@ class RedisSyncBucket(AbstractBucket):
             remove_count = self.redis.zremrangebyscore(
                 self.bucket_key,
                 0,
-                current_timestamp - self.rates[-1].interval - 1,
+                current_timestamp - self.rates[-1].interval,
             )
             return remove_count
 
