@@ -113,7 +113,7 @@ def test_leaking(conn: sqlite3.Connection):
 
     def sleep_past_first_item():
         lag = conn.execute(Queries.GET_LAG.format(table=TABLE_NAME)).fetchone()[0]
-        time_remain = 1 - lag / 1000 + 0.001
+        time_remain = 1 - lag / 1000
         logging.info("remaining time util first item can be removed: %s", time_remain)
 
         if time_remain > 0:
