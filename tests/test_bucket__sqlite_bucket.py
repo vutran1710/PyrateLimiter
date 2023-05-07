@@ -51,8 +51,6 @@ def conn():
 
     yield db_conn
 
-    db_conn.close()
-
 
 def test_bucket_init(conn: sqlite3.Connection):
     rates = [Rate(20, 1000)]
