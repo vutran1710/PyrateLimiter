@@ -10,13 +10,13 @@ on:
 
 env:
   LATEST_PY_VERSION: '3.11'
-  REDIS: 'redis://redis:6379'
+  REDIS: 'redis://pyrate_redis:6379'
 
 jobs:
   check:
     runs-on: ubuntu-latest
     services:
-      redis:
+      pyrate_redis:
         image: bitnami/redis:latest
         env:
           ALLOW_EMPTY_PASSWORD: yes
