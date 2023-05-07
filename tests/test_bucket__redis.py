@@ -14,7 +14,7 @@ from pyrate_limiter.utils import id_generator
 
 @pytest.fixture
 def redis_pool():
-    pool = ConnectionPool(host=getenv("REDIS", "localhost"), port=6379, db=0)
+    pool = ConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
     yield pool
 
 

@@ -10,6 +10,7 @@ on:
 
 env:
   LATEST_PY_VERSION: '3.11'
+  REDIS: 'redis://redis:6379'
 
 jobs:
   check:
