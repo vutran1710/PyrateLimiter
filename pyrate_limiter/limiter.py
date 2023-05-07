@@ -45,7 +45,7 @@ class Limiter:
         return put_async() if iscoroutinefunction(bucket.put) else put_sync()
 
     def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Coroutine[None, None, bool]]:
-        assert weight >= 0, "bad item's weight value"
+        assert weight >= 0, "item's weight must be >= 0"
 
         if weight == 0:
             # NOTE: if item is weightless, just let it go through
@@ -76,7 +76,7 @@ class Limiter:
 
             return acquire_async()
 
-        assert type(item) == RateItem  # NOTE: this is to silence mypy warning
+        assert isinstance(item, RateItem)  # NOTE: this is to silence mypy warning
         bucket = self.bucket_factory.get(item)
 
         if not bucket:
