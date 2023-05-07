@@ -19,7 +19,7 @@ class Queries:
     CREATE INDEX IF NOT EXISTS '{index_name}' ON '{table_name}' (item_timestamp)
     """
     COUNT_BEFORE_INSERT = """
-    SELECT COUNT(*) FROM '{table}'
+    SELECT {interval} as interval, COUNT(*) FROM '{table}'
     WHERE item_timestamp >= (strftime('%s','now') || substr(strftime('%f','now'),4)) - {interval}
     """
     PUT_ITEM = """
@@ -59,30 +59,40 @@ class SQLiteBucket(AbstractBucket):
     lock: Lock
     conn: sqlite3.Connection
     table: str
+    full_count_query: str
 
     def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str):
         self.conn = conn
         self.table = table
         self.rates = rates
         self.lock = Lock()
+        self.full_count_query = self._build_full_count_query()
+
+    def _build_full_count_query(self) -> str:
+        full_query: List[str] = []
+
+        for rate in self.rates:
+            query = Queries.COUNT_BEFORE_INSERT.format(
+                table=self.table,
+                interval=rate.interval,
+            )
+
+            full_query.append(query)
+
+        join_full_query = " union ".join(full_query) if len(full_query) > 1 else full_query[0]
+        return join_full_query
 
     def put(self, item: RateItem) -> bool:
         with self.lock:
-            # Check before insert
-            # NOTE: this part can be rewritten using pure SQL, but its kinda complex,
-            # so I leave it as room for improvement
-            for rate in self.rates:
-                count = self.conn.execute(
-                    Queries.COUNT_BEFORE_INSERT.format(
-                        table=self.table,
-                        interval=rate.interval,
-                    )
-                ).fetchone()[0]
+            rate_limit_counts = self.conn.execute(self.full_count_query).fetchall()
 
+            for idx, result in enumerate(rate_limit_counts):
+                interval, count = result
+                rate = self.rates[idx]
+                assert interval == rate.interval
                 space_available = rate.limit - count
 
                 if space_available < item.weight:
-                    self.failing_rate = rate
                     return False
 
             items = ", ".join([f"('{name}')" for name in [item.name] * item.weight])
