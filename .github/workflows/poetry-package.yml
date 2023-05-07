@@ -63,8 +63,6 @@ jobs:
         source $VENV
         nox -e lint
     - name: Test and Coverage
-      env:
-        REDIS: redis
       run: |
         source $VENV
         nox -e cover
