@@ -3,7 +3,6 @@ from inspect import iscoroutinefunction
 from typing import Coroutine
 from typing import Union
 
-from .abstracts import AbstractAsyncBucket
 from .abstracts import AbstractBucket
 from .abstracts import BucketFactory
 from .abstracts import RateItem
@@ -23,7 +22,7 @@ class Limiter:
 
     def handle_bucket_put(
         self,
-        bucket: Union[AbstractBucket, AbstractAsyncBucket],
+        bucket: Union[AbstractBucket],
         item: RateItem,
     ) -> Union[bool, Coroutine[None, None, bool]]:
         def check_acquire(is_success: bool):

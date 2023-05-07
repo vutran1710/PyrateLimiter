@@ -5,7 +5,6 @@ from typing import Union
 
 import pytest
 
-from pyrate_limiter import AbstractAsyncBucket
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import Clock
@@ -42,7 +41,7 @@ class DummySyncBucket(AbstractBucket):
         pass
 
 
-class DummyAsyncBucket(AbstractAsyncBucket):
+class DummyAsyncBucket(AbstractBucket):
     failing_rate = Rate(1, 100)
 
     async def put(self, item: RateItem):

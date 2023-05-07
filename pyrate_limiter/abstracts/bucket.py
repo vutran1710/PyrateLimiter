@@ -13,40 +13,21 @@ from .rate import RateItem
 
 
 class AbstractBucket(ABC):
-    """Base bucket `SYNCHRONOUS` interface"""
+    """Base bucket interface"""
 
     rates: List[Rate]
     failing_rate: Optional[Rate]
 
     @abstractmethod
-    def put(self, item: RateItem) -> bool:
+    def put(self, item: RateItem) -> Union[bool, Coroutine[None, None, bool]]:
         """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
-    def leak(self, current_timestamp: Optional[int] = None) -> int:
+    def leak(self, current_timestamp: Optional[int] = None) -> Union[int, Coroutine[None, None, int]]:
         """Schedule a leak and run in a task"""
 
     @abstractmethod
-    def flush(self) -> None:
-        """Flush the whole bucket"""
-
-
-class AbstractAsyncBucket(ABC):
-    """Base bucket `ASYNCHRONOUS` interface"""
-
-    rates: List[Rate]
-    failing_rate: Optional[Rate]
-
-    @abstractmethod
-    async def put(self, item: RateItem) -> bool:
-        """Put an item (typically the current time) in the bucket"""
-
-    @abstractmethod
-    async def leak(self, current_timestamp: Optional[int] = None) -> int:
-        """Schedule a leak and run in a task"""
-
-    @abstractmethod
-    async def flush(self) -> None:
+    def flush(self) -> Union[None, Coroutine[None, None, None]]:
         """Flush the whole bucket"""
 
 
@@ -68,7 +49,7 @@ class BucketFactory(ABC):
         """
 
     @abstractmethod
-    def get(self, item: RateItem) -> Optional[Union[AbstractBucket, AbstractAsyncBucket]]:
+    def get(self, item: RateItem) -> Optional[Union[AbstractBucket]]:
         """Create or get the corresponding bucket to this item"""
 
     @abstractmethod
