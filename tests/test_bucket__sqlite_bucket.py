@@ -15,7 +15,7 @@ from pyrate_limiter.buckets import SQLiteQueries as Queries
 from pyrate_limiter.utils import id_generator
 
 TEMP_DIR = Path(gettempdir())
-DEFAULT_DB_PATH = "/Users/vutran/pyrate_limiter.sqlite"
+DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
 TABLE_NAME = f"pyrate-test-bucket-{id_generator(size=10)}"
 INDEX_NAME = TABLE_NAME + "__timestamp_index"
 
