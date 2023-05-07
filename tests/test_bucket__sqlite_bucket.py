@@ -74,11 +74,10 @@ def test_bucket_init(conn: sqlite3.Connection):
     ).fetchone()[1]
     assert count == 11
 
-    # Insert 10 more item, it should fail
+    # Insert 21 more items, it should fail at 20th
     sleep(1)
     for ntn in range(21):
         is_ok = bucket.put(RateItem("my-item", 0))
-        sleep(0.01)
 
         if ntn == 20:
             assert is_ok is False
