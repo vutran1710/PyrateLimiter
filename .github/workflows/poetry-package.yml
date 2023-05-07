@@ -10,7 +10,7 @@ on:
 
 env:
   LATEST_PY_VERSION: '3.11'
-  REDIS: 'redis://pyrate_redis:6379'
+  REDIS: 'redis://localhost:6379'
 
 jobs:
   check:
