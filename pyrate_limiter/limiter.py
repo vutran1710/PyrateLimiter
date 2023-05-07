@@ -11,6 +11,10 @@ from .exceptions import BucketRetrievalFail
 
 
 class Limiter:
+    """This class responsibility is to sum up all underlying logic
+    and make working with async/sync functions easily
+    """
+
     bucket_factory: BucketFactory
     raise_when_fail: bool
 
