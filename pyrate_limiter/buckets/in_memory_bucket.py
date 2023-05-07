@@ -29,9 +29,6 @@ class InMemoryBucket(AbstractBucket):
     def put(self, item: RateItem) -> bool:
         with self.lock:
             for rate in self.rates:
-                if len(self.items) < rate.limit:
-                    continue
-
                 lower_bound_value = item.timestamp - rate.interval
                 lower_bound_idx = binary_search(self.items, lower_bound_value)
 
@@ -73,3 +70,6 @@ class InMemoryBucket(AbstractBucket):
     def flush(self) -> None:
         with self.lock:
             self.items = []
+
+    def count(self) -> int:
+        return len(self.items)

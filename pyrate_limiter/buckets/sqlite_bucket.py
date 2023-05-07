@@ -12,7 +12,7 @@ class Queries:
     CREATE_BUCKET_TABLE = """
     CREATE TABLE IF NOT EXISTS '{table}' (
         name VARCHAR,
-        item_timestamp INTEGER DEFAULT (strftime('%s','now') || substr(strftime('%f','now'),4))
+        item_timestamp INTEGER
     )
     """
     CREATE_INDEX_ON_TIMESTAMP = """
@@ -20,17 +20,14 @@ class Queries:
     """
     COUNT_BEFORE_INSERT = """
     SELECT {interval} as interval, COUNT(*) FROM '{table}'
-    WHERE item_timestamp >= (strftime('%s','now') || substr(strftime('%f','now'),4)) - {interval}
-    """
-    QUERY_COUNT_VIEW = """
-    SELECT * FROM '{table}_view__rate_limit_counts'
+    WHERE item_timestamp >= {current_timestamp} - {interval}
     """
     PUT_ITEM = """
-    INSERT INTO '{table}' (name) VALUES %s
+    INSERT INTO '{table}' (name, item_timestamp) VALUES %s
     """
     LEAK = """
     DELETE FROM '{table}'
-    WHERE item_timestamp < (strftime('%s','now') || substr(strftime('%f','now'),4)) - {interval}
+    WHERE item_timestamp < {current_timestamp} - {interval}
     """
     FLUSH = """
     DELETE FROM '{table}'
@@ -69,16 +66,15 @@ class SQLiteBucket(AbstractBucket):
         self.table = table
         self.rates = rates
         self.lock = Lock()
-        self.full_count_query = self._build_full_count_query()
-        self._create_limit_count_view()
 
-    def _build_full_count_query(self) -> str:
+    def _build_full_count_query(self, current_timestamp: int) -> str:
         full_query: List[str] = []
 
         for rate in self.rates:
             query = Queries.COUNT_BEFORE_INSERT.format(
                 table=self.table,
                 interval=rate.interval,
+                current_timestamp=current_timestamp,
             )
 
             full_query.append(query)
@@ -86,19 +82,10 @@ class SQLiteBucket(AbstractBucket):
         join_full_query = " union ".join(full_query) if len(full_query) > 1 else full_query[0]
         return join_full_query
 
-    def _create_limit_count_view(self):
-        assert self.full_count_query
-        self.conn.execute(
-            f"""
-        CREATE VIEW IF NOT EXISTS '{self.table}_view__rate_limit_counts'
-        AS
-        {self.full_count_query}
-        """
-        )
-
     def put(self, item: RateItem) -> bool:
         with self.lock:
-            rate_limit_counts = self.conn.execute(Queries.QUERY_COUNT_VIEW.format(table=self.table)).fetchall()
+            query = self._build_full_count_query(item.timestamp)
+            rate_limit_counts = self.conn.execute(query).fetchall()
 
             for idx, result in enumerate(rate_limit_counts):
                 interval, count = result
@@ -107,20 +94,23 @@ class SQLiteBucket(AbstractBucket):
                 space_available = rate.limit - count
 
                 if space_available < item.weight:
+                    self.failing_rate = rate
                     return False
 
-            items = ", ".join([f"('{name}')" for name in [item.name] * item.weight])
+            items = ", ".join([f"('{name}', {item.timestamp})" for name in [item.name] * item.weight])
             query = Queries.PUT_ITEM.format(table=self.table) % items
             self.conn.execute(query)
             self.conn.commit()
             return True
 
-    def leak(self, _: Optional[int] = None) -> int:
+    def leak(self, current_timestamp: Optional[int] = None) -> int:
         """Leaking/clean up bucket"""
+        assert current_timestamp is not None
         with self.lock:
             query = Queries.LEAK.format(
                 table=self.table,
                 interval=self.rates[-1].interval,
+                current_timestamp=current_timestamp,
             )
             self.conn.execute(query)
             self.conn.commit()
@@ -130,3 +120,7 @@ class SQLiteBucket(AbstractBucket):
         with self.lock:
             self.conn.execute(Queries.FLUSH.format(table=self.table))
             self.conn.commit()
+
+    def count(self) -> int:
+        with self.lock:
+            return self.conn.execute(Queries.COUNT_ALL.format(table=self.table)).fetchone()[0]

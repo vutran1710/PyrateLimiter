@@ -30,6 +30,10 @@ class AbstractBucket(ABC):
     def flush(self) -> Union[None, Coroutine[None, None, None]]:
         """Flush the whole bucket"""
 
+    @abstractmethod
+    def count(self) -> Union[int, Coroutine[None, None, int]]:
+        """Count number of items in the bucket"""
+
 
 class BucketFactory(ABC):
     """Asbtract BucketFactory class

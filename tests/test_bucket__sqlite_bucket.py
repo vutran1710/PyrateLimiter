@@ -3,8 +3,8 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import gettempdir
-from time import sleep
 from time import time
+from typing import Union
 
 import pytest
 
@@ -12,6 +12,8 @@ from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import SQLiteBucket
 from pyrate_limiter.buckets import SQLiteQueries as Queries
+from pyrate_limiter.clocks import MonotonicClock
+from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.utils import id_generator
 
 TEMP_DIR = Path(gettempdir())
@@ -52,102 +54,79 @@ def conn():
     yield db_conn
 
 
-def test_bucket_init(conn: sqlite3.Connection):
+def test_bucket_01(clock: Union[MonotonicClock, TimeClock], conn: sqlite3.Connection):
     rates = [Rate(20, 1000)]
     bucket = SQLiteBucket(rates, conn, TABLE_NAME)
     assert bucket is not None
 
-    bucket.put(RateItem("my-item", 0))
+    bucket.put(RateItem("my-item", clock.now()))
+    assert bucket.count() == 1
 
-    assert count_all(conn) == 1
+    bucket.put(RateItem("my-item", clock.now(), weight=10))
+    assert bucket.count() == 11
 
-    bucket.put(RateItem("my-item", 0, weight=10))
-    assert count_all(conn) == 11
+    assert bucket.put(RateItem("my-item", clock.now(), weight=20)) is False
+    assert bucket.failing_rate == rates[0]
 
-    count = conn.execute(
-        Queries.COUNT_BEFORE_INSERT.format(
-            table=TABLE_NAME,
-            interval=1000,
-        )
-    ).fetchone()[1]
-    assert count == 11
+    assert bucket.put(RateItem("my-item", clock.now(), weight=9)) is True
+    assert bucket.count() == 20
 
-    # Insert 21 more items, it should fail at 20th
-    sleep(1)
-    for ntn in range(21):
-        is_ok = bucket.put(RateItem("my-item", 0))
-
-        if ntn == 20:
-            assert is_ok is False
-
-    sleep(1)
-    # Insert an item with excessive weight should fail
-    assert bucket.put(RateItem("some-heavy-item", 0, weight=22)) is False
+    assert bucket.put(RateItem("my-item", clock.now())) is False
 
 
-def test_leaking(conn: sqlite3.Connection):
-    rates = [Rate(10, 1000)]
+def test_bucket_02(clock: Union[MonotonicClock, TimeClock], conn: sqlite3.Connection):
+    rates = [Rate(30, 1000), Rate(50, 2000)]
+    bucket = SQLiteBucket(rates, conn, TABLE_NAME)
+    assert bucket.count() == 0
+
+    start = time()
+    while bucket.count() < 150:
+        bucket.put(RateItem("item", clock.now()))
+
+        if bucket.count() == 31:
+            cost = time() - start
+            logging.info(">30 items: %s", cost)
+            assert cost > 1
+
+        if bucket.count() == 51:
+            cost = time() - start
+            logging.info(">50 items: %s", cost)
+            assert cost > 2
+
+        if bucket.count() == 81:
+            cost = time() - start
+            logging.info(">80 items: %s", cost)
+            assert cost > 3
+
+        if bucket.count() == 101:
+            cost = time() - start
+            logging.info(">100 items: %s", cost)
+            assert cost > 4
+
+
+def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], conn: sqlite3.Connection):
+    rates = [Rate(1000, 1000)]
     bucket = SQLiteBucket(rates, conn, TABLE_NAME)
 
-    assert count_all(conn) == 0
+    while bucket.count() < 2000:
+        bucket.put(RateItem("item", clock.now()))
 
-    while count_all(conn) < 10:
-        before = time()
-        bucket.put(RateItem("item", 0))
-        time_cost = int((time() - before) * 1000)
-        logging.info("-------> time cost: %s(ms)", time_cost)
-        sleep(0.04)
-
-    assert count_all(conn) == 10
-    items = conn.execute(Queries.GET_ALL_ITEM.format(table=TABLE_NAME)).fetchall()
-
-    for idx, item in enumerate(items):
-        if idx == 0:
-            continue
-
-        delta = item[1] - items[idx - 1][1]
-        logging.info("> delta: %s", delta)
-
-    def sleep_past_first_item():
-        lag = conn.execute(Queries.GET_LAG.format(table=TABLE_NAME)).fetchone()[0]
-        time_remain = 1 - lag / 1000
-        logging.info("remaining time util first item can be removed: %s", time_remain)
-
-        if time_remain > 0:
-            sleep(time_remain)
-
-    sleep_past_first_item()
-    bucket.leak()
-    assert count_all(conn) == 9
-
-    sleep_past_first_item()
-    bucket.leak()
-    assert count_all(conn) == 8
-
-    sleep_past_first_item()
-    bucket.leak()
-    assert count_all(conn) == 7
-
-    sleep(1)
-    bucket.leak()
-    assert count_all(conn) == 0
+    bucket.leak(clock.now())
+    assert bucket.count() == 1000
 
 
-def test_flush(conn: sqlite3.Connection):
-    rates = [Rate(10, 1000)]
+def test_bucket_flush(clock: Union[MonotonicClock, TimeClock], conn: sqlite3.Connection):
+    rates = [Rate(5000, 1000)]
     bucket = SQLiteBucket(rates, conn, TABLE_NAME)
 
-    assert count_all(conn) == 0
+    while bucket.count() < 10000:
+        bucket.put(RateItem("item", clock.now()))
 
-    for n in range(30):
-        bucket.put(RateItem(f"item={n}", 0))
-
-    assert count_all(conn) == 10
     bucket.flush()
-    assert count_all(conn) == 0
+    assert bucket.count() == 0
 
 
-def test_stress_test(conn: sqlite3.Connection):
+def test_stress_test(clock: Union[MonotonicClock, TimeClock], conn: sqlite3.Connection):
     rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 4000), Rate(40000, 5000)]
     bucket = SQLiteBucket(rates, conn, TABLE_NAME)
 
@@ -156,7 +135,7 @@ def test_stress_test(conn: sqlite3.Connection):
     before = time()
 
     def put_item(nth: int):
-        bucket.put(RateItem(f"item={nth}", 0))
+        bucket.put(RateItem(f"item={nth}", clock.now()))
 
     with ThreadPoolExecutor() as executor:
         for _ in executor.map(put_item, list(range(10000))):
