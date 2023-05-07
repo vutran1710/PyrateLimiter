@@ -7,22 +7,21 @@ import pytest
 
 from pyrate_limiter import AbstractAsyncBucket
 from pyrate_limiter import AbstractBucket
-from pyrate_limiter import AsyncClock
 from pyrate_limiter import BucketFactory
+from pyrate_limiter import Clock
 from pyrate_limiter import Limiter
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
-from pyrate_limiter import SyncClock
 from pyrate_limiter.exceptions import BucketFullException
 from pyrate_limiter.exceptions import BucketRetrievalFail
 
 
-class DummySyncClock(SyncClock):
+class DummySyncClock(Clock):
     def now(self):
         return 1
 
 
-class DummyAsyncClock(AsyncClock):
+class DummyAsyncClock(Clock):
     async def now(self):
         return 1
 

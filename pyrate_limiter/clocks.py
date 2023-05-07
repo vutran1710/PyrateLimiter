@@ -1,10 +1,10 @@
 from time import monotonic
 from time import time
 
-from .abstracts import SyncClock
+from .abstracts import Clock
 
 
-class MonotonicClock(SyncClock):
+class MonotonicClock(Clock):
     def __init__(self):
         monotonic()
 
@@ -12,6 +12,6 @@ class MonotonicClock(SyncClock):
         return int(1000 * monotonic())
 
 
-class TimeClock(SyncClock):
+class TimeClock(Clock):
     def now(self):
         return int(1000 * time())
