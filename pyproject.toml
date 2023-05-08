@@ -28,7 +28,7 @@ python = "^3.7"
 
 # Optional backend dependencies
 filelock = {optional=true, version=">=3.0"}
-redis = {optional=true, version="^4.1.0"}
+redis = {optional=true, version="^4.0.0"}
 
 # Documentation dependencies needed for Readthedocs builds
 furo = {optional=true, version="^2022.3.4"}
