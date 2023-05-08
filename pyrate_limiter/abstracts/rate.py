@@ -1,5 +1,40 @@
 """Initialize this class to define rates for limiter
 """
+from enum import Enum
+from typing import Union
+
+
+class Duration(Enum):
+    """Interval helper class"""
+
+    SECOND = 1000
+    MINUTE = 1000 * 60
+    HOUR = 1000 * 60 * 60
+    DAY = 1000 * 60 * 60 * 24
+    WEEK = 1000 * 60 * 60 * 24 * 7
+
+    def __mul__(self, mutiplier: float) -> int:
+        return int(self.value * mutiplier)
+
+    def __int__(self) -> int:
+        return self.value
+
+    @staticmethod
+    def readable(value: int) -> str:
+        notes = [
+            (Duration.WEEK, "w"),
+            (Duration.DAY, "d"),
+            (Duration.HOUR, "h"),
+            (Duration.MINUTE, "m"),
+            (Duration.SECOND, "s"),
+        ]
+
+        for note, shorten in notes:
+            if value >= note.value:
+                decimal_value = value / note.value
+                return f"{decimal_value:0.1f}{shorten}"
+
+        return f"{value}ms"
 
 
 class RateItem:
@@ -30,10 +65,20 @@ class Rate:
     def __init__(
         self,
         limit: int,
-        interval: int,
+        interval: Union[int, Duration],
     ):
         self.limit = limit
-        self.interval = interval
+
+        if isinstance(interval, int):
+            self.interval = interval
+
+        if isinstance(interval, Duration):
+            self.interval = interval.value
+
+        assert self.interval
 
     def __str__(self) -> str:
-        return f"limit={self.limit}/{self.interval}ms"
+        return f"limit={self.limit}/{Duration.readable(self.interval)}"
+
+    def __repr__(self) -> str:
+        return f"limit={self.limit}/{self.interval}"
