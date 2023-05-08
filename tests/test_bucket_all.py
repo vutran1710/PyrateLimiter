@@ -36,33 +36,33 @@ def create_redis_bucket(rates: List[Rate]):
 
 
 def create_sqlite_bucket(rates: List[Rate]):
-    TEMP_DIR = Path(gettempdir())
-    DEFAULT_DB_PATH = TEMP_DIR / "pyrate_limiter.sqlite"
-    TABLE_NAME = f"pyrate-test-bucket-{id_generator(size=10)}"
-    INDEX_NAME = TABLE_NAME + "__timestamp_index"
+    temp_dir = Path(gettempdir())
+    default_db_path = temp_dir / "pyrate_limiter.sqlite"
+    table_name = f"pyrate-test-bucket-{id_generator(size=10)}"
+    index_name = table_name + "__timestamp_index"
 
     conn = sqlite3.connect(
-        DEFAULT_DB_PATH,
+        default_db_path,
         isolation_level="EXCLUSIVE",
         check_same_thread=False,
     )
-    drop_table_query = Queries.DROP_TABLE.format(table=TABLE_NAME)
-    drop_index_query = Queries.DROP_INDEX.format(index=INDEX_NAME)
-    create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=TABLE_NAME)
+    drop_table_query = Queries.DROP_TABLE.format(table=table_name)
+    drop_index_query = Queries.DROP_INDEX.format(index=index_name)
+    create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=table_name)
 
     conn.execute(drop_table_query)
     conn.execute(drop_index_query)
     conn.execute(create_table_query)
 
     create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
-        index_name=INDEX_NAME,
-        table_name=TABLE_NAME,
+        index_name=index_name,
+        table_name=table_name,
     )
 
     conn.execute(create_idx_query)
 
     conn.commit()
-    return SQLiteBucket(rates, conn, TABLE_NAME)
+    return SQLiteBucket(rates, conn, table_name)
 
 
 @pytest.fixture(
@@ -138,7 +138,9 @@ def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], create_bucket):
 
     sleep(1.01)
     assert bucket.leak(clock.now()) == 100
+    assert bucket.count() == 0
     assert bucket.leak(clock.now()) == 0
+    assert bucket.count() == 0
 
 
 def test_bucket_flush(clock: Union[MonotonicClock, TimeClock], create_bucket):
