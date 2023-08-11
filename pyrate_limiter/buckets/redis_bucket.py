@@ -78,7 +78,7 @@ class RedisSyncBucket(AbstractBucket):
             item.timestamp,
             item.weight,
             self.bucket_key,
-            # this is to avoid key collision since we are using ZSET
+            # NOTE: this is to avoid key collision since we are using ZSET
             f"{item.name}:{id_generator()}:",
             *[rate.limit for rate in self.rates],
         ]
