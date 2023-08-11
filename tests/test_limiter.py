@@ -184,3 +184,68 @@ async def test_limiter_02(clock, limiter_should_raise, item_name):
 
         if iscoroutine(try_acquire):
             await try_acquire
+
+
+@pytest.mark.asyncio
+async def test_limiter_decorator(clock, limiter_should_raise, item_name):
+    factory = DummyBucketFactory(clock)
+    limiter = Limiter(factory, raise_when_fail=limiter_should_raise)
+    limiter_wrapper = limiter.as_decorator()
+
+    if isinstance(clock, DummySyncClock) or clock is None:
+        # Test with pure sync Limiter first
+        def mapping_sync(_: int):
+            return "sync", 1
+
+        counter = 0
+
+        def inc_counter(num: int):
+            nonlocal counter
+            counter += num
+
+        wrapped_inc = limiter_wrapper(mapping_sync)(inc_counter)
+        wrapped_inc(1)
+        assert counter == 1, "Should work with synchronous functions"
+
+        async def async_inc_counter(num: int):
+            nonlocal counter
+            counter += num
+
+        wrapped_inc = limiter_wrapper(mapping_sync)(async_inc_counter)
+        await wrapped_inc(1)
+        assert counter == 2, "Should work with async functions"
+    else:
+        # From this point, Limiter is always async
+        def mapping_sync(_: int):
+            return "sync", 1
+
+        def mapping_async(_: int):
+            return "async", 1
+
+        counter = 0
+
+        def inc_counter(num: int):
+            nonlocal counter
+            counter += num
+
+        wrapped_inc_1 = limiter_wrapper(mapping_sync)(inc_counter)
+        wrapped_inc_2 = limiter_wrapper(mapping_async)(inc_counter)
+
+        await wrapped_inc_1(1)
+        assert counter == 1
+
+        await wrapped_inc_2(1)
+        assert counter == 2
+
+        async def async_inc_counter(num: int):
+            nonlocal counter
+            counter += num
+
+        wrapped_inc_3 = limiter_wrapper(mapping_sync)(async_inc_counter)
+        wrapped_inc_4 = limiter_wrapper(mapping_async)(async_inc_counter)
+
+        await wrapped_inc_3(1)
+        assert counter == 3
+
+        await wrapped_inc_4(1)
+        assert counter == 4

@@ -1,6 +1,16 @@
+"""
+Limiter class implementation
+- Smart logic,
+- Switching async/sync context
+- Can be used as decorator
+"""
+from functools import wraps
 from inspect import iscoroutine
 from inspect import iscoroutinefunction
+from typing import Any
+from typing import Callable
 from typing import Coroutine
+from typing import Tuple
 from typing import Union
 
 from .abstracts import AbstractBucket
@@ -29,9 +39,12 @@ class Limiter:
         bucket: Union[AbstractBucket],
         item: RateItem,
     ) -> Union[bool, Coroutine[None, None, bool]]:
+        """Putting item into bucket"""
+
         def check_acquire(is_success: bool):
             if not is_success:
-                assert bucket.failing_rate is not None, "No failing rate when not success, logical error"
+                error_msg = "No failing rate when not success, logical error"
+                assert bucket.failing_rate is not None, error_msg
 
                 if self.raise_when_fail:
                     raise BucketFullException(item.name, bucket.failing_rate)
@@ -49,6 +62,9 @@ class Limiter:
         return put_async() if iscoroutinefunction(bucket.put) else put_sync()
 
     def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Coroutine[None, None, bool]]:
+        """Try accquiring an item with name & weight
+        Return true on success, false on failure
+        """
         assert weight >= 0, "item's weight must be >= 0"
 
         if weight == 0:
@@ -90,3 +106,38 @@ class Limiter:
             return False
 
         return self.handle_bucket_put(bucket, item)
+
+    def as_decorator(self):
+        """Use limiter decorator
+        Use with both sync & async function
+        """
+
+        def with_mapping_func(mapping: Callable[Any, Tuple[str, int]]):
+            def func_wrapper(func):
+                """Actual function warpper"""
+
+                @wraps(func)
+                def wrapper(*args, **kwargs):
+                    (name, weight) = mapping(*args, **kwargs)
+                    accquire_ok = self.try_acquire(name, weight)
+
+                    if not iscoroutine(accquire_ok):
+                        return func(*args, **kwargs)
+
+                    async def handle_accquire_is_coroutine():
+                        nonlocal accquire_ok
+                        accquire_ok = await accquire_ok
+                        result = func(*args, **kwargs)
+
+                        if iscoroutine(result):
+                            return await result
+
+                        return result
+
+                    return handle_accquire_is_coroutine()
+
+                return wrapper
+
+            return func_wrapper
+
+        return with_mapping_func
