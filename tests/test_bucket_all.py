@@ -132,6 +132,22 @@ def test_bucket_02(clock: Union[MonotonicClock, TimeClock], create_bucket):
             assert cost > 4
 
 
+def test_bucket_03(clock: Union[MonotonicClock, TimeClock]):
+    rates = [Rate(10, 1000)]
+    bucket = create_in_memory_bucket(rates)
+
+    assert bucket.availability(1) == 0
+
+    for _ in range(10):
+        assert bucket.put(RateItem("a", clock.now())) is True
+        # NOTE: sleep 50ms between each item
+        sleep(0.05)
+
+    assert bucket.put(RateItem("a", clock.now())) is False
+    assert int(bucket.availability(1) / 50) == 1
+    assert int(bucket.availability(5) / 50) == 5
+
+
 def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], create_bucket):
     rates = [Rate(100, 3000)]
     bucket = create_bucket(rates)

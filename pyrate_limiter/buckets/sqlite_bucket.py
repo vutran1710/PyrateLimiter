@@ -1,7 +1,9 @@
 import sqlite3
 from threading import RLock as Lock
+from typing import Coroutine
 from typing import List
 from typing import Optional
+from typing import Union
 
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
@@ -128,3 +130,6 @@ class SQLiteBucket(AbstractBucket):
     def count(self) -> int:
         with self.lock:
             return self.conn.execute(Queries.COUNT_ALL.format(table=self.table)).fetchone()[0]
+
+    def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
+        return 1

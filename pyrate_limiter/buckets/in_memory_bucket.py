@@ -1,6 +1,8 @@
 from threading import RLock as Lock
+from typing import Coroutine
 from typing import List
 from typing import Optional
+from typing import Union
 
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
@@ -25,6 +27,7 @@ class InMemoryBucket(AbstractBucket):
         self.rates = sorted(rates, key=lambda r: r.interval)
         self.items = []
         self.lock = Lock()
+        self.failing_rate = None
 
     def put(self, item: RateItem) -> bool:
         with self.lock:
@@ -74,7 +77,7 @@ class InMemoryBucket(AbstractBucket):
     def count(self) -> int:
         return len(self.items)
 
-    def availability(self, weight: int) -> int:
+    def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
         if self.failing_rate is None:
             if weight > self.rates[-1].limit:
                 return -1
@@ -86,11 +89,12 @@ class InMemoryBucket(AbstractBucket):
 
         while aggregated_weight < weight:
             aggregated_weight += self.items[cursor].weight
+            cursor += 1
 
         if cursor == 0:
             # NOTE: technically, this first item is the lower bound of the time interval
             # and it means the bucket is immediately available
-            # To avoid flaky test, we add a slight delay here (10ms)
+            # To avoid flaky-ness, we add a slight delay here (10ms)
             return 10
 
         remaining_time = self.items[cursor].timestamp - self.items[0].timestamp

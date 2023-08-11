@@ -1,6 +1,8 @@
 from threading import RLock as Lock
+from typing import Coroutine
 from typing import List
 from typing import Optional
+from typing import Union
 
 from redis import Redis
 
@@ -112,3 +114,6 @@ class RedisSyncBucket(AbstractBucket):
 
     def count(self):
         return self.redis.zcard(self.bucket_key)
+
+    def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
+        return 1
