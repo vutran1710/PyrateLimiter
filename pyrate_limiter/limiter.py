@@ -21,6 +21,7 @@ from .exceptions import BucketRetrievalFail
 
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
+DecoratorWrapper = Callable[[Callable[[Any], Any]], Any]
 
 
 class Limiter:
@@ -110,18 +111,20 @@ class Limiter:
 
         return self.handle_bucket_put(bucket, item)
 
-    def as_decorator(self) -> Callable[[ItemMapping], Callable[[Any], Any]]:
+    def as_decorator(self) -> Callable[[ItemMapping], DecoratorWrapper]:
         """Use limiter decorator
         Use with both sync & async function
         """
 
         def with_mapping_func(mapping: ItemMapping):
-            def func_wrapper(func):
+            def decorator_wrapper(func):
                 """Actual function warpper"""
 
                 @wraps(func)
                 def wrapper(*args, **kwargs):
                     (name, weight) = mapping(*args, **kwargs)
+                    assert isinstance(name, str), "Mapping name is expected but not found"
+                    assert isinstance(weight, int), "Mapping weight is expected but not found"
                     accquire_ok = self.try_acquire(name, weight)
 
                     if not iscoroutine(accquire_ok):
@@ -141,6 +144,6 @@ class Limiter:
 
                 return wrapper
 
-            return func_wrapper
+            return decorator_wrapper
 
         return with_mapping_func
