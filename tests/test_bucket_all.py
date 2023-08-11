@@ -96,6 +96,12 @@ def test_bucket_01(clock: Union[MonotonicClock, TimeClock], create_bucket):
 
     assert bucket.put(RateItem("my-item", clock.now())) is False
 
+    sleep(2)
+    assert bucket.put(RateItem("my-item", clock.now())) is True
+
+    sleep(2)
+    assert bucket.put(RateItem("my-item", clock.now(), weight=30)) is False
+
 
 def test_bucket_02(clock: Union[MonotonicClock, TimeClock], create_bucket):
     rates = [Rate(30, 1000), Rate(50, 2000)]
@@ -135,6 +141,7 @@ def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], create_bucket):
 
     bucket.leak(clock.now())
     assert bucket.count() == 100
+    assert bucket.leak(clock.now()) == 0
 
     sleep(1.01)
     assert bucket.leak(clock.now()) == 100
