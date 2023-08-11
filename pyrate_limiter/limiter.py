@@ -21,7 +21,7 @@ from .exceptions import BucketRetrievalFail
 
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
-DecoratorWrapper = Callable[[Callable[[Any], Any]], Any]
+DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
 
 
 class Limiter:
@@ -116,8 +116,8 @@ class Limiter:
         Use with both sync & async function
         """
 
-        def with_mapping_func(mapping: ItemMapping):
-            def decorator_wrapper(func):
+        def with_mapping_func(mapping: ItemMapping) -> DecoratorWrapper:
+            def decorator_wrapper(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 """Actual function warpper"""
 
                 @wraps(func)
