@@ -20,6 +20,9 @@ from .exceptions import BucketFullException
 from .exceptions import BucketRetrievalFail
 
 
+ItemMapping = Callable[[Any], Tuple[str, int]]
+
+
 class Limiter:
     """This class responsibility is to sum up all underlying logic
     and make working with async/sync functions easily
@@ -107,12 +110,12 @@ class Limiter:
 
         return self.handle_bucket_put(bucket, item)
 
-    def as_decorator(self):
+    def as_decorator(self) -> Callable[[ItemMapping], Callable[[Any], Any]]:
         """Use limiter decorator
         Use with both sync & async function
         """
 
-        def with_mapping_func(mapping: Callable[Any, Tuple[str, int]]):
+        def with_mapping_func(mapping: ItemMapping):
             def func_wrapper(func):
                 """Actual function warpper"""
 
