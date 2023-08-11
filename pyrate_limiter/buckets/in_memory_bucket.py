@@ -73,3 +73,25 @@ class InMemoryBucket(AbstractBucket):
 
     def count(self) -> int:
         return len(self.items)
+
+    def availability(self, weight: int) -> int:
+        if self.failing_rate is None:
+            if weight > self.rates[-1].limit:
+                return -1
+
+            return 0
+
+        aggregated_weight = 0
+        cursor = 0
+
+        while aggregated_weight < weight:
+            aggregated_weight += self.items[cursor].weight
+
+        if cursor == 0:
+            # NOTE: technically, this first item is the lower bound of the time interval
+            # and it means the bucket is immediately available
+            # To avoid flaky test, we add a slight delay here (10ms)
+            return 10
+
+        remaining_time = self.items[cursor].timestamp - self.items[0].timestamp
+        return remaining_time
