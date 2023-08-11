@@ -34,6 +34,14 @@ class AbstractBucket(ABC):
     def count(self) -> Union[int, Coroutine[None, None, int]]:
         """Count number of items in the bucket"""
 
+    @abstractmethod
+    def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
+        """Check when there will be room for the weight to be consumed
+        0: immediately available
+        > 0: milisecs until available
+        < 0: never
+        """
+
 
 class BucketFactory(ABC):
     """Asbtract BucketFactory class
