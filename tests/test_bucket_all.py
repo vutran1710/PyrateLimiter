@@ -133,7 +133,7 @@ def test_bucket_02(clock: Union[MonotonicClock, TimeClock], create_bucket):
 
 
 def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], create_bucket):
-    rates = [Rate(100, 1000)]
+    rates = [Rate(100, 2000)]
     bucket = create_bucket(rates)
 
     while bucket.count() < 200:
@@ -142,10 +142,10 @@ def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], create_bucket):
     bucket.leak(clock.now())
     assert bucket.count() == 100
     assert bucket.leak(clock.now()) == 0
+    assert bucket.count() == 100
 
-    sleep(1.01)
+    sleep(2.01)
     assert bucket.leak(clock.now()) == 100
-    assert bucket.count() == 0
     assert bucket.leak(clock.now()) == 0
     assert bucket.count() == 0
 
