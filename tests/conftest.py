@@ -4,9 +4,13 @@ from logging import getLogger
 from os import getenv
 from pathlib import Path
 from tempfile import gettempdir
+from time import time
+from typing import Coroutine
+from typing import Union
 
 import pytest
 
+from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.clocks import MonotonicClock
 from pyrate_limiter.clocks import SQLiteClock
 from pyrate_limiter.clocks import TimeClock
@@ -26,7 +30,18 @@ conn = sqlite3.connect(
     check_same_thread=False,
 )
 
-clocks = [MonotonicClock(), TimeClock(), SQLiteClock(conn)]
+
+class MockAsyncClock(Clock):
+    """Mock Async Clock, only for testing"""
+
+    def now(self) -> Union[int, Coroutine[None, None, int]]:
+        async def _now():
+            return int(1000 * time())
+
+        return _now()
+
+
+clocks = [MonotonicClock(), TimeClock(), SQLiteClock(conn), MockAsyncClock()]
 
 
 @pytest.fixture(params=clocks)

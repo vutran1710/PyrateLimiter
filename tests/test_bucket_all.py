@@ -3,6 +3,7 @@ Testing buckets of all implementations
 """
 import logging
 import sqlite3
+from inspect import iscoroutine
 from os import getenv
 from pathlib import Path
 from tempfile import gettempdir
@@ -15,6 +16,8 @@ import pytest
 from redis import ConnectionPool
 from redis import Redis
 
+from .conftest import MockAsyncClock
+from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.abstracts import get_bucket_availability
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
@@ -26,6 +29,17 @@ from pyrate_limiter.clocks import MonotonicClock
 from pyrate_limiter.clocks import SQLiteClock
 from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.utils import id_generator
+
+
+async def get_now(clock: Clock) -> int:
+    """Util function to get time now"""
+    now = clock.now()
+
+    if iscoroutine(now):
+        now = await now
+
+    assert isinstance(now, int)
+    return now
 
 
 def create_in_memory_bucket(rates: List[Rate]):
@@ -83,39 +97,41 @@ def create_bucket(request):
     return request.param
 
 
-def test_bucket_01(clock: Union[MonotonicClock, TimeClock, SQLiteClock], create_bucket):
+@pytest.mark.asyncio
+async def test_bucket_01(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
     rates = [Rate(20, 1000)]
     bucket = create_bucket(rates)
     assert bucket is not None
 
-    bucket.put(RateItem("my-item", clock.now()))
+    bucket.put(RateItem("my-item", await get_now(clock)))
     assert bucket.count() == 1
 
-    bucket.put(RateItem("my-item", clock.now(), weight=10))
+    bucket.put(RateItem("my-item", await get_now(clock), weight=10))
     assert bucket.count() == 11
 
-    assert bucket.put(RateItem("my-item", clock.now(), weight=20)) is False
+    assert bucket.put(RateItem("my-item", await get_now(clock), weight=20)) is False
     assert bucket.failing_rate == rates[0]
 
-    assert bucket.put(RateItem("my-item", clock.now(), weight=9)) is True
+    assert bucket.put(RateItem("my-item", await get_now(clock), weight=9)) is True
     assert bucket.count() == 20
 
-    assert bucket.put(RateItem("my-item", clock.now())) is False
+    assert bucket.put(RateItem("my-item", await get_now(clock))) is False
 
     sleep(2)
-    assert bucket.put(RateItem("my-item", clock.now())) is True
+    assert bucket.put(RateItem("my-item", await get_now(clock))) is True
 
     sleep(2)
-    assert bucket.put(RateItem("my-item", clock.now(), weight=30)) is False
+    assert bucket.put(RateItem("my-item", await get_now(clock), weight=30)) is False
 
 
-def test_bucket_02(clock: Union[MonotonicClock, TimeClock, SQLiteClock], create_bucket):
+@pytest.mark.asyncio
+async def test_bucket_02(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
     rates = [Rate(30, 1000), Rate(50, 2000)]
     bucket = create_bucket(rates)
-
     start = time()
+
     while bucket.count() < 150:
-        bucket.put(RateItem("item", clock.now()))
+        bucket.put(RateItem("item", await get_now(clock)))
 
         if bucket.count() == 31:
             cost = time() - start
@@ -138,98 +154,102 @@ def test_bucket_02(clock: Union[MonotonicClock, TimeClock, SQLiteClock], create_
             assert cost > 4
 
 
-def test_bucket_availability(clock: Union[MonotonicClock, TimeClock, SQLiteClock], create_bucket):
+@pytest.mark.asyncio
+async def test_bucket_availability(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
     rates = [Rate(3, 500)]
     bucket = create_bucket(rates)
 
     logging.info("Testing `get_bucket_availability` with Bucket: %s, \nclock=%s", bucket, clock)
 
-    assert get_bucket_availability(bucket, clock.now(), 1) == 0
+    assert get_bucket_availability(bucket, await get_now(clock), 1) == 0
 
-    start = clock.now()
+    start = await get_now(clock)
     assert start > 0
 
     for i in range(3):
-        assert bucket.put(RateItem(f"a:{i}", clock.now())) is True
+        assert bucket.put(RateItem(f"a:{i}", await get_now(clock))) is True
         # NOTE: sleep 100ms between each item
         sleep(0.1)
 
-    end = clock.now()
+    end = await get_now(clock)
     assert end > 0
 
     elapsed = end - start
     assert elapsed > 0
 
     logging.info("Elapsed: %s", elapsed)
-    assert bucket.put(RateItem("a:3", clock.now())) is False
+    assert bucket.put(RateItem("a:3", await get_now(clock))) is False
 
-    availability = get_bucket_availability(bucket, clock.now(), 1)
+    availability = get_bucket_availability(bucket, await get_now(clock), 1)
     assert isinstance(availability, int)
     logging.info("1 space available in: %s", availability)
 
     sleep(availability / 1000 - 0.01)
-    assert bucket.put(RateItem("a:3", clock.now())) is False
+    assert bucket.put(RateItem("a:3", await get_now(clock))) is False
     sleep(0.02)
-    assert bucket.put(RateItem("a:3", clock.now())) is True
+    assert bucket.put(RateItem("a:3", await get_now(clock))) is True
 
-    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is False
-    availability = get_bucket_availability(bucket, clock.now(), 2)
+    assert bucket.put(RateItem("a:4", await get_now(clock), weight=2)) is False
+    availability = get_bucket_availability(bucket, await get_now(clock), 2)
     assert isinstance(availability, int)
     logging.info("2 space available in: %s", availability)
 
     sleep(availability / 1000 - 0.01)
-    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is False
+    assert bucket.put(RateItem("a:4", await get_now(clock), weight=2)) is False
     sleep(0.02)
-    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is True
+    assert bucket.put(RateItem("a:4", await get_now(clock), weight=2)) is True
 
-    assert bucket.put(RateItem("a:5", clock.now(), weight=3)) is False
-    availability = get_bucket_availability(bucket, clock.now(), 3)
+    assert bucket.put(RateItem("a:5", await get_now(clock), weight=3)) is False
+    availability = get_bucket_availability(bucket, await get_now(clock), 3)
     assert isinstance(availability, int)
     logging.info("3 space available in: %s", availability)
 
     sleep(availability / 1000 - 0.01)
-    assert bucket.put(RateItem("a:5", clock.now(), weight=3)) is False
+    assert bucket.put(RateItem("a:5", await get_now(clock), weight=3)) is False
     sleep(0.02)
-    assert bucket.put(RateItem("a:5", clock.now(), 3)) is True
+    assert bucket.put(RateItem("a:5", await get_now(clock), 3)) is True
 
 
-def test_bucket_leak(clock: Union[MonotonicClock, TimeClock, SQLiteClock], create_bucket):
+@pytest.mark.asyncio
+async def test_bucket_leak(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
     rates = [Rate(100, 3000)]
     bucket = create_bucket(rates)
 
     while bucket.count() < 200:
-        bucket.put(RateItem("item", clock.now()))
+        bucket.put(RateItem("item", await get_now(clock)))
 
-    bucket.leak(clock.now())
+    bucket.leak(await get_now(clock))
     assert bucket.count() == 100
-    assert bucket.leak(clock.now()) == 0
+    assert bucket.leak(await get_now(clock)) == 0
     assert bucket.count() == 100
 
     sleep(3.01)
-    assert bucket.leak(clock.now()) == 100
-    assert bucket.leak(clock.now()) == 0
+    assert bucket.leak(await get_now(clock)) == 100
+    assert bucket.leak(await get_now(clock)) == 0
     assert bucket.count() == 0
 
 
-def test_bucket_flush(clock: Union[MonotonicClock, TimeClock, SQLiteClock], create_bucket):
+@pytest.mark.asyncio
+async def test_bucket_flush(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
     rates = [Rate(5000, 1000)]
     bucket = create_bucket(rates)
 
     while bucket.count() < 5000:
-        bucket.put(RateItem("item", clock.now()))
+        bucket.put(RateItem("item", await get_now(clock)))
 
     bucket.flush()
     assert bucket.count() == 0
 
 
-def test_with_large_items(clock: Union[MonotonicClock, TimeClock, SQLiteClock], create_bucket):
+@pytest.mark.asyncio
+async def test_with_large_items(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
     rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 5000)]
     bucket = create_bucket(rates)
 
     before = time()
 
     for _ in range(10_000):
-        item = RateItem("item", clock.now())
+        item = RateItem("item", await get_now(clock))
         bucket.put(item)
 
     after = time()
