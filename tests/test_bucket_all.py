@@ -1,3 +1,6 @@
+"""
+Testing buckets of all implementations
+"""
 import logging
 import sqlite3
 from os import getenv
@@ -12,6 +15,7 @@ import pytest
 from redis import ConnectionPool
 from redis import Redis
 
+from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import InMemoryBucket
@@ -23,19 +27,19 @@ from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.utils import id_generator
 
 
-def create_in_memory_bucket(rates: List[Rate]):
-    return InMemoryBucket(rates)
+def create_in_memory_bucket(rates: List[Rate], clock: Clock):
+    return InMemoryBucket(rates, clock)
 
 
-def create_redis_bucket(rates: List[Rate]):
+def create_redis_bucket(rates: List[Rate], clock: Clock):
     pool = ConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
     redis_db = Redis(connection_pool=pool)
     bucket_key = f"test-bucket/{id_generator()}"
     redis_db.delete(bucket_key)
-    return RedisSyncBucket(rates, redis_db, bucket_key)
+    return RedisSyncBucket(rates, redis_db, bucket_key, clock)
 
 
-def create_sqlite_bucket(rates: List[Rate]):
+def create_sqlite_bucket(rates: List[Rate], _: Clock):
     temp_dir = Path(gettempdir())
     default_db_path = temp_dir / "pyrate_limiter.sqlite"
     table_name = f"pyrate-test-bucket-{id_generator(size=10)}"
@@ -79,7 +83,7 @@ def create_bucket(request):
 
 def test_bucket_01(clock: Union[MonotonicClock, TimeClock], create_bucket):
     rates = [Rate(20, 1000)]
-    bucket = create_bucket(rates)
+    bucket = create_bucket(rates, clock)
     assert bucket is not None
 
     bucket.put(RateItem("my-item", clock.now()))
@@ -105,7 +109,7 @@ def test_bucket_01(clock: Union[MonotonicClock, TimeClock], create_bucket):
 
 def test_bucket_02(clock: Union[MonotonicClock, TimeClock], create_bucket):
     rates = [Rate(30, 1000), Rate(50, 2000)]
-    bucket = create_bucket(rates)
+    bucket = create_bucket(rates, clock)
 
     start = time()
     while bucket.count() < 150:
@@ -132,25 +136,56 @@ def test_bucket_02(clock: Union[MonotonicClock, TimeClock], create_bucket):
             assert cost > 4
 
 
-def test_bucket_03(clock: Union[MonotonicClock, TimeClock]):
-    rates = [Rate(10, 1000)]
-    bucket = create_in_memory_bucket(rates)
+def test_bucket_availability(clock: Union[MonotonicClock, TimeClock], create_bucket):
+    rates = [Rate(3, 1000)]
+    bucket = create_bucket(rates, clock)
+
+    logging.info("Testing with Bucket: %s, \nclock=%s", bucket, clock)
+    if isinstance(bucket, (SQLiteBucket)):
+        return
 
     assert bucket.availability(1) == 0
 
-    for _ in range(10):
-        assert bucket.put(RateItem("a", clock.now())) is True
-        # NOTE: sleep 50ms between each item
-        sleep(0.05)
+    start = time()
+    for i in range(3):
+        assert bucket.put(RateItem(f"a:{i}", clock.now())) is True
+        # NOTE: sleep 100ms between each item
+        sleep(0.2)
+    end = time()
+    elapsed = end - start
+    logging.info("Elapsed: %s", elapsed)
+    assert bucket.put(RateItem("a:3", clock.now())) is False
 
-    assert bucket.put(RateItem("a", clock.now())) is False
-    assert int(bucket.availability(1) / 50) == 1
-    assert int(bucket.availability(5) / 50) == 5
+    availability_for_1 = bucket.availability(1)
+    logging.info("1 space available in: %s", availability_for_1)
+
+    sleep(availability_for_1 / 1000 - 0.01)
+    assert bucket.put(RateItem("a:3", clock.now())) is False
+    sleep(0.01)
+    assert bucket.put(RateItem("a:3", clock.now())) is True
+
+    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is False
+    availability_for_2 = bucket.availability(2)
+    logging.info("2 space available in: %s", availability_for_2)
+
+    sleep(availability_for_2 / 1000 - 0.01)
+    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is False
+    sleep(0.01)
+    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is True
+
+    assert bucket.put(RateItem("a:5", clock.now(), weight=3)) is False
+    availability_for_3 = bucket.availability(3)
+    logging.info("3 space available in: %s", availability_for_3)
+
+    sleep(availability_for_3 / 1000 - 0.01)
+    assert bucket.put(RateItem("a:5", clock.now(), weight=3)) is False
+    sleep(0.01)
+    assert bucket.put(RateItem("a:5", clock.now(), 3)) is True
 
 
 def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], create_bucket):
     rates = [Rate(100, 3000)]
-    bucket = create_bucket(rates)
+    bucket = create_bucket(rates, clock)
 
     while bucket.count() < 200:
         bucket.put(RateItem("item", clock.now()))
@@ -168,7 +203,7 @@ def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], create_bucket):
 
 def test_bucket_flush(clock: Union[MonotonicClock, TimeClock], create_bucket):
     rates = [Rate(5000, 1000)]
-    bucket = create_bucket(rates)
+    bucket = create_bucket(rates, clock)
 
     while bucket.count() < 5000:
         bucket.put(RateItem("item", clock.now()))
@@ -179,7 +214,7 @@ def test_bucket_flush(clock: Union[MonotonicClock, TimeClock], create_bucket):
 
 def test_with_large_items(clock: Union[MonotonicClock, TimeClock], create_bucket):
     rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 5000)]
-    bucket = create_bucket(rates)
+    bucket = create_bucket(rates, clock)
 
     before = time()
 

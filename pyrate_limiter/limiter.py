@@ -4,12 +4,14 @@ Limiter class implementation
 - Switching async/sync context
 - Can be used as decorator
 """
+import asyncio
 from functools import wraps
 from inspect import iscoroutine
 from inspect import iscoroutinefunction
 from typing import Any
 from typing import Callable
 from typing import Coroutine
+from typing import Optional
 from typing import Tuple
 from typing import Union
 
@@ -31,6 +33,7 @@ class Limiter:
 
     bucket_factory: BucketFactory
     raise_when_fail: bool
+    delay: Optional[int]
 
     def __init__(self, bucket_factory: BucketFactory, raise_when_fail: bool = True):
         self.bucket_factory = bucket_factory
@@ -58,7 +61,22 @@ class Limiter:
             return True
 
         async def put_async():
-            return check_acquire(await bucket.put(item))
+            accquire_ok = check_acquire(await bucket.put(item))
+
+            if accquire_ok:
+                return True
+
+            if self.delay:
+                until_available = bucket.availability(item.weight)
+
+                if iscoroutine(until_available):
+                    until_available = await until_available
+
+                if until_available > self.delay:
+                    return False
+
+                await asyncio.sleep(until_available / 1000)
+                return self.handle_bucket_put(bucket, item)
 
         def put_sync():
             return check_acquire(bucket.put(item))

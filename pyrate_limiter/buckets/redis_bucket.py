@@ -1,12 +1,13 @@
+"""Bucket implementation using Redis
+"""
 from threading import RLock as Lock
-from typing import Coroutine
 from typing import List
 from typing import Optional
-from typing import Union
 
 from redis import Redis
 
-from ..abstracts import AbstractBucket
+from ..abstracts import AbstractClockingBucket
+from ..abstracts import Clock
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from ..utils import id_generator
@@ -40,7 +41,7 @@ class LuaScript:
     """
 
 
-class RedisSyncBucket(AbstractBucket):
+class RedisSyncBucket(AbstractClockingBucket):
     """A bucket using redis for storing data
     - We are not using redis' built-in TIME since it is non-deterministic
     - In distributed context, use local server time, but beware of
@@ -53,12 +54,14 @@ class RedisSyncBucket(AbstractBucket):
     lock: Lock
     bucket_key: str
     script_hash: str
+    clock: Clock
 
     def __init__(
         self,
         rates: List[Rate],
         redis: Redis,
         bucket_key: str,
+        clock: Clock,
         script_hash: Optional[str] = None,
     ):
         self.rates = rates
@@ -66,6 +69,8 @@ class RedisSyncBucket(AbstractBucket):
         self.redis = redis
         self.bucket_key = bucket_key
         self.script_hash = script_hash or self.redis.script_load(LuaScript.PUT_ITEM)
+        self.failing_rate = None
+        self.clock = clock
 
     def _check_and_insert(self, item: RateItem) -> Optional[Rate]:
         keys = [
@@ -115,5 +120,18 @@ class RedisSyncBucket(AbstractBucket):
     def count(self):
         return self.redis.zcard(self.bucket_key)
 
-    def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
-        return 1
+    def peek(self, index: int) -> Optional[RateItem]:
+        items = self.redis.zrange(
+            self.bucket_key,
+            -index,
+            -index,
+            withscores=True,
+            score_cast_func=int,
+        )
+
+        if not items:
+            return None
+
+        item = items[0]
+        rate_item = RateItem(name=str(item[0]), timestamp=item[1])
+        return rate_item

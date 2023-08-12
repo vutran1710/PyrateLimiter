@@ -5,7 +5,7 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from ..abstracts import AbstractBucket
+from ..abstracts import AbstractClockingBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
 
@@ -53,7 +53,7 @@ class Queries:
     """
 
 
-class SQLiteBucket(AbstractBucket):
+class SQLiteBucket(AbstractClockingBucket):
     """For sqlite bucket, we are using the sql time function as the clock
     item's timestamp wont matter here
     """
@@ -133,3 +133,6 @@ class SQLiteBucket(AbstractBucket):
 
     def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
         return 1
+
+    def peek(self, index: int) -> Optional[RateItem]:
+        return None

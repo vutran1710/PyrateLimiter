@@ -1,16 +1,15 @@
 from threading import RLock as Lock
-from typing import Coroutine
 from typing import List
 from typing import Optional
-from typing import Union
 
-from ..abstracts import AbstractBucket
+from ..abstracts import AbstractClockingBucket
+from ..abstracts import Clock
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from ..utils import binary_search
 
 
-class InMemoryBucket(AbstractBucket):
+class InMemoryBucket(AbstractClockingBucket):
     """Simple In-memory Bucket using native list
     Clock can be either `time.time` or `time.monotonic`
     When leak, clock is required
@@ -22,12 +21,13 @@ class InMemoryBucket(AbstractBucket):
     items: List[RateItem]
     lock: Lock
     failing_rate: Optional[Rate]
+    clock: Clock
 
-    def __init__(self, rates: List[Rate]):
+    def __init__(self, rates: List[Rate], clock: Clock):
         self.rates = sorted(rates, key=lambda r: r.interval)
         self.items = []
         self.lock = Lock()
-        self.failing_rate = None
+        self.clock = clock
 
     def put(self, item: RateItem) -> bool:
         with self.lock:
@@ -77,25 +77,5 @@ class InMemoryBucket(AbstractBucket):
     def count(self) -> int:
         return len(self.items)
 
-    def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
-        if self.failing_rate is None:
-            if weight > self.rates[-1].limit:
-                return -1
-
-            return 0
-
-        aggregated_weight = 0
-        cursor = 0
-
-        while aggregated_weight < weight:
-            aggregated_weight += self.items[cursor].weight
-            cursor += 1
-
-        if cursor == 0:
-            # NOTE: technically, this first item is the lower bound of the time interval
-            # and it means the bucket is immediately available
-            # To avoid flaky-ness, we add a slight delay here (10ms)
-            return 10
-
-        remaining_time = self.items[cursor].timestamp - self.items[0].timestamp
-        return remaining_time
+    def peek(self, index: int) -> Optional[RateItem]:
+        return self.items[-index] if abs(index) <= self.count() else None
