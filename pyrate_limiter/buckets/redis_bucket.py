@@ -6,8 +6,7 @@ from typing import Optional
 
 from redis import Redis
 
-from ..abstracts import AbstractClockingBucket
-from ..abstracts import Clock
+from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from ..utils import id_generator
@@ -41,7 +40,7 @@ class LuaScript:
     """
 
 
-class RedisSyncBucket(AbstractClockingBucket):
+class RedisSyncBucket(AbstractBucket):
     """A bucket using redis for storing data
     - We are not using redis' built-in TIME since it is non-deterministic
     - In distributed context, use local server time, but beware of
@@ -54,14 +53,12 @@ class RedisSyncBucket(AbstractClockingBucket):
     lock: Lock
     bucket_key: str
     script_hash: str
-    clock: Clock
 
     def __init__(
         self,
         rates: List[Rate],
         redis: Redis,
         bucket_key: str,
-        clock: Clock,
         script_hash: Optional[str] = None,
     ):
         self.rates = rates
@@ -70,7 +67,6 @@ class RedisSyncBucket(AbstractClockingBucket):
         self.bucket_key = bucket_key
         self.script_hash = script_hash or self.redis.script_load(LuaScript.PUT_ITEM)
         self.failing_rate = None
-        self.clock = clock
 
     def _check_and_insert(self, item: RateItem) -> Optional[Rate]:
         keys = [

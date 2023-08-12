@@ -2,14 +2,13 @@ from threading import RLock as Lock
 from typing import List
 from typing import Optional
 
-from ..abstracts import AbstractClockingBucket
-from ..abstracts import Clock
+from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from ..utils import binary_search
 
 
-class InMemoryBucket(AbstractClockingBucket):
+class InMemoryBucket(AbstractBucket):
     """Simple In-memory Bucket using native list
     Clock can be either `time.time` or `time.monotonic`
     When leak, clock is required
@@ -21,13 +20,11 @@ class InMemoryBucket(AbstractClockingBucket):
     items: List[RateItem]
     lock: Lock
     failing_rate: Optional[Rate]
-    clock: Clock
 
-    def __init__(self, rates: List[Rate], clock: Clock):
+    def __init__(self, rates: List[Rate]):
         self.rates = sorted(rates, key=lambda r: r.interval)
         self.items = []
         self.lock = Lock()
-        self.clock = clock
 
     def put(self, item: RateItem) -> bool:
         with self.lock:

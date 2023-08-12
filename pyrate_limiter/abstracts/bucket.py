@@ -41,58 +41,7 @@ class AbstractBucket(ABC):
 
     @abstractmethod
     def peek(self, index: int) -> Union[Optional[RateItem], Coroutine[None, None, Optional[RateItem]]]:
-        """Peek at the rate-item at a specific index"""
-
-
-class AbstractClockingBucket(AbstractBucket):
-    """AbstractBucket with dedicated clock"""
-
-    clock: Clock
-
-    def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
-        """Use dedicated clock to calculate bucket's availability"""
-        if weight == 0:
-            return 0
-
-        if self.failing_rate is None:
-            if weight > self.rates[-1].limit:
-                return -1
-
-            return 0
-
-        now = self.clock.now()
-        bound_item = self.peek(self.failing_rate.limit - weight + 1)
-
-        def _calc_availability(inner_now: int, inner_bound_item: RateItem) -> int:
-            assert self.failing_rate is not None
-            lower_time_bound = inner_now - self.failing_rate.interval
-            upper_time_bound = inner_bound_item.timestamp
-            return upper_time_bound - lower_time_bound
-
-        async def _calc_availability_async():
-            nonlocal now, bound_item
-            now = await now
-
-            if iscoroutine(bound_item):
-                bound_item = await bound_item
-
-            if bound_item is None:
-                # NOTE: if no bound item, that means bucket is available
-                return 0
-
-            return _calc_availability(now, bound_item)
-
-        if iscoroutine(now) or iscoroutine(bound_item):
-            return _calc_availability_async()
-
-        assert isinstance(now, int)
-
-        if bound_item is None:
-            # NOTE: if no bound item, that means bucket is available
-            return 0
-
-        assert isinstance(bound_item, RateItem)
-        return _calc_availability(now, bound_item)
+        """Peek at the rate-item at a specific index in latest-to-earliest order"""
 
 
 class BucketFactory(ABC):
@@ -113,7 +62,7 @@ class BucketFactory(ABC):
         """
 
     @abstractmethod
-    def get(self, item: RateItem) -> Optional[Union[AbstractBucket, AbstractClockingBucket]]:
+    def get(self, item: RateItem) -> Optional[Union[AbstractBucket]]:
         """Create or get the corresponding bucket to this item"""
 
     @abstractmethod
@@ -123,3 +72,53 @@ class BucketFactory(ABC):
     @abstractmethod
     def schedule_flush(self) -> None:
         """Schedule all the buckets' flush"""
+
+
+def get_bucket_availability(
+    bucket: Union[AbstractBucket],
+    clock: Clock,
+    weight: int,
+) -> Union[int, Coroutine[None, None, int]]:
+    """Use clock to calculate time until bucket become availabe"""
+    if weight == 0:
+        return 0
+
+    if bucket.failing_rate is None:
+        if weight > bucket.rates[-1].limit:
+            return -1
+
+        return 0
+
+    now = clock.now()
+    bound_item = bucket.peek(bucket.failing_rate.limit - weight + 1)
+
+    def _calc_availability(inner_now: int, inner_bound_item: RateItem) -> int:
+        assert bucket.failing_rate is not None
+        lower_time_bound = inner_now - bucket.failing_rate.interval
+        upper_time_bound = inner_bound_item.timestamp
+        return upper_time_bound - lower_time_bound
+
+    async def _calc_availability_async():
+        nonlocal now, bound_item
+        now = await now
+
+        if iscoroutine(bound_item):
+            bound_item = await bound_item
+
+        if bound_item is None:
+            # NOTE: if no bound item, that means bucket is available
+            return 0
+
+        return _calc_availability(now, bound_item)
+
+    if iscoroutine(now) or iscoroutine(bound_item):
+        return _calc_availability_async()
+
+    assert isinstance(now, int)
+
+    if bound_item is None:
+        # NOTE: if no bound item, that means bucket is available
+        return 0
+
+    assert isinstance(bound_item, RateItem)
+    return _calc_availability(now, bound_item)

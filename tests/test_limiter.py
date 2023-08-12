@@ -43,6 +43,9 @@ class DummySyncBucket(AbstractBucket):
     def count(self):
         return 1
 
+    def peek(self, index: int):
+        return None
+
 
 class DummyAsyncBucket(AbstractBucket):
     failing_rate = Rate(1, 100)
@@ -61,6 +64,9 @@ class DummyAsyncBucket(AbstractBucket):
 
     async def count(self):
         return 1
+
+    def peek(self, index: int):
+        return None
 
 
 class DummyBucketFactory(BucketFactory):

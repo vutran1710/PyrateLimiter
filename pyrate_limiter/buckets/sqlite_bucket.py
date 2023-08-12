@@ -4,8 +4,7 @@ from threading import RLock as Lock
 from typing import List
 from typing import Optional
 
-from ..abstracts import AbstractClockingBucket
-from ..abstracts import Clock
+from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
 
@@ -51,24 +50,10 @@ class Queries:
     LIMIT 1
     )
     """
-    GET_TIME_NOW = "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
     PEEK = "SELECT * FROM '{table}' ORDER BY item_timestamp DESC LIMIT 1 OFFSET {offset}"
 
 
-class SQLiteClock(Clock):
-    """Get timestamp using SQLite"""
-
-    conn: sqlite3.Connection
-
-    def __init__(self, conn: sqlite3.Connection):
-        self.conn = conn
-
-    def now(self) -> int:
-        now = self.conn.execute(Queries.GET_TIME_NOW).fetchone()[0]
-        return int(now)
-
-
-class SQLiteBucket(AbstractClockingBucket):
+class SQLiteBucket(AbstractBucket):
     """For sqlite bucket, we are using the sql time function as the clock
     item's timestamp wont matter here
     """
@@ -79,14 +64,12 @@ class SQLiteBucket(AbstractClockingBucket):
     conn: sqlite3.Connection
     table: str
     full_count_query: str
-    clock: SQLiteClock
 
     def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str):
         self.conn = conn
         self.table = table
         self.rates = rates
         self.lock = Lock()
-        self.clock = SQLiteClock(self.conn)
 
     def _build_full_count_query(self, current_timestamp: int) -> str:
         full_query: List[str] = []
