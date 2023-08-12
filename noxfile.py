@@ -5,7 +5,7 @@ from nox_poetry import session
 nox.options.reuse_existing_virtualenvs = True
 
 PYTEST_ARGS = ["--verbose", "-s", "--full-trace", "--maxfail=1", "--numprocesses=auto"]
-COVERAGE_ARGS = ["--cov", "--cov-report=term", "--cov-report=xml"]
+COVERAGE_ARGS = ["--cov", "--cov-report=term", "--cov-report=xml", "--cov-report=html"]
 
 
 @session(python=False)
