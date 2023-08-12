@@ -56,7 +56,7 @@ class BucketFactory(ABC):
         weight: int = 1,
     ) -> Union[RateItem, Coroutine[None, None, RateItem]]:
         """Mark the current timestamp to the receiving item,
-        if neccessary then wrap it into a RateItem.
+        Wrap it into a RateItem
         Can return either a coroutine or a RateItem instance
         """
 
@@ -91,8 +91,7 @@ def get_bucket_availability(
     bound_item = bucket.peek(bucket.failing_rate.limit - weight + 1)
 
     # NOTE: if there is a failing rate, then this can't be None!
-    bad_logic_err = "Failing rate but no item found! Probably leak/flush without reset bucket"
-    assert bound_item is not None, bad_logic_err
+    assert bound_item is not None, "Bound-item not found"
 
     def _calc_availability(inner_now: int, inner_bound_item: RateItem) -> int:
         assert bucket.failing_rate is not None  # NOTE: silence mypy
@@ -105,8 +104,7 @@ def get_bucket_availability(
         bound_item = await bound_item
 
         # NOTE: if there is a failing rate, then this can't be None!
-        bad_logic_err = "Failing rate but no item found! Probably leak/flush without reset bucket"
-        assert bound_item is not None, bad_logic_err
+        assert bound_item is not None, "Bound-item not found"
 
         return _calc_availability(now, bound_item)
 
