@@ -160,7 +160,7 @@ class RedisBucket(AbstractBucket):
 
     def flush(self):
         with self.lock:
-            self.redis.delete(self.bucket_key)
+            return self.redis.delete(self.bucket_key)
 
     def count(self):
         return self.redis.zcard(self.bucket_key)

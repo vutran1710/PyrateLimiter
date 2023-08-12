@@ -83,10 +83,7 @@ def get_bucket_availability(
         return 0
 
     if bucket.failing_rate is None:
-        if weight > bucket.rates[-1].limit:
-            return -1
-
-        return 0
+        return -1 if weight > bucket.rates[-1].limit else 0
 
     bound_item = bucket.peek(bucket.failing_rate.limit - weight + 1)
 
