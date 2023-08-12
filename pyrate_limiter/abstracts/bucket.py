@@ -27,7 +27,10 @@ class AbstractBucket(ABC):
         """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
-    def leak(self, current_timestamp: Optional[int] = None) -> Union[int, Coroutine[None, None, int]]:
+    def leak(
+        self,
+        current_timestamp: Optional[int] = None,
+    ) -> Union[int, Coroutine[None, None, int]]:
         """Schedule a leak and run in a task"""
 
     @abstractmethod
