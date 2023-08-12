@@ -8,6 +8,7 @@ import asyncio
 from functools import wraps
 from inspect import iscoroutine
 from inspect import iscoroutinefunction
+from time import sleep
 from typing import Any
 from typing import Callable
 from typing import Coroutine
@@ -17,6 +18,7 @@ from typing import Union
 
 from .abstracts import AbstractBucket
 from .abstracts import BucketFactory
+from .abstracts import get_bucket_availability
 from .abstracts import RateItem
 from .exceptions import BucketFullException
 from .exceptions import BucketRetrievalFail
@@ -35,11 +37,12 @@ class Limiter:
     raise_when_fail: bool
     delay: Optional[int]
 
-    def __init__(self, bucket_factory: BucketFactory, raise_when_fail: bool = True):
+    def __init__(self, bucket_factory: BucketFactory, raise_when_fail: bool = True, delay: Optional[int] = None):
         self.bucket_factory = bucket_factory
         bucket_factory.schedule_leak()
         bucket_factory.schedule_flush()
         self.raise_when_fail = raise_when_fail
+        self.delay = delay
 
     def handle_bucket_put(
         self,
@@ -60,26 +63,40 @@ class Limiter:
 
             return True
 
+        async def handle_delay():
+            nonlocal bucket, item
+            until_available = get_bucket_availability(bucket, item.timestamp, item.weight)
+            async_delay = False
+
+            if iscoroutine(until_available):
+                until_available = await until_available
+                async_delay = True
+
+            if until_available > self.delay:
+                return False
+
+            if async_delay:
+                await asyncio.sleep(until_available / 1000)
+            else:
+                sleep(until_available / 1000)
+
+            return self.handle_bucket_put(bucket, item)
+
         async def put_async():
             accquire_ok = check_acquire(await bucket.put(item))
 
-            if accquire_ok:
-                return True
+            if accquire_ok is False and self.delay:
+                return handle_delay()
 
-            if self.delay:
-                until_available = bucket.availability(item.weight)
-
-                if iscoroutine(until_available):
-                    until_available = await until_available
-
-                if until_available > self.delay:
-                    return False
-
-                await asyncio.sleep(until_available / 1000)
-                return self.handle_bucket_put(bucket, item)
+            return accquire_ok
 
         def put_sync():
-            return check_acquire(bucket.put(item))
+            accquire_ok = check_acquire(bucket.put(item))
+
+            if accquire_ok is False and self.delay:
+                return handle_delay()
+
+            return accquire_ok
 
         return put_async() if iscoroutinefunction(bucket.put) else put_sync()
 

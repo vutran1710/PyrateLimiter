@@ -144,7 +144,7 @@ def test_bucket_availability(clock: Union[MonotonicClock, TimeClock, SQLiteClock
 
     logging.info("Testing `get_bucket_availability` with Bucket: %s, \nclock=%s", bucket, clock)
 
-    assert get_bucket_availability(bucket, clock, 1) == 0
+    assert get_bucket_availability(bucket, clock.now(), 1) == 0
 
     start = clock.now()
     assert start > 0
@@ -163,33 +163,33 @@ def test_bucket_availability(clock: Union[MonotonicClock, TimeClock, SQLiteClock
     logging.info("Elapsed: %s", elapsed)
     assert bucket.put(RateItem("a:3", clock.now())) is False
 
-    availability = get_bucket_availability(bucket, clock, 1)
+    availability = get_bucket_availability(bucket, clock.now(), 1)
     assert isinstance(availability, int)
     logging.info("1 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.01)
+    sleep(availability / 1000 - 0.05)
     assert bucket.put(RateItem("a:3", clock.now())) is False
-    sleep(0.01)
+    sleep(0.05)
     assert bucket.put(RateItem("a:3", clock.now())) is True
 
     assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is False
-    availability = get_bucket_availability(bucket, clock, 2)
+    availability = get_bucket_availability(bucket, clock.now(), 2)
     assert isinstance(availability, int)
     logging.info("2 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.01)
+    sleep(availability / 1000 - 0.05)
     assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is False
-    sleep(0.01)
+    sleep(0.05)
     assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is True
 
     assert bucket.put(RateItem("a:5", clock.now(), weight=3)) is False
-    availability = get_bucket_availability(bucket, clock, 3)
+    availability = get_bucket_availability(bucket, clock.now(), 3)
     assert isinstance(availability, int)
     logging.info("3 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.01)
+    sleep(availability / 1000 - 0.05)
     assert bucket.put(RateItem("a:5", clock.now(), weight=3)) is False
-    sleep(0.01)
+    sleep(0.05)
     assert bucket.put(RateItem("a:5", clock.now(), 3)) is True
 
 

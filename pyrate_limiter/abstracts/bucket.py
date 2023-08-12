@@ -9,7 +9,6 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from .clock import Clock
 from .rate import Rate
 from .rate import RateItem
 
@@ -76,7 +75,7 @@ class BucketFactory(ABC):
 
 def get_bucket_availability(
     bucket: Union[AbstractBucket],
-    clock: Clock,
+    now: int,
     weight: int,
 ) -> Union[int, Coroutine[None, None, int]]:
     """Use clock to calculate time until bucket become availabe"""
@@ -89,11 +88,10 @@ def get_bucket_availability(
 
         return 0
 
-    now = clock.now()
     bound_item = bucket.peek(bucket.failing_rate.limit - weight + 1)
 
     def _calc_availability(inner_now: int, inner_bound_item: RateItem) -> int:
-        assert bucket.failing_rate is not None
+        assert bucket.failing_rate is not None  # NOTE: silence mypy
         lower_time_bound = inner_now - bucket.failing_rate.interval
         upper_time_bound = inner_bound_item.timestamp
         return upper_time_bound - lower_time_bound
@@ -111,10 +109,8 @@ def get_bucket_availability(
 
         return _calc_availability(now, bound_item)
 
-    if iscoroutine(now) or iscoroutine(bound_item):
+    if iscoroutine(bound_item):
         return _calc_availability_async()
-
-    assert isinstance(now, int)
 
     if bound_item is None:
         # NOTE: if no bound item, that means bucket is available
