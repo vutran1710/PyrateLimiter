@@ -5,8 +5,6 @@ from os import getenv
 from pathlib import Path
 from tempfile import gettempdir
 from time import time
-from typing import Coroutine
-from typing import Union
 
 import pytest
 
@@ -34,11 +32,8 @@ conn = sqlite3.connect(
 class MockAsyncClock(Clock):
     """Mock Async Clock, only for testing"""
 
-    def now(self) -> Union[int, Coroutine[None, None, int]]:
-        async def _now():
-            return int(1000 * time())
-
-        return _now()
+    async def now(self) -> int:
+        return int(1000 * time())
 
 
 clocks = [MonotonicClock(), TimeClock(), SQLiteClock(conn), MockAsyncClock()]
