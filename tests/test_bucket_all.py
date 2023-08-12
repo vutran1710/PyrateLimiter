@@ -22,7 +22,7 @@ from pyrate_limiter.abstracts import get_bucket_availability
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
 from pyrate_limiter.buckets import InMemoryBucket
-from pyrate_limiter.buckets import RedisSyncBucket
+from pyrate_limiter.buckets import RedisBucket
 from pyrate_limiter.buckets import SQLiteBucket
 from pyrate_limiter.buckets import SQLiteQueries as Queries
 from pyrate_limiter.clocks import MonotonicClock
@@ -59,7 +59,7 @@ def create_redis_bucket(rates: List[Rate]):
     redis_db = Redis(connection_pool=pool)
     bucket_key = f"test-bucket/{id_generator()}"
     redis_db.delete(bucket_key)
-    return RedisSyncBucket(rates, redis_db, bucket_key)
+    return RedisBucket.init(rates, redis_db, bucket_key)
 
 
 def create_sqlite_bucket(rates: List[Rate]):
