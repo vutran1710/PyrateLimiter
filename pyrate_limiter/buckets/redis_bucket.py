@@ -165,7 +165,7 @@ class RedisBucket(AbstractBucket):
     def count(self):
         return self.redis.zcard(self.bucket_key)
 
-    def peek(self, index: int) -> Optional[RateItem]:
+    def peek(self, index: int) -> EitherSync[Optional[RateItem]]:
         items = self.redis.zrange(
             self.bucket_key,
             -index,
