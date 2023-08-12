@@ -162,6 +162,8 @@ async def test_bucket_availability(clock: Union[MonotonicClock, TimeClock, SQLit
     logging.info("Testing `get_bucket_availability` with Bucket: %s, \nclock=%s", bucket, clock)
 
     assert get_bucket_availability(bucket, await get_now(clock), 1) == 0
+    assert get_bucket_availability(bucket, await get_now(clock), 0) == 0
+    assert get_bucket_availability(bucket, await get_now(clock), 4) == -1
 
     start = await get_now(clock)
     assert start > 0

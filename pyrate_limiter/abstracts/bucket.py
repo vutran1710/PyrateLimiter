@@ -66,11 +66,11 @@ class BucketFactory(ABC):
 
     @abstractmethod
     def schedule_leak(self) -> None:
-        """Schedule all the buckets' leak"""
+        """Schedule all the buckets' leak, reset bucket's failing rate"""
 
     @abstractmethod
     def schedule_flush(self) -> None:
-        """Schedule all the buckets' flush"""
+        """Schedule all the buckets' flush, reset bucket's failing rate"""
 
 
 def get_bucket_availability(
@@ -90,6 +90,10 @@ def get_bucket_availability(
 
     bound_item = bucket.peek(bucket.failing_rate.limit - weight + 1)
 
+    # NOTE: if there is a failing rate, then this can't be None!
+    bad_logic_err = "Failing rate but no item found! Probably leak/flush without reset bucket"
+    assert bound_item is not None, bad_logic_err
+
     def _calc_availability(inner_now: int, inner_bound_item: RateItem) -> int:
         assert bucket.failing_rate is not None  # NOTE: silence mypy
         lower_time_bound = inner_now - bucket.failing_rate.interval
@@ -98,23 +102,16 @@ def get_bucket_availability(
 
     async def _calc_availability_async():
         nonlocal now, bound_item
-        now = await now
+        bound_item = await bound_item
 
-        if iscoroutine(bound_item):
-            bound_item = await bound_item
-
-        if bound_item is None:
-            # NOTE: if no bound item, that means bucket is available
-            return 0
+        # NOTE: if there is a failing rate, then this can't be None!
+        bad_logic_err = "Failing rate but no item found! Probably leak/flush without reset bucket"
+        assert bound_item is not None, bad_logic_err
 
         return _calc_availability(now, bound_item)
 
     if iscoroutine(bound_item):
         return _calc_availability_async()
-
-    if bound_item is None:
-        # NOTE: if no bound item, that means bucket is available
-        return 0
 
     assert isinstance(bound_item, RateItem)
     return _calc_availability(now, bound_item)
