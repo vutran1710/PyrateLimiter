@@ -1,11 +1,11 @@
+import logging
 import sqlite3
 from threading import RLock as Lock
-from typing import Coroutine
 from typing import List
 from typing import Optional
-from typing import Union
 
 from ..abstracts import AbstractClockingBucket
+from ..abstracts import Clock
 from ..abstracts import Rate
 from ..abstracts import RateItem
 
@@ -51,6 +51,21 @@ class Queries:
     LIMIT 1
     )
     """
+    GET_TIME_NOW = "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
+    PEEK = "SELECT * FROM '{table}' ORDER BY item_timestamp DESC LIMIT 1 OFFSET {offset}"
+
+
+class SQLiteClock(Clock):
+    """Get timestamp using SQLite"""
+
+    conn: sqlite3.Connection
+
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+
+    def now(self) -> int:
+        now = self.conn.execute(Queries.GET_TIME_NOW).fetchone()[0]
+        return int(now)
 
 
 class SQLiteBucket(AbstractClockingBucket):
@@ -64,12 +79,14 @@ class SQLiteBucket(AbstractClockingBucket):
     conn: sqlite3.Connection
     table: str
     full_count_query: str
+    clock: SQLiteClock
 
     def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str):
         self.conn = conn
         self.table = table
         self.rates = rates
         self.lock = Lock()
+        self.clock = SQLiteClock(self.conn)
 
     def _build_full_count_query(self, current_timestamp: int) -> str:
         full_query: List[str] = []
@@ -131,8 +148,13 @@ class SQLiteBucket(AbstractClockingBucket):
         with self.lock:
             return self.conn.execute(Queries.COUNT_ALL.format(table=self.table)).fetchone()[0]
 
-    def availability(self, weight: int) -> Union[int, Coroutine[None, None, int]]:
-        return 1
-
     def peek(self, index: int) -> Optional[RateItem]:
-        return None
+        with self.lock:
+            query = Queries.PEEK.format(table=self.table, offset=index - 1)
+            item = self.conn.execute(query).fetchone()
+
+            if not item:
+                return None
+
+            logging.info("Item: %s", item)
+            return RateItem(item[0], item[1])

@@ -42,6 +42,7 @@ def create_redis_bucket(rates: List[Rate], clock: Clock):
 def create_sqlite_bucket(rates: List[Rate], _: Clock):
     temp_dir = Path(gettempdir())
     default_db_path = temp_dir / "pyrate_limiter.sqlite"
+    logging.info("SQLite db path: %s", default_db_path)
     table_name = f"pyrate-test-bucket-{id_generator(size=10)}"
     index_name = table_name + "__timestamp_index"
 
@@ -141,46 +142,53 @@ def test_bucket_availability(clock: Union[MonotonicClock, TimeClock], create_buc
     bucket = create_bucket(rates, clock)
 
     logging.info("Testing with Bucket: %s, \nclock=%s", bucket, clock)
-    if isinstance(bucket, (SQLiteBucket)):
-        return
+    # if not isinstance(bucket, (SQLiteBucket)):
+    #     return
 
     assert bucket.availability(1) == 0
 
-    start = time()
+    start = bucket.clock.now()
+    assert start > 0
+
     for i in range(3):
-        assert bucket.put(RateItem(f"a:{i}", clock.now())) is True
+        assert bucket.put(RateItem(f"a:{i}", bucket.clock.now())) is True
         # NOTE: sleep 100ms between each item
         sleep(0.2)
-    end = time()
+
+    end = bucket.clock.now()
+    assert end > 0
+
     elapsed = end - start
+    assert elapsed > 0
+
     logging.info("Elapsed: %s", elapsed)
-    assert bucket.put(RateItem("a:3", clock.now())) is False
+    assert bucket.put(RateItem("a:3", bucket.clock.now())) is False
 
     availability_for_1 = bucket.availability(1)
     logging.info("1 space available in: %s", availability_for_1)
 
     sleep(availability_for_1 / 1000 - 0.01)
-    assert bucket.put(RateItem("a:3", clock.now())) is False
+    assert bucket.put(RateItem("a:3", bucket.clock.now())) is False
     sleep(0.01)
-    assert bucket.put(RateItem("a:3", clock.now())) is True
+    assert bucket.put(RateItem("a:3", bucket.clock.now())) is True
 
-    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is False
+    assert bucket.put(RateItem("a:4", bucket.clock.now(), weight=2)) is False
     availability_for_2 = bucket.availability(2)
     logging.info("2 space available in: %s", availability_for_2)
 
     sleep(availability_for_2 / 1000 - 0.01)
-    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is False
+    assert bucket.put(RateItem("a:4", bucket.clock.now(), weight=2)) is False
     sleep(0.01)
-    assert bucket.put(RateItem("a:4", clock.now(), weight=2)) is True
+    assert bucket.put(RateItem("a:4", bucket.clock.now(), weight=2)) is True
 
-    assert bucket.put(RateItem("a:5", clock.now(), weight=3)) is False
+    assert bucket.put(RateItem("a:5", bucket.clock.now(), weight=3)) is False
     availability_for_3 = bucket.availability(3)
     logging.info("3 space available in: %s", availability_for_3)
 
     sleep(availability_for_3 / 1000 - 0.01)
-    assert bucket.put(RateItem("a:5", clock.now(), weight=3)) is False
+    assert bucket.put(RateItem("a:5", bucket.clock.now(), weight=3)) is False
     sleep(0.01)
-    assert bucket.put(RateItem("a:5", clock.now(), 3)) is True
+    assert bucket.put(RateItem("a:5", bucket.clock.now(), 3)) is True
 
 
 def test_bucket_leak(clock: Union[MonotonicClock, TimeClock], create_bucket):
