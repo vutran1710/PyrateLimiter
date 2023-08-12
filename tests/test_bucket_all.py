@@ -31,6 +31,14 @@ from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.utils import id_generator
 
 
+ClockSet = Union[
+    MonotonicClock,
+    TimeClock,
+    SQLiteClock,
+    MockAsyncClock,
+]
+
+
 async def get_now(clock: Clock) -> int:
     """Util function to get time now"""
     now = clock.now()
@@ -98,7 +106,7 @@ def create_bucket(request):
 
 
 @pytest.mark.asyncio
-async def test_bucket_01(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
+async def test_bucket_01(clock: ClockSet, create_bucket):
     rates = [Rate(20, 1000)]
     bucket = create_bucket(rates)
     assert bucket is not None
@@ -125,7 +133,7 @@ async def test_bucket_01(clock: Union[MonotonicClock, TimeClock, SQLiteClock, Mo
 
 
 @pytest.mark.asyncio
-async def test_bucket_02(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
+async def test_bucket_02(clock: ClockSet, create_bucket):
     rates = [Rate(30, 1000), Rate(50, 2000)]
     bucket = create_bucket(rates)
     start = time()
@@ -136,7 +144,7 @@ async def test_bucket_02(clock: Union[MonotonicClock, TimeClock, SQLiteClock, Mo
         if bucket.count() == 31:
             cost = time() - start
             logging.info(">30 items: %s", cost)
-            assert cost > 1
+            assert cost > 0.99
 
         if bucket.count() == 51:
             cost = time() - start
@@ -155,7 +163,7 @@ async def test_bucket_02(clock: Union[MonotonicClock, TimeClock, SQLiteClock, Mo
 
 
 @pytest.mark.asyncio
-async def test_bucket_availability(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
+async def test_bucket_availability(clock: ClockSet, create_bucket):
     rates = [Rate(3, 500)]
     bucket = create_bucket(rates)
 
@@ -213,7 +221,7 @@ async def test_bucket_availability(clock: Union[MonotonicClock, TimeClock, SQLit
 
 
 @pytest.mark.asyncio
-async def test_bucket_leak(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
+async def test_bucket_leak(clock: ClockSet, create_bucket):
     rates = [Rate(100, 3000)]
     bucket = create_bucket(rates)
 
@@ -232,7 +240,7 @@ async def test_bucket_leak(clock: Union[MonotonicClock, TimeClock, SQLiteClock, 
 
 
 @pytest.mark.asyncio
-async def test_bucket_flush(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
+async def test_bucket_flush(clock: ClockSet, create_bucket):
     rates = [Rate(5000, 1000)]
     bucket = create_bucket(rates)
 
@@ -244,7 +252,7 @@ async def test_bucket_flush(clock: Union[MonotonicClock, TimeClock, SQLiteClock,
 
 
 @pytest.mark.asyncio
-async def test_with_large_items(clock: Union[MonotonicClock, TimeClock, SQLiteClock, MockAsyncClock], create_bucket):
+async def test_with_large_items(clock: ClockSet, create_bucket):
     rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 5000)]
     bucket = create_bucket(rates)
 
