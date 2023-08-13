@@ -3,8 +3,8 @@ a workable bucket for Limiter to use
 """
 from abc import ABC
 from abc import abstractmethod
-from inspect import iscoroutine
-from typing import Coroutine
+from inspect import isawaitable
+from typing import Awaitable
 from typing import List
 from typing import Optional
 from typing import Union
@@ -23,26 +23,26 @@ class AbstractBucket(ABC):
     failing_rate: Optional[Rate] = None
 
     @abstractmethod
-    def put(self, item: RateItem) -> Union[bool, Coroutine[None, None, bool]]:
+    def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Put an item (typically the current time) in the bucket"""
 
     @abstractmethod
     def leak(
         self,
         current_timestamp: Optional[int] = None,
-    ) -> Union[int, Coroutine[None, None, int]]:
+    ) -> Union[int, Awaitable[int]]:
         """Schedule a leak and run in a task"""
 
     @abstractmethod
-    def flush(self) -> Union[None, Coroutine[None, None, None]]:
+    def flush(self) -> Union[None, Awaitable[None]]:
         """Flush the whole bucket"""
 
     @abstractmethod
-    def count(self) -> Union[int, Coroutine[None, None, int]]:
+    def count(self) -> Union[int, Awaitable[int]]:
         """Count number of items in the bucket"""
 
     @abstractmethod
-    def peek(self, index: int) -> Union[Optional[RateItem], Coroutine[None, None, Optional[RateItem]]]:
+    def peek(self, index: int) -> Union[Optional[RateItem], Awaitable[Optional[RateItem]]]:
         """Peek at the rate-item at a specific index in latest-to-earliest order"""
 
 
@@ -57,7 +57,7 @@ class BucketFactory(ABC):
         self,
         name: str,
         weight: int = 1,
-    ) -> Union[RateItem, Coroutine[None, None, RateItem]]:
+    ) -> Union[RateItem, Awaitable[RateItem]]:
         """Mark the current timestamp to the receiving item,
         Wrap it into a RateItem
         Can return either a coroutine or a RateItem instance
@@ -76,7 +76,7 @@ class BucketFactory(ABC):
         """Schedule all the buckets' flush, reset bucket's failing rate"""
 
 
-def get_bucket_availability(bucket: Union[AbstractBucket], item: RateItem) -> Union[int, Coroutine[None, None, int]]:
+def get_bucket_availability(bucket: Union[AbstractBucket], item: RateItem) -> Union[int, Awaitable[int]]:
     """Use clock to calculate time until bucket become availabe"""
     assert bucket.failing_rate is not None, "Wrong use!"
     assert item.weight > 0
@@ -94,15 +94,16 @@ def get_bucket_availability(bucket: Union[AbstractBucket], item: RateItem) -> Un
         upper_time_bound = inner_bound_item.timestamp
         return upper_time_bound - lower_time_bound
 
-    async def _calc_availability_async():
+    async def _calc_availability_async() -> int:
         nonlocal item, bound_item
+        assert isawaitable(bound_item)
         bound_item = await bound_item
 
         # NOTE: if there is a failing rate, then this can't be None!
-        assert bound_item is not None, "Bound-item not found"
+        assert isinstance(bound_item, RateItem), "Bound-item not a valid rate-item"
         return _calc_availability(bound_item)
 
-    if iscoroutine(bound_item):
+    if isawaitable(bound_item):
         return _calc_availability_async()
 
     assert isinstance(bound_item, RateItem)
