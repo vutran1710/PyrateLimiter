@@ -64,7 +64,7 @@ class BucketFactory(ABC):
         """
 
     @abstractmethod
-    def get(self, item: RateItem) -> Optional[Union[AbstractBucket]]:
+    def get(self, item: RateItem) -> Union[AbstractBucket]:
         """Create or get the corresponding bucket to this item"""
 
     @abstractmethod

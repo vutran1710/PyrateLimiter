@@ -1,6 +1,5 @@
 from inspect import iscoroutine
 from inspect import iscoroutinefunction
-from typing import Optional
 from typing import Union
 
 import pytest
@@ -12,7 +11,6 @@ from pyrate_limiter import Limiter
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
 from pyrate_limiter.exceptions import BucketFullException
-from pyrate_limiter.exceptions import BucketRetrievalFail
 
 
 class DummySyncClock(Clock):
@@ -87,14 +85,11 @@ class DummyBucketFactory(BucketFactory):
 
         return wrap_async() if iscoroutinefunction(self.clock.now) else wrap_sycn()
 
-    def get(self, item: RateItem) -> Optional[Union[DummySyncBucket, DummyAsyncBucket]]:
-        if item.name == "sync":
-            return DummySyncBucket()
-
+    def get(self, item: RateItem) -> Union[DummySyncBucket, DummyAsyncBucket]:
         if item.name == "async":
             return DummyAsyncBucket()
 
-        return None
+        return DummySyncBucket()
 
     def schedule_leak(self):
         pass
@@ -114,7 +109,7 @@ def limiter_should_raise(request):
     return request.param
 
 
-@pytest.fixture(params=["sync", "async", "unknown"])
+@pytest.fixture(params=["sync", "async"])
 def item_name(request):
     return request.param
 
@@ -164,24 +159,12 @@ async def test_limiter_02(clock, limiter_should_raise, item_name):
         if iscoroutine(try_acquire):
             try_acquire = await try_acquire
 
-        assert try_acquire == (item_name != "unknown")
-
         try_acquire = limiter.try_acquire(item_name, 2)
 
-        if iscoroutine(try_acquire):
+        while iscoroutine(try_acquire):
             try_acquire = await try_acquire
 
         assert try_acquire is False
-        return
-
-    if item_name == "unknown":
-        print("----------- Expect no bucket, item=", item_name)
-        with pytest.raises(BucketRetrievalFail):
-            try_acquire = limiter.try_acquire(item_name)
-
-            if iscoroutine(try_acquire):
-                await try_acquire
-
         return
 
     with pytest.raises(BucketFullException):
