@@ -3,7 +3,7 @@ Testing buckets of all implementations
 """
 import logging
 import sqlite3
-from inspect import iscoroutine
+from inspect import isawaitable
 from os import getenv
 from pathlib import Path
 from tempfile import gettempdir
@@ -47,7 +47,7 @@ async def get_now(clock: Clock) -> int:
     """Util function to get time now"""
     now = clock.now()
 
-    if iscoroutine(now):
+    if isawaitable(now):
         now = await now
 
     assert isinstance(now, int)
@@ -123,7 +123,7 @@ def create_bucket(request):
 
 
 async def awating(coro_or_not):
-    if iscoroutine(coro_or_not):
+    if isawaitable(coro_or_not):
         return await coro_or_not
 
     return coro_or_not
@@ -228,7 +228,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
         nonlocal clock
         now = clock.now()
 
-        if iscoroutine(now):
+        if isawaitable(now):
             now = await now
 
         assert isinstance(now, int)

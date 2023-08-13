@@ -1,12 +1,11 @@
 """Bucket implementation using Redis
 """
-from inspect import iscoroutine
+from inspect import isawaitable
 from threading import RLock as Lock
-from typing import Coroutine
+from typing import Awaitable
 from typing import List
 from typing import Optional
 from typing import Tuple
-from typing import TypeVar
 from typing import Union
 
 from redis import Redis
@@ -16,9 +15,6 @@ from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from ..utils import id_generator
-
-T = TypeVar("T")
-EitherSync = Union[T, Coroutine[None, None, T]]
 
 
 class LuaScript:
@@ -87,7 +83,7 @@ class RedisBucket(AbstractBucket):
     ):
         script_hash = redis.script_load(LuaScript.PUT_ITEM)
 
-        if iscoroutine(script_hash):
+        if isawaitable(script_hash):
 
             async def _async_init():
                 nonlocal script_hash
@@ -98,7 +94,7 @@ class RedisBucket(AbstractBucket):
 
         return cls(rates, redis, bucket_key, script_hash)
 
-    def _check_and_insert(self, item: RateItem) -> EitherSync[Optional[Rate]]:
+    def _check_and_insert(self, item: RateItem) -> Union[Rate, None, Awaitable[Optional[Rate]]]:
         keys = [
             "timestamp",
             "weight",
@@ -125,18 +121,18 @@ class RedisBucket(AbstractBucket):
 
             return self.rates[returned_idx]
 
-        async def _handle_async(returned_idx: Coroutine[None, None, int]):
-            assert iscoroutine(returned_idx), "Not corotine"
+        async def _handle_async(returned_idx: Awaitable[int]):
+            assert isawaitable(returned_idx), "Not corotine"
             awaited_idx = await returned_idx
             return _handle_sync(awaited_idx)
 
-        return _handle_async(idx) if iscoroutine(idx) else _handle_sync(idx)
+        return _handle_async(idx) if isawaitable(idx) else _handle_sync(idx)
 
-    def put(self, item: RateItem) -> EitherSync[bool]:
+    def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Add item to key"""
         with self.lock:
             failing_rate = self._check_and_insert(item)
-            if iscoroutine(failing_rate):
+            if isawaitable(failing_rate):
 
                 async def _handle_async():
                     nonlocal failing_rate
@@ -149,7 +145,7 @@ class RedisBucket(AbstractBucket):
             self.failing_rate = failing_rate
             return not bool(self.failing_rate)
 
-    def leak(self, current_timestamp: Optional[int] = None) -> EitherSync[int]:
+    def leak(self, current_timestamp: Optional[int] = None) -> Union[int, Awaitable[int]]:
         assert current_timestamp is not None
         with self.lock:
             return self.redis.zremrangebyscore(
@@ -165,7 +161,7 @@ class RedisBucket(AbstractBucket):
     def count(self):
         return self.redis.zcard(self.bucket_key)
 
-    def peek(self, index: int) -> EitherSync[Optional[RateItem]]:
+    def peek(self, index: int) -> Union[RateItem, None, Awaitable[Optional[RateItem]]]:
         items = self.redis.zrange(
             self.bucket_key,
             -index,
@@ -182,7 +178,7 @@ class RedisBucket(AbstractBucket):
             rate_item = RateItem(name=str(item[0]), timestamp=item[1])
             return rate_item
 
-        if iscoroutine(items):
+        if isawaitable(items):
 
             async def _awaiting():
                 nonlocal items

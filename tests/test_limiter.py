@@ -1,4 +1,4 @@
-from inspect import iscoroutine
+from inspect import isawaitable
 from inspect import iscoroutinefunction
 from typing import Union
 
@@ -147,7 +147,7 @@ async def test_limiter_02(clock, limiter_should_raise, item_name):
 
     try_acquire = limiter.try_acquire("dark-matter", 0)
 
-    if iscoroutine(try_acquire):
+    if isawaitable(try_acquire):
         try_acquire = await try_acquire
 
     assert try_acquire is True
@@ -156,12 +156,12 @@ async def test_limiter_02(clock, limiter_should_raise, item_name):
         print("----------- Expect no raise, item=", item_name)
         try_acquire = limiter.try_acquire(item_name)
 
-        if iscoroutine(try_acquire):
+        if isawaitable(try_acquire):
             try_acquire = await try_acquire
 
         try_acquire = limiter.try_acquire(item_name, 2)
 
-        while iscoroutine(try_acquire):
+        while isawaitable(try_acquire):
             try_acquire = await try_acquire
 
         assert try_acquire is False
@@ -171,7 +171,7 @@ async def test_limiter_02(clock, limiter_should_raise, item_name):
         print("----- expect raise full-exception with item=", item_name)
         try_acquire = limiter.try_acquire(item_name, 2)
 
-        if iscoroutine(try_acquire):
+        if isawaitable(try_acquire):
             await try_acquire
 
 
