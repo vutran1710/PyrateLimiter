@@ -76,40 +76,34 @@ class BucketFactory(ABC):
         """Schedule all the buckets' flush, reset bucket's failing rate"""
 
 
-def get_bucket_availability(
-    bucket: Union[AbstractBucket],
-    now: int,
-    weight: int,
-) -> Union[int, Coroutine[None, None, int]]:
+def get_bucket_availability(bucket: Union[AbstractBucket], item: RateItem) -> Union[int, Coroutine[None, None, int]]:
     """Use clock to calculate time until bucket become availabe"""
-    if weight == 0:
-        return 0
+    assert bucket.failing_rate is not None, "Wrong use!"
+    assert item.weight > 0
 
-    if bucket.failing_rate is None:
-        return -1 if weight > bucket.rates[-1].limit else 0
+    if item.weight > bucket.failing_rate.limit:
+        return -1
 
-    bound_item = bucket.peek(bucket.failing_rate.limit - weight + 1)
-
-    # NOTE: if there is a failing rate, then this can't be None!
+    bound_item = bucket.peek(bucket.failing_rate.limit - item.weight + 1)
     assert bound_item is not None, "Bound-item not found"
 
-    def _calc_availability(inner_now: int, inner_bound_item: RateItem) -> int:
+    def _calc_availability(inner_bound_item: RateItem) -> int:
+        nonlocal item
         assert bucket.failing_rate is not None  # NOTE: silence mypy
-        lower_time_bound = inner_now - bucket.failing_rate.interval
+        lower_time_bound = item.timestamp - bucket.failing_rate.interval
         upper_time_bound = inner_bound_item.timestamp
         return upper_time_bound - lower_time_bound
 
     async def _calc_availability_async():
-        nonlocal now, bound_item
+        nonlocal item, bound_item
         bound_item = await bound_item
 
         # NOTE: if there is a failing rate, then this can't be None!
         assert bound_item is not None, "Bound-item not found"
-
-        return _calc_availability(now, bound_item)
+        return _calc_availability(bound_item)
 
     if iscoroutine(bound_item):
         return _calc_availability_async()
 
     assert isinstance(bound_item, RateItem)
-    return _calc_availability(now, bound_item)
+    return _calc_availability(bound_item)

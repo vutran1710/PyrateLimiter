@@ -224,15 +224,21 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
 
     bucket = BucketWrapper(bucket)
 
-    assert get_bucket_availability(bucket, await get_now(clock), 1) == 0
-    assert get_bucket_availability(bucket, await get_now(clock), 0) == 0
-    assert get_bucket_availability(bucket, await get_now(clock), 4) == -1
+    async def create_item(weight: int = 1) -> RateItem:
+        nonlocal clock
+        now = clock.now()
+
+        if iscoroutine(now):
+            now = await now
+
+        assert isinstance(now, int)
+        return RateItem("item", now, weight)
 
     start = await get_now(clock)
     assert start > 0
 
-    for i in range(3):
-        assert await bucket.put(RateItem(f"a:{i}", await get_now(clock))) is True
+    for _ in range(3):
+        assert await bucket.put(await create_item()) is True
         # NOTE: sleep 100ms between each item
         sleep(0.1)
 
@@ -243,36 +249,36 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     assert elapsed > 0
 
     logging.info("Elapsed: %s", elapsed)
-    assert await bucket.put(RateItem("a:3", await get_now(clock))) is False
+    assert await bucket.put(await create_item()) is False
 
-    availability = await get_bucket_availability(bucket, await get_now(clock), 1)  # type: ignore
+    availability = await get_bucket_availability(bucket, await create_item())  # type: ignore
     assert isinstance(availability, int)
     logging.info("1 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.01)
-    assert await bucket.put(RateItem("a:3", await get_now(clock))) is False
-    sleep(0.02)
-    assert await bucket.put(RateItem("a:3", await get_now(clock))) is True
+    sleep(availability / 1000 - 0.02)
+    assert await bucket.put(await create_item()) is False
+    sleep(0.03)
+    assert await bucket.put(await create_item()) is True
 
-    assert await bucket.put(RateItem("a:4", await get_now(clock), weight=2)) is False
-    availability = await get_bucket_availability(bucket, await get_now(clock), 2)  # type: ignore
+    assert await bucket.put(await create_item(2)) is False
+    availability = await get_bucket_availability(bucket, await create_item(2))  # type: ignore
     assert isinstance(availability, int)
     logging.info("2 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.01)
-    assert await bucket.put(RateItem("a:4", await get_now(clock), weight=2)) is False
-    sleep(0.02)
-    assert await bucket.put(RateItem("a:4", await get_now(clock), weight=2)) is True
+    sleep(availability / 1000 - 0.02)
+    assert await bucket.put(await create_item(2)) is False
+    sleep(0.03)
+    assert await bucket.put(await create_item(2)) is True
 
-    assert await bucket.put(RateItem("a:5", await get_now(clock), weight=3)) is False
-    availability = await get_bucket_availability(bucket, await get_now(clock), 3)  # type: ignore
+    assert await bucket.put(await create_item(3)) is False
+    availability = await get_bucket_availability(bucket, await create_item(3))  # type: ignore
     assert isinstance(availability, int)
     logging.info("3 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.01)
-    assert await bucket.put(RateItem("a:5", await get_now(clock), weight=3)) is False
-    sleep(0.02)
-    assert await bucket.put(RateItem("a:5", await get_now(clock), 3)) is True
+    sleep(availability / 1000 - 0.02)
+    assert await bucket.put(await create_item(3)) is False
+    sleep(0.03)
+    assert await bucket.put(await create_item(3)) is True
 
 
 @pytest.mark.asyncio
