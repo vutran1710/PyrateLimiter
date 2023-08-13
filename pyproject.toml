@@ -24,7 +24,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 
 # Optional backend dependencies
 filelock = {optional=true, version=">=3.0"}
