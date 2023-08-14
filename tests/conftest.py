@@ -29,7 +29,8 @@ from pyrate_limiter.utils import id_generator
 # Make log messages visible on test failure (or with pytest -s)
 basicConfig(level="INFO")
 # Uncomment for more verbose output:
-getLogger("pyrate_limiter").setLevel(getenv("LOG_LEVEL", "INFO"))
+logger = getLogger("pyrate_limiter")
+logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 
 clocks = [MonotonicClock(), TimeClock(), SQLiteClock(), TimeAsyncClock()]
 
@@ -72,7 +73,6 @@ async def create_async_redis_bucket(rates: List[Rate]):
 
 
 async def create_sqlite_bucket(rates: List[Rate]):
-    logger = getLogger("pyrate_limiter")
     temp_dir = Path(gettempdir())
     default_db_path = temp_dir / f"pyrate_limiter_{id_generator(size=5)}.sqlite"
     logger.info("SQLite db path: %s", default_db_path)

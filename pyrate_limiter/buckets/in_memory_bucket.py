@@ -69,6 +69,7 @@ class InMemoryBucket(AbstractBucket):
 
     def flush(self) -> None:
         with self.lock:
+            self.failing_rate = None
             self.items = []
 
     def count(self) -> int:

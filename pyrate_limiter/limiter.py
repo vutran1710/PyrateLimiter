@@ -91,19 +91,6 @@ class Limiter:
                 nonlocal delay, item, bucket
                 delay = await delay
                 assert isinstance(delay, int), "Delay not integer"
-
-                if delay < 0:
-                    logger.error(
-                        "Cannot fit item into bucket: item=%s, rate=%s, bucket=%s",
-                        item,
-                        bucket.failing_rate,
-                        bucket,
-                    )
-                    if self.raise_when_fail:
-                        raise BucketFullException(item.name, bucket.failing_rate)
-
-                    return False
-
                 delay += 50
 
                 if delay > self.allowed_delay:

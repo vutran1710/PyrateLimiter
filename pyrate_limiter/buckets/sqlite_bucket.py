@@ -125,6 +125,7 @@ class SQLiteBucket(AbstractBucket):
         with self.lock:
             self.conn.execute(Queries.FLUSH.format(table=self.table))
             self.conn.commit()
+            self.failing_rate = None
 
     def count(self) -> int:
         with self.lock:
