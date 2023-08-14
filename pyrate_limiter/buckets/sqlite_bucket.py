@@ -1,4 +1,3 @@
-import logging
 import sqlite3
 from threading import RLock as Lock
 from typing import List
@@ -139,5 +138,4 @@ class SQLiteBucket(AbstractBucket):
             if not item:
                 return None
 
-            logging.info("Item: %s", item)
             return RateItem(item[0], item[1])

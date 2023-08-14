@@ -1,5 +1,9 @@
+import logging
 from inspect import isawaitable
 from inspect import iscoroutinefunction
+from time import sleep
+from time import time
+from typing import Tuple
 from typing import Union
 
 import pytest
@@ -7,10 +11,13 @@ import pytest
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import Clock
+from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
+from pyrate_limiter import TimeClock
 from pyrate_limiter.exceptions import BucketFullException
+from pyrate_limiter.utils import validate_rate_list
 
 
 class DummySyncClock(Clock):
@@ -68,8 +75,13 @@ class DummyAsyncBucket(AbstractBucket):
 
 
 class DummyBucketFactory(BucketFactory):
+    default_bucket: InMemoryBucket
+    default_rates = [Rate(3, 1000), Rate(4, 1500)]
+
     def __init__(self, clock=None):
         self.clock = clock
+        assert validate_rate_list(self.default_rates)
+        self.default_bucket = InMemoryBucket(self.default_rates)
 
     def wrap_item(self, name: str, weight: int = 1):
         if self.clock is None:
@@ -85,11 +97,14 @@ class DummyBucketFactory(BucketFactory):
 
         return wrap_async() if iscoroutinefunction(self.clock.now) else wrap_sycn()
 
-    def get(self, item: RateItem) -> Union[DummySyncBucket, DummyAsyncBucket]:
+    def get(self, item: RateItem) -> Union[DummySyncBucket, DummyAsyncBucket, InMemoryBucket]:
         if item.name == "async":
             return DummyAsyncBucket()
 
-        return DummySyncBucket()
+        if item.name == "sync":
+            return DummySyncBucket()
+
+        return self.default_bucket
 
     def schedule_leak(self):
         pass
@@ -138,6 +153,81 @@ async def test_factory_01(clock):
         item = await item
 
     assert isinstance(factory.get(item), DummyAsyncBucket)
+
+
+@pytest.mark.asyncio
+async def test_limiter_delay(limiter_should_raise):
+    factory = DummyBucketFactory(TimeClock())
+    limiter = Limiter(factory, raise_when_fail=limiter_should_raise, allowed_delay=500)
+
+    item = "hello"
+
+    async def async_acquire(weight: int = 1) -> Tuple[bool, int]:
+        nonlocal item
+        start = time()
+        acquire = limiter.try_acquire(item, weight=weight)
+
+        if isawaitable(acquire):
+            acquire = await acquire
+
+        delay_time_in_ms = int((time() - start) * 1000)
+        return acquire, delay_time_in_ms
+
+    logging.info("----------- Limit Delay Test #1")
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost <= 1
+    sleep(0.3)
+
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost <= 1
+    sleep(0.3)
+
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost <= 1
+
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost > 400
+
+    # Flush before testing again
+    factory.default_bucket.flush()
+
+    logging.info("----------- Limit Delay Test #2: delay > allowed_delay")
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost <= 1
+
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost <= 1
+
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost <= 1
+
+    if limiter_should_raise:
+        try:
+            await async_acquire()
+            assert False
+        except BucketFullException:
+            assert True
+        except Exception:
+            assert False
+        return
+
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert not acquire_ok
 
 
 @pytest.mark.asyncio

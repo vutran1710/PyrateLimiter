@@ -43,9 +43,10 @@ def validate_rate_list(rates: List[Rate]) -> bool:
         if current_rate.interval <= prev_rate.interval:
             return False
 
-        invalid = (current_rate.limit / current_rate.interval) >= (prev_rate.limit / prev_rate.interval)
+        if current_rate.limit <= prev_rate.limit:
+            return False
 
-        if invalid:
+        if (current_rate.limit / current_rate.interval) > (prev_rate.limit / prev_rate.interval):
             return False
 
     return True

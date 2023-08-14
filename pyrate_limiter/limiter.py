@@ -33,26 +33,32 @@ class Limiter:
 
     bucket_factory: BucketFactory
     raise_when_fail: bool
-    delay: Optional[int] = None
+    allowed_delay: Optional[int] = None
 
     def __init__(
         self,
         bucket_factory: BucketFactory,
         raise_when_fail: bool = True,
-        delay: Optional[int] = None,
+        allowed_delay: Optional[int] = None,
     ):
         self.bucket_factory = bucket_factory
         bucket_factory.schedule_leak()
         bucket_factory.schedule_flush()
         self.raise_when_fail = raise_when_fail
-        self.delay = delay
+
+        if allowed_delay is not None:
+            assert allowed_delay >= 0, "Allowed delay must not be negative"
+
+        self.allowed_delay = allowed_delay
 
     def delay_or_raise(
         self,
         bucket: Union[AbstractBucket],
         item: RateItem,
     ) -> Union[bool, Awaitable[bool]]:
-        if self.delay is None:
+        assert bucket.failing_rate is not None
+
+        if self.allowed_delay is None:
             if self.raise_when_fail:
                 assert bucket.failing_rate is not None  # NOTE: silence mypy
                 raise BucketFullException(item.name, bucket.failing_rate)
@@ -74,7 +80,7 @@ class Limiter:
                 nonlocal delay, item, bucket
                 delay = (await delay) + 50
 
-                if delay > self.delay:
+                if delay > self.allowed_delay:
                     if self.raise_when_fail:
                         assert bucket.failing_rate is not None  # NOTE: silence mypy
                         raise BucketFullException(item.name, bucket.failing_rate)
@@ -94,7 +100,7 @@ class Limiter:
         assert isinstance(delay, int)
         delay += 50
 
-        if delay > self.delay:
+        if delay > self.allowed_delay:
             if self.raise_when_fail:
                 assert bucket.failing_rate is not None  # NOTE: silence mypy
                 raise BucketFullException(item.name, bucket.failing_rate)
