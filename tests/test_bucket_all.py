@@ -1,7 +1,6 @@
 """
 Testing buckets of all implementations
 """
-import logging
 from inspect import isawaitable
 from time import sleep
 from time import time
@@ -11,6 +10,7 @@ from typing import Union
 import pytest
 
 from .conftest import ClockSet
+from .conftest import logger
 from pyrate_limiter import TimeClock
 from pyrate_limiter.abstracts import AbstractBucket
 from pyrate_limiter.abstracts import Clock
@@ -31,8 +31,8 @@ async def get_now(clock: Clock) -> int:
 
 
 async def awating(coro_or_not):
-    if isawaitable(coro_or_not):
-        return await coro_or_not
+    while isawaitable(coro_or_not):
+        coro_or_not = await coro_or_not
 
     return coro_or_not
 
@@ -55,7 +55,13 @@ class BucketWrapper(AbstractBucket):
         return await awating(self.bucket.flush())
 
     async def peek(self, index: int) -> Optional[RateItem]:
-        return await awating(self.bucket.peek(index))
+        item = self.bucket.peek(index)
+
+        if isawaitable(item):
+            item = await item
+
+        assert item is None or isinstance(item, RateItem)
+        return item
 
     @property
     def failing_rate(self):
@@ -71,6 +77,9 @@ async def test_bucket_01(clock: ClockSet, create_bucket):
     rates = [Rate(20, 1000)]
     bucket = BucketWrapper(await create_bucket(rates))
     assert bucket is not None
+
+    peek = await bucket.peek(0)
+    assert peek is None
 
     await bucket.put(RateItem("my-item", await get_now(clock)))
     assert await bucket.count() == 1
@@ -104,23 +113,62 @@ async def test_bucket_02(clock: ClockSet, create_bucket):
 
         if await bucket.count() == 31:
             cost = time() - start
-            logging.info(">30 items: %s", cost)
+            logger.info(">30 items: %s", cost)
             assert cost > 0.99
 
         if await bucket.count() == 51:
             cost = time() - start
-            logging.info(">50 items: %s", cost)
+            logger.info(">50 items: %s", cost)
             assert cost > 2
 
         if await bucket.count() == 81:
             cost = time() - start
-            logging.info(">80 items: %s", cost)
+            logger.info(">80 items: %s", cost)
             assert cost > 3
 
         if await bucket.count() == 101:
             cost = time() - start
-            logging.info(">100 items: %s", cost)
+            logger.info(">100 items: %s", cost)
             assert cost > 4
+
+
+@pytest.mark.asyncio
+async def test_bucket_03(clock: ClockSet, create_bucket):
+    rates = [Rate(30, 1000), Rate(50, 2000)]
+    bucket = BucketWrapper(await create_bucket(rates))
+
+    peek = await bucket.peek(0)
+    assert peek is None
+
+    await bucket.put(RateItem("item1", await get_now(clock)))
+    peek = await bucket.peek(0)
+    assert isinstance(peek, RateItem)
+    assert "item1" in peek.name
+
+    await bucket.put(RateItem("item2", await get_now(clock)))
+    peek = await bucket.peek(0)
+    assert isinstance(peek, RateItem)
+    assert "item2" in peek.name
+
+    peek = await bucket.peek(1)
+    assert isinstance(peek, RateItem)
+    assert "item1" in peek.name
+
+    await bucket.put(RateItem("item3", await get_now(clock)))
+    peek = await bucket.peek(0)
+    assert isinstance(peek, RateItem)
+    assert "item3" in peek.name
+
+    peek = await bucket.peek(1)
+    assert isinstance(peek, RateItem)
+    assert "item2" in peek.name
+
+    peek = await bucket.peek(2)
+    assert isinstance(peek, RateItem)
+    assert "item1" in peek.name
+
+    peek = await bucket.peek(3)
+    assert peek is None
 
 
 @pytest.mark.asyncio
@@ -128,7 +176,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     rates = [Rate(3, 500)]
     bucket = await create_bucket(rates)
 
-    logging.info("Testing `get_bucket_availability` with Bucket: %s, \nclock=%s", bucket, clock)
+    logger.info("Testing `get_bucket_availability` with Bucket: %s, \nclock=%s", bucket, clock)
 
     bucket = BucketWrapper(bucket)
 
@@ -156,12 +204,12 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     elapsed = end - start
     assert elapsed > 0
 
-    logging.info("Elapsed: %s", elapsed)
+    logger.info("Elapsed: %s", elapsed)
     assert await bucket.put(await create_item()) is False
 
     availability = await get_bucket_availability(bucket, await create_item())  # type: ignore
     assert isinstance(availability, int)
-    logging.info("1 space available in: %s", availability)
+    logger.info("1 space available in: %s", availability)
 
     sleep(availability / 1000 - 0.02)
     assert await bucket.put(await create_item()) is False
@@ -171,7 +219,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     assert await bucket.put(await create_item(2)) is False
     availability = await get_bucket_availability(bucket, await create_item(2))  # type: ignore
     assert isinstance(availability, int)
-    logging.info("2 space available in: %s", availability)
+    logger.info("2 space available in: %s", availability)
 
     sleep(availability / 1000 - 0.02)
     assert await bucket.put(await create_item(2)) is False
@@ -181,7 +229,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     assert await bucket.put(await create_item(3)) is False
     availability = await get_bucket_availability(bucket, await create_item(3))  # type: ignore
     assert isinstance(availability, int)
-    logging.info("3 space available in: %s", availability)
+    logger.info("3 space available in: %s", availability)
 
     sleep(availability / 1000 - 0.02)
     assert await bucket.put(await create_item(3)) is False
@@ -239,4 +287,4 @@ async def test_with_large_items(clock: ClockSet, create_bucket):
 
     after = time()
     elapsed = after - before
-    logging.info("---------- INSERT 10K ITEMS COST: %s(secs), %s(items)", elapsed, await bucket.count())
+    logger.info("---------- INSERT 10K ITEMS COST: %s(secs), %s(items)", elapsed, await bucket.count())

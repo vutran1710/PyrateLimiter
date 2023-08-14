@@ -89,7 +89,7 @@ def get_bucket_availability(bucket: Union[AbstractBucket], item: RateItem) -> Un
     if item.weight > bucket.failing_rate.limit:
         return -1
 
-    bound_item = bucket.peek(bucket.failing_rate.limit - item.weight + 1)
+    bound_item = bucket.peek(bucket.failing_rate.limit - item.weight)
     assert bound_item is not None, "Bound-item not found"
 
     def _calc_availability(inner_bound_item: RateItem) -> int:
@@ -101,9 +101,9 @@ def get_bucket_availability(bucket: Union[AbstractBucket], item: RateItem) -> Un
 
     async def _calc_availability_async() -> int:
         nonlocal item, bound_item
-        assert isawaitable(bound_item)
-        bound_item = await bound_item
 
+        while isawaitable(bound_item):
+            bound_item = await bound_item
         # NOTE: if there is a failing rate, then this can't be None!
         assert isinstance(bound_item, RateItem), "Bound-item not a valid rate-item"
         return _calc_availability(bound_item)

@@ -165,8 +165,8 @@ class RedisBucket(AbstractBucket):
     def peek(self, index: int) -> Union[RateItem, None, Awaitable[Optional[RateItem]]]:
         items = self.redis.zrange(
             self.bucket_key,
-            -index,
-            -index,
+            -1 - index,
+            -1 - index,
             withscores=True,
             score_cast_func=int,
         )
@@ -175,6 +175,9 @@ class RedisBucket(AbstractBucket):
             return None
 
         def _handle_items(received_items: List[Tuple[str, int]]):
+            if not received_items:
+                return None
+
             item = received_items[0]
             rate_item = RateItem(name=str(item[0]), timestamp=item[1])
             return rate_item

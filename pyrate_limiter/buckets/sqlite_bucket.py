@@ -133,7 +133,7 @@ class SQLiteBucket(AbstractBucket):
 
     def peek(self, index: int) -> Optional[RateItem]:
         with self.lock:
-            query = Queries.PEEK.format(table=self.table, offset=index - 1)
+            query = Queries.PEEK.format(table=self.table, offset=index)
             item = self.conn.execute(query).fetchone()
 
             if not item:
