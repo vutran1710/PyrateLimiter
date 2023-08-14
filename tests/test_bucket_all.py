@@ -19,7 +19,7 @@ from redis import Redis
 from redis.asyncio import ConnectionPool as AsyncConnectionPool
 from redis.asyncio import Redis as AsyncRedis
 
-from .conftest import MockAsyncClock
+from .conftest import ClockSet
 from pyrate_limiter.abstracts import AbstractBucket
 from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.abstracts import get_bucket_availability
@@ -29,18 +29,7 @@ from pyrate_limiter.buckets import InMemoryBucket
 from pyrate_limiter.buckets import RedisBucket
 from pyrate_limiter.buckets import SQLiteBucket
 from pyrate_limiter.buckets import SQLiteQueries as Queries
-from pyrate_limiter.clocks import MonotonicClock
-from pyrate_limiter.clocks import SQLiteClock
-from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.utils import id_generator
-
-
-ClockSet = Union[
-    MonotonicClock,
-    TimeClock,
-    SQLiteClock,
-    MockAsyncClock,
-]
 
 
 async def get_now(clock: Clock) -> int:
