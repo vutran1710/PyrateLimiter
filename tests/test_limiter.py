@@ -235,11 +235,43 @@ async def test_limiter_delay(limiter_should_raise):
             assert err.meta_info["name"] == item
         except Exception:
             assert False
-        return
+    else:
+        acquire_ok, cost = await async_acquire()
+        logging.info("cost = %s", cost)
+        assert not acquire_ok
+
+    # Flush before testing again
+    factory.default_bucket.flush()
+
+    logging.info("----------- Limit Delay Test #3: exceeding weight")
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost <= 1
 
     acquire_ok, cost = await async_acquire()
     logging.info("cost = %s", cost)
-    assert not acquire_ok
+    assert acquire_ok
+    assert cost <= 1
+
+    acquire_ok, cost = await async_acquire()
+    logging.info("cost = %s", cost)
+    assert acquire_ok
+    assert cost <= 1
+
+    if limiter_should_raise:
+        try:
+            await async_acquire(5)
+            assert False
+        except BucketFullException:
+            assert True
+        except Exception:
+            assert False
+    else:
+        acquire_ok, cost = await async_acquire()
+        logging.info("cost = %s", cost)
+        assert not acquire_ok
+        assert cost <= 1
 
 
 @pytest.mark.asyncio
@@ -326,6 +358,25 @@ async def test_limiter_delay_async(limiter_should_raise):
         acquire_ok, cost = await async_acquire()
         logging.info("cost = %s", cost)
         assert not acquire_ok
+
+    # Flush before testing again
+    await factory.default_bucket_async.flush()
+    assert factory.default_bucket_async.failing_rate is None
+
+    logging.info("----------- Limit Delay Test #3: exceeding weight")
+    if limiter_should_raise:
+        try:
+            await async_acquire(5)
+            assert False
+        except BucketFullException:
+            assert True
+        except Exception:
+            assert False
+    else:
+        acquire_ok, cost = await async_acquire(5)
+        logging.info("cost = %s", cost)
+        assert not acquire_ok
+        assert cost <= 20
 
 
 @pytest.mark.asyncio

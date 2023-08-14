@@ -5,6 +5,7 @@ Limiter class implementation
 - Can be used as decorator
 """
 import asyncio
+import logging
 from functools import wraps
 from inspect import isawaitable
 from time import sleep
@@ -22,6 +23,7 @@ from .abstracts import RateItem
 from .exceptions import BucketFullException
 from .exceptions import LimiterDelayException
 
+logger = logging.getLogger("pyrate_limiter")
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
 DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
@@ -57,6 +59,7 @@ class Limiter:
         bucket: Union[AbstractBucket],
         item: RateItem,
     ) -> Union[bool, Awaitable[bool]]:
+        """On `try_acquire` failed, handle delay or raise error immediately"""
         assert bucket.failing_rate is not None
 
         if self.allowed_delay is None:
@@ -69,9 +72,16 @@ class Limiter:
         delay = get_bucket_availability(bucket, item)
 
         def _handle_reacquire(re_acquire: bool) -> bool:
-            if self.raise_when_fail and re_acquire is False:
-                assert bucket.failing_rate is not None  # NOTE: silence mypy
-                raise BucketFullException(item.name, bucket.failing_rate)
+            if not re_acquire:
+                logger.error(
+                    """
+                Re-acquiring with delay expected to be successful,
+                if it failed then either clock or bucket is probably unstable
+                """
+                )
+                if self.raise_when_fail:
+                    assert bucket.failing_rate is not None  # NOTE: silence mypy
+                    raise BucketFullException(item.name, bucket.failing_rate)
 
             return re_acquire
 
@@ -79,9 +89,29 @@ class Limiter:
 
             async def _handle_async():
                 nonlocal delay, item, bucket
-                delay = (await delay) + 50
+                delay = await delay
+                assert isinstance(delay, int), "Delay not integer"
+
+                if delay < 0:
+                    logger.error(
+                        "Cannot fit item into bucket: item=%s, rate=%s, bucket=%s",
+                        item,
+                        bucket.failing_rate,
+                        bucket,
+                    )
+                    if self.raise_when_fail:
+                        raise BucketFullException(item.name, bucket.failing_rate)
+
+                    return False
+
+                delay += 50
 
                 if delay > self.allowed_delay:
+                    logger.error(
+                        "Required delay too large: actual=%s, expected=%s",
+                        delay,
+                        self.allowed_delay,
+                    )
                     if self.raise_when_fail:
                         assert bucket.failing_rate is not None  # NOTE: silence mypy
                         raise LimiterDelayException(
@@ -104,9 +134,27 @@ class Limiter:
             return _handle_async()
 
         assert isinstance(delay, int)
+
+        if delay < 0:
+            logger.error(
+                "Cannot fit item into bucket: item=%s, rate=%s, bucket=%s",
+                item,
+                bucket.failing_rate,
+                bucket,
+            )
+            if self.raise_when_fail:
+                raise BucketFullException(item.name, bucket.failing_rate)
+
+            return False
+
         delay += 50
 
         if delay > self.allowed_delay:
+            logger.error(
+                "Required delay too large: actual=%s, expected=%s",
+                delay,
+                self.allowed_delay,
+            )
             if self.raise_when_fail:
                 assert bucket.failing_rate is not None  # NOTE: silence mypy
                 raise LimiterDelayException(
@@ -187,7 +235,7 @@ class Limiter:
                 assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
                 result = self.handle_bucket_put(bucket, item)
 
-                if isawaitable(result):
+                while isawaitable(result):
                     result = await result
 
                 return result
@@ -203,7 +251,7 @@ class Limiter:
 
             async def _handle_async_result():
                 nonlocal result
-                if isawaitable(result):
+                while isawaitable(result):
                     result = await result
 
                 return result
