@@ -156,6 +156,7 @@ class RedisBucket(AbstractBucket):
 
     def flush(self):
         with self.lock:
+            self.failing_rate = None
             return self.redis.delete(self.bucket_key)
 
     def count(self):

@@ -35,7 +35,9 @@ class AbstractBucket(ABC):
 
     @abstractmethod
     def flush(self) -> Union[None, Awaitable[None]]:
-        """Flush the whole bucket"""
+        """Flush the whole bucket
+        Must remove `failing-rate` after flushing
+        """
 
     @abstractmethod
     def count(self) -> Union[int, Awaitable[int]]:

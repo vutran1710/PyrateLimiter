@@ -20,6 +20,7 @@ from .abstracts import BucketFactory
 from .abstracts import get_bucket_availability
 from .abstracts import RateItem
 from .exceptions import BucketFullException
+from .exceptions import LimiterDelayException
 
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
@@ -83,7 +84,12 @@ class Limiter:
                 if delay > self.allowed_delay:
                     if self.raise_when_fail:
                         assert bucket.failing_rate is not None  # NOTE: silence mypy
-                        raise BucketFullException(item.name, bucket.failing_rate)
+                        raise LimiterDelayException(
+                            item.name,
+                            bucket.failing_rate,
+                            delay,
+                            self.allowed_delay,
+                        )
                     return False
 
                 await asyncio.sleep(delay / 1000)
@@ -103,7 +109,12 @@ class Limiter:
         if delay > self.allowed_delay:
             if self.raise_when_fail:
                 assert bucket.failing_rate is not None  # NOTE: silence mypy
-                raise BucketFullException(item.name, bucket.failing_rate)
+                raise LimiterDelayException(
+                    item.name,
+                    bucket.failing_rate,
+                    delay,
+                    self.allowed_delay,
+                )
             return False
 
         sleep(delay / 1000)
@@ -143,7 +154,12 @@ class Limiter:
             async def _put_async():
                 nonlocal acquire
                 acquire = await acquire
-                return _handle_result(acquire)
+                result = _handle_result(acquire)
+
+                while isawaitable(result):
+                    result = await result
+
+                return result
 
             return _put_async()
 
