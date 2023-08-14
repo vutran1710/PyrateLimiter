@@ -213,34 +213,39 @@ async def test_bucket_leak(clock: ClockSet, create_bucket):
 
 
 @pytest.mark.asyncio
-async def test_bucket_flush(clock: ClockSet, create_bucket):
+async def test_bucket_flush(create_bucket):
+    """Testing bucket's flush, only need 1 single clock type"""
     rates = [Rate(5000, 1000)]
     bucket = BucketAsyncWrapper(await create_bucket(rates))
+    assert isinstance(bucket.rates[0], Rate)
+    clock = TimeClock()
 
     while await bucket.count() < 5000:
-        await bucket.put(RateItem("item", await get_now(clock)))
+        await bucket.put(RateItem("item", clock.now()))
 
+    bucket.bucket.failing_rate = bucket.rates[0]
     await bucket.flush()
     assert await bucket.count() == 0
+    assert bucket.failing_rate is None
 
 
 @pytest.mark.asyncio
-async def test_with_large_items(clock: ClockSet, create_bucket):
+async def test_bucket_performance(create_bucket):
     """Bucket's performance test
+    Putting a very large number of item into bucket
     Only need to test with a single clock type
     """
-    if not isinstance(clock, TimeClock):
-        return
-
-    rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 5000)]
+    clock = TimeClock()
+    rates = [Rate(30000, 5000)]
     bucket = BucketAsyncWrapper(await create_bucket(rates))
 
     before = time()
 
     for _ in range(10_000):
-        item = RateItem("item", await get_now(clock))
+        item = RateItem("item", clock.now())
         await bucket.put(item)
 
     after = time()
     elapsed = after - before
-    logger.info("---------- INSERT 10K ITEMS COST: %s(secs), %s(items)", elapsed, await bucket.count())
+    assert await bucket.count() == 10_000
+    logger.info("Performance test: insert 10k items %s(secs)", elapsed)
