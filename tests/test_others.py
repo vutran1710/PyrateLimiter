@@ -91,6 +91,9 @@ def test_rate_validator():
     rates = [Rate(1, 1), Rate(2, 2)]
     assert validate_rate_list(rates) is True
 
+    rates = [Rate(2, 1), Rate(1, 2)]
+    assert validate_rate_list(rates) is False
+
     rates = [Rate(2, 1), Rate(3, 2)]
     assert validate_rate_list(rates) is True
 
