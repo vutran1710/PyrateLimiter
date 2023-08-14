@@ -43,7 +43,10 @@ class AbstractBucket(ABC):
 
     @abstractmethod
     def peek(self, index: int) -> Union[Optional[RateItem], Awaitable[Optional[RateItem]]]:
-        """Peek at the rate-item at a specific index in latest-to-earliest order"""
+        """Peek at the rate-item at a specific index in latest-to-earliest order
+        NOTE: The reason we cannot peek from the start of the queue(earliest-to-latest) is
+        we can't really tell how many outdated items are still in the queue
+        """
 
 
 class BucketFactory(ABC):
