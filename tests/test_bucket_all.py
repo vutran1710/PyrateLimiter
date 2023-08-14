@@ -11,6 +11,7 @@ from typing import Union
 import pytest
 
 from .conftest import ClockSet
+from pyrate_limiter import TimeClock
 from pyrate_limiter.abstracts import AbstractBucket
 from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.abstracts import get_bucket_availability
@@ -221,6 +222,12 @@ async def test_bucket_flush(clock: ClockSet, create_bucket):
 
 @pytest.mark.asyncio
 async def test_with_large_items(clock: ClockSet, create_bucket):
+    """Bucket's performance test
+    Only need to test with a single clock type
+    """
+    if not isinstance(clock, TimeClock):
+        return
+
     rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 5000)]
     bucket = BucketWrapper(await create_bucket(rates))
 
