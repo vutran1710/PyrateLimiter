@@ -4,21 +4,26 @@ Limiter class implementation
 - Switching async/sync context
 - Can be used as decorator
 """
+import asyncio
+import logging
 from functools import wraps
-from inspect import iscoroutine
-from inspect import iscoroutinefunction
+from inspect import isawaitable
+from time import sleep
 from typing import Any
+from typing import Awaitable
 from typing import Callable
-from typing import Coroutine
+from typing import Optional
 from typing import Tuple
 from typing import Union
 
 from .abstracts import AbstractBucket
 from .abstracts import BucketFactory
+from .abstracts import get_bucket_availability
 from .abstracts import RateItem
 from .exceptions import BucketFullException
-from .exceptions import BucketRetrievalFail
+from .exceptions import LimiterDelayException
 
+logger = logging.getLogger("pyrate_limiter")
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
 DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
@@ -31,41 +36,184 @@ class Limiter:
 
     bucket_factory: BucketFactory
     raise_when_fail: bool
+    allowed_delay: Optional[int] = None
 
-    def __init__(self, bucket_factory: BucketFactory, raise_when_fail: bool = True):
+    def __init__(
+        self,
+        bucket_factory: BucketFactory,
+        raise_when_fail: bool = True,
+        allowed_delay: Optional[int] = None,
+    ):
         self.bucket_factory = bucket_factory
         bucket_factory.schedule_leak()
         bucket_factory.schedule_flush()
         self.raise_when_fail = raise_when_fail
 
+        if allowed_delay is not None:
+            assert allowed_delay >= 0, "Allowed delay must not be negative"
+
+        self.allowed_delay = allowed_delay
+
+    def delay_or_raise(
+        self,
+        bucket: Union[AbstractBucket],
+        item: RateItem,
+    ) -> Union[bool, Awaitable[bool]]:
+        """On `try_acquire` failed, handle delay or raise error immediately"""
+        assert bucket.failing_rate is not None
+
+        if self.allowed_delay is None:
+            if self.raise_when_fail:
+                assert bucket.failing_rate is not None  # NOTE: silence mypy
+                raise BucketFullException(item.name, bucket.failing_rate)
+
+            return False
+
+        delay = get_bucket_availability(bucket, item)
+
+        def _handle_reacquire(re_acquire: bool) -> bool:
+            if not re_acquire:
+                logger.error(
+                    """
+                Re-acquiring with delay expected to be successful,
+                if it failed then either clock or bucket is probably unstable
+                """
+                )
+                if self.raise_when_fail:
+                    assert bucket.failing_rate is not None  # NOTE: silence mypy
+                    raise BucketFullException(item.name, bucket.failing_rate)
+
+            return re_acquire
+
+        if isawaitable(delay):
+
+            async def _handle_async():
+                nonlocal delay, item, bucket
+                delay = await delay
+                assert isinstance(delay, int), "Delay not integer"
+
+                if delay < 0:
+                    logger.error(
+                        "Cannot fit item into bucket: item=%s, rate=%s, bucket=%s",
+                        item,
+                        bucket.failing_rate,
+                        bucket,
+                    )
+                    if self.raise_when_fail:
+                        raise BucketFullException(item.name, bucket.failing_rate)
+
+                    return False
+
+                delay += 50
+
+                if delay > self.allowed_delay:
+                    logger.error(
+                        "Required delay too large: actual=%s, expected=%s",
+                        delay,
+                        self.allowed_delay,
+                    )
+                    if self.raise_when_fail:
+                        assert bucket.failing_rate is not None  # NOTE: silence mypy
+                        raise LimiterDelayException(
+                            item.name,
+                            bucket.failing_rate,
+                            delay,
+                            self.allowed_delay,
+                        )
+                    return False
+
+                await asyncio.sleep(delay / 1000)
+                item.timestamp += delay
+                re_acquire = bucket.put(item)
+
+                if isawaitable(re_acquire):
+                    re_acquire = await re_acquire
+
+                return _handle_reacquire(re_acquire)
+
+            return _handle_async()
+
+        assert isinstance(delay, int)
+
+        if delay < 0:
+            logger.error(
+                "Cannot fit item into bucket: item=%s, rate=%s, bucket=%s",
+                item,
+                bucket.failing_rate,
+                bucket,
+            )
+            if self.raise_when_fail:
+                raise BucketFullException(item.name, bucket.failing_rate)
+
+            return False
+
+        delay += 50
+
+        if delay > self.allowed_delay:
+            logger.error(
+                "Required delay too large: actual=%s, expected=%s",
+                delay,
+                self.allowed_delay,
+            )
+            if self.raise_when_fail:
+                assert bucket.failing_rate is not None  # NOTE: silence mypy
+                raise LimiterDelayException(
+                    item.name,
+                    bucket.failing_rate,
+                    delay,
+                    self.allowed_delay,
+                )
+            return False
+
+        sleep(delay / 1000)
+        item.timestamp += delay
+        re_acquire = bucket.put(item)
+
+        if isawaitable(re_acquire):
+
+            async def _resolve_re_acquire():
+                nonlocal re_acquire
+                re_acquire = await re_acquire
+                assert isinstance(re_acquire, bool)
+                return _handle_reacquire(re_acquire)
+
+            return _resolve_re_acquire()
+
+        assert isinstance(re_acquire, bool)
+        return _handle_reacquire(re_acquire)
+
     def handle_bucket_put(
         self,
         bucket: Union[AbstractBucket],
         item: RateItem,
-    ) -> Union[bool, Coroutine[None, None, bool]]:
+    ) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
 
-        def check_acquire(is_success: bool):
+        def _handle_result(is_success: bool):
             if not is_success:
-                error_msg = "No failing rate when not success, logical error"
-                assert bucket.failing_rate is not None, error_msg
-
-                if self.raise_when_fail:
-                    raise BucketFullException(item.name, bucket.failing_rate)
-
-                return False
+                return self.delay_or_raise(bucket, item)
 
             return True
 
-        async def put_async():
-            return check_acquire(await bucket.put(item))
+        acquire = bucket.put(item)
 
-        def put_sync():
-            return check_acquire(bucket.put(item))
+        if isawaitable(acquire):
 
-        return put_async() if iscoroutinefunction(bucket.put) else put_sync()
+            async def _put_async():
+                nonlocal acquire
+                acquire = await acquire
+                result = _handle_result(acquire)
 
-    def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Coroutine[None, None, bool]]:
+                while isawaitable(result):
+                    result = await result
+
+                return result
+
+            return _put_async()
+
+        return _handle_result(acquire)  # type: ignore
+
+    def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
         """Try accquiring an item with name & weight
         Return true on success, false on failure
         """
@@ -78,38 +226,39 @@ class Limiter:
 
         item = self.bucket_factory.wrap_item(name, weight)
 
-        if iscoroutine(item):
+        if isawaitable(item):
 
-            async def acquire_async():
+            async def _handle_async():
                 nonlocal item
                 item = await item
                 bucket = self.bucket_factory.get(item)
-
-                if bucket is None:
-                    if self.raise_when_fail:
-                        raise BucketRetrievalFail(item.name)
-
-                    return False
-
+                assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
                 result = self.handle_bucket_put(bucket, item)
 
-                if iscoroutine(result):
+                while isawaitable(result):
                     result = await result
 
                 return result
 
-            return acquire_async()
+            return _handle_async()
 
         assert isinstance(item, RateItem)  # NOTE: this is to silence mypy warning
         bucket = self.bucket_factory.get(item)
+        assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
+        result = self.handle_bucket_put(bucket, item)
 
-        if not bucket:
-            if self.raise_when_fail:
-                raise BucketRetrievalFail(item.name)
+        if isawaitable(result):
 
-            return False
+            async def _handle_async_result():
+                nonlocal result
+                while isawaitable(result):
+                    result = await result
 
-        return self.handle_bucket_put(bucket, item)
+                return result
+
+            return _handle_async_result()
+
+        return result
 
     def as_decorator(self) -> Callable[[ItemMapping], DecoratorWrapper]:
         """Use limiter decorator
@@ -127,20 +276,20 @@ class Limiter:
                     assert isinstance(weight, int), "Mapping weight is expected but not found"
                     accquire_ok = self.try_acquire(name, weight)
 
-                    if not iscoroutine(accquire_ok):
+                    if not isawaitable(accquire_ok):
                         return func(*args, **kwargs)
 
-                    async def handle_accquire_is_coroutine():
+                    async def _handle_accquire_async():
                         nonlocal accquire_ok
                         accquire_ok = await accquire_ok
                         result = func(*args, **kwargs)
 
-                        if iscoroutine(result):
+                        if isawaitable(result):
                             return await result
 
                         return result
 
-                    return handle_accquire_is_coroutine()
+                    return _handle_accquire_async()
 
                 return wrapper
 

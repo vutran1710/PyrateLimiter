@@ -49,6 +49,7 @@ class Queries:
     LIMIT 1
     )
     """
+    PEEK = "SELECT * FROM '{table}' ORDER BY item_timestamp DESC LIMIT 1 OFFSET {offset}"
 
 
 class SQLiteBucket(AbstractBucket):
@@ -128,3 +129,13 @@ class SQLiteBucket(AbstractBucket):
     def count(self) -> int:
         with self.lock:
             return self.conn.execute(Queries.COUNT_ALL.format(table=self.table)).fetchone()[0]
+
+    def peek(self, index: int) -> Optional[RateItem]:
+        with self.lock:
+            query = Queries.PEEK.format(table=self.table, offset=index - 1)
+            item = self.conn.execute(query).fetchone()
+
+            if not item:
+                return None
+
+            return RateItem(item[0], item[1])

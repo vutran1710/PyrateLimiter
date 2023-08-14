@@ -73,3 +73,6 @@ class InMemoryBucket(AbstractBucket):
 
     def count(self) -> int:
         return len(self.items)
+
+    def peek(self, index: int) -> Optional[RateItem]:
+        return self.items[-index] if abs(index) <= self.count() else None
