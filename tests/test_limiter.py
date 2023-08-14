@@ -8,7 +8,7 @@ from typing import Union
 
 import pytest
 
-from .test_bucket_all import create_async_redis_bucket
+from .conftest import create_async_redis_bucket
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import Clock
