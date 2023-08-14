@@ -4,15 +4,13 @@ Testing buckets of all implementations
 from inspect import isawaitable
 from time import sleep
 from time import time
-from typing import Optional
-from typing import Union
 
 import pytest
 
 from .conftest import ClockSet
 from .conftest import logger
 from pyrate_limiter import TimeClock
-from pyrate_limiter.abstracts import AbstractBucket
+from pyrate_limiter.abstracts import BucketAsyncWrapper
 from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.abstracts import get_bucket_availability
 from pyrate_limiter.abstracts import Rate
@@ -30,52 +28,10 @@ async def get_now(clock: Clock) -> int:
     return now
 
 
-async def awating(coro_or_not):
-    while isawaitable(coro_or_not):
-        coro_or_not = await coro_or_not
-
-    return coro_or_not
-
-
-class BucketWrapper(AbstractBucket):
-    def __init__(self, bucket: Union[AbstractBucket]):
-        assert isinstance(bucket, AbstractBucket)
-        self.bucket = bucket
-
-    async def put(self, item: RateItem):
-        return await awating(self.bucket.put(item))
-
-    async def count(self):
-        return await awating(self.bucket.count())
-
-    async def leak(self, current_timestamp: Optional[int] = None) -> int:
-        return await awating(self.bucket.leak(current_timestamp))
-
-    async def flush(self) -> None:
-        return await awating(self.bucket.flush())
-
-    async def peek(self, index: int) -> Optional[RateItem]:
-        item = self.bucket.peek(index)
-
-        if isawaitable(item):
-            item = await item
-
-        assert item is None or isinstance(item, RateItem)
-        return item
-
-    @property
-    def failing_rate(self):
-        return self.bucket.failing_rate
-
-    @property
-    def rates(self):
-        return self.bucket.rates
-
-
 @pytest.mark.asyncio
 async def test_bucket_01(clock: ClockSet, create_bucket):
     rates = [Rate(20, 1000)]
-    bucket = BucketWrapper(await create_bucket(rates))
+    bucket = BucketAsyncWrapper(await create_bucket(rates))
     assert bucket is not None
 
     peek = await bucket.peek(0)
@@ -105,7 +61,7 @@ async def test_bucket_01(clock: ClockSet, create_bucket):
 @pytest.mark.asyncio
 async def test_bucket_02(clock: ClockSet, create_bucket):
     rates = [Rate(30, 1000), Rate(50, 2000)]
-    bucket = BucketWrapper(await create_bucket(rates))
+    bucket = BucketAsyncWrapper(await create_bucket(rates))
     start = time()
 
     while await bucket.count() < 150:
@@ -135,7 +91,7 @@ async def test_bucket_02(clock: ClockSet, create_bucket):
 @pytest.mark.asyncio
 async def test_bucket_03(clock: ClockSet, create_bucket):
     rates = [Rate(30, 1000), Rate(50, 2000)]
-    bucket = BucketWrapper(await create_bucket(rates))
+    bucket = BucketAsyncWrapper(await create_bucket(rates))
 
     peek = await bucket.peek(0)
     assert peek is None
@@ -178,7 +134,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
 
     logger.info("Testing `get_bucket_availability` with Bucket: %s, \nclock=%s", bucket, clock)
 
-    bucket = BucketWrapper(bucket)
+    bucket = BucketAsyncWrapper(bucket)
 
     async def create_item(weight: int = 1) -> RateItem:
         nonlocal clock
@@ -240,7 +196,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
 @pytest.mark.asyncio
 async def test_bucket_leak(clock: ClockSet, create_bucket):
     rates = [Rate(100, 3000)]
-    bucket = BucketWrapper(await create_bucket(rates))
+    bucket = BucketAsyncWrapper(await create_bucket(rates))
 
     while await bucket.count() < 200:
         await bucket.put(RateItem("item", await get_now(clock)))
@@ -259,7 +215,7 @@ async def test_bucket_leak(clock: ClockSet, create_bucket):
 @pytest.mark.asyncio
 async def test_bucket_flush(clock: ClockSet, create_bucket):
     rates = [Rate(5000, 1000)]
-    bucket = BucketWrapper(await create_bucket(rates))
+    bucket = BucketAsyncWrapper(await create_bucket(rates))
 
     while await bucket.count() < 5000:
         await bucket.put(RateItem("item", await get_now(clock)))
@@ -277,7 +233,7 @@ async def test_with_large_items(clock: ClockSet, create_bucket):
         return
 
     rates = [Rate(10000, 1000), Rate(20000, 3000), Rate(30000, 5000)]
-    bucket = BucketWrapper(await create_bucket(rates))
+    bucket = BucketAsyncWrapper(await create_bucket(rates))
 
     before = time()
 
