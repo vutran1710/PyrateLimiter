@@ -236,16 +236,15 @@ async def test_bucket_performance(create_bucket):
     Only need to test with a single clock type
     """
     clock = TimeClock()
-    rates = [Rate(30000, 5000)]
+    rates = [Rate(30000, 50000)]
     bucket = BucketAsyncWrapper(await create_bucket(rates))
-
     before = time()
 
     for _ in range(10_000):
         item = RateItem("item", clock.now())
-        await bucket.put(item)
+        assert await bucket.put(item) is True
 
     after = time()
     elapsed = after - before
     assert await bucket.count() == 10_000
-    logger.info("Performance test: insert 10k items %s(secs)", elapsed)
+    logger.info("Bucket: %s \nPerformance test: insert 10k items %s(secs)", bucket.bucket, elapsed)
