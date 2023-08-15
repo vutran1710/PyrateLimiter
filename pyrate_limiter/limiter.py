@@ -158,17 +158,7 @@ class Limiter:
         sleep(delay / 1000)
         item.timestamp += delay
         re_acquire = bucket.put(item)
-
-        if isawaitable(re_acquire):
-
-            async def _resolve_re_acquire():
-                nonlocal re_acquire
-                re_acquire = await re_acquire
-                assert isinstance(re_acquire, bool)
-                return _handle_reacquire(re_acquire)
-
-            return _resolve_re_acquire()
-
+        # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
         assert isinstance(re_acquire, bool)
         return _handle_reacquire(re_acquire)
 
