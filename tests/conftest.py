@@ -24,7 +24,6 @@ from pyrate_limiter.clocks import MonotonicClock
 from pyrate_limiter.clocks import SQLiteClock
 from pyrate_limiter.clocks import TimeAsyncClock
 from pyrate_limiter.clocks import TimeClock
-from pyrate_limiter.utils import dedicated_sqlite_clock_connection
 from pyrate_limiter.utils import id_generator
 
 # Make log messages visible on test failure (or with pytest -s)
@@ -36,7 +35,7 @@ logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 clocks = [
     MonotonicClock(),
     TimeClock(),
-    SQLiteClock(dedicated_sqlite_clock_connection()),
+    SQLiteClock.default(),
     TimeAsyncClock(),
 ]
 

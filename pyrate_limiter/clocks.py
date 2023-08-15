@@ -5,6 +5,7 @@ from time import monotonic
 from time import time
 
 from .abstracts import Clock
+from .utils import dedicated_sqlite_clock_connection
 
 
 class MonotonicClock(Clock):
@@ -35,6 +36,11 @@ class SQLiteClock(Clock):
 
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
+
+    @classmethod
+    def default(cls):
+        conn = dedicated_sqlite_clock_connection()
+        return cls(conn)
 
     def now(self) -> int:
         now = self.conn.execute(self.time_query).fetchone()[0]
