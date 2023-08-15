@@ -1,3 +1,5 @@
+"""Complete Limiter test suite
+"""
 from concurrent.futures import ThreadPoolExecutor
 from inspect import isawaitable
 from time import sleep
@@ -61,7 +63,11 @@ def limiter_delay(request):
     return request.param
 
 
-async def check_items_in_bucket(bucket: Union[AbstractBucket], expected_item_count: int):
+async def inspect_bucket_items(bucket: Union[AbstractBucket], expected_item_count: int):
+    """Inspect items in the bucket
+    - Assert number of item == expected-item-count
+    - Assert that items are ordered by timestamps, from latest to earliest
+    """
     collected_items = []
 
     for idx in range(expected_item_count):
@@ -83,7 +89,7 @@ async def check_items_in_bucket(bucket: Union[AbstractBucket], expected_item_cou
     return item_names
 
 
-async def thread_pool_acquire(limiter: Limiter, items: List[str]):
+async def concurrent_acquire(limiter: Limiter, items: List[str]):
     with ThreadPoolExecutor() as executor:
         result = list(executor.map(limiter.try_acquire, items))
         for idx, coro in enumerate(result):
@@ -101,13 +107,13 @@ async def async_acquire(limiter: Limiter, item: str, weight: int = 1) -> Tuple[b
     if isawaitable(acquire):
         acquire = await acquire
 
-    delay_time_in_ms = int((time() - start) * 1000)
+    time_cost_in_ms = int((time() - start) * 1000)
     assert isinstance(acquire, bool)
-    return acquire, delay_time_in_ms
+    return acquire, time_cost_in_ms
 
 
-async def pre_filling_bucket(limiter: Limiter, sleep_interval: float, item: str):
-    """Prefilling bucket to the limit
+async def prefilling_bucket(limiter: Limiter, sleep_interval: float, item: str):
+    """Pre-filling bucket to the limit before testing
     the time cost might vary depending on the bucket's backend
     - For in-memory bucket, this should be less than a 1ms
     - For external bucket's source ie Redis, this mostly depends on the network latency
@@ -181,41 +187,32 @@ async def test_limiter_01(
     assert cost == 0
     assert await bucket.count() == 0
 
-    logger.info("----------- Limiter Test #1")
-    await pre_filling_bucket(limiter, 0.3, item)
+    logger.info("Limiter Test #1")
+    await prefilling_bucket(limiter, 0.3, item)
 
     if not limiter_should_raise:
-        logger.info("Test#1: If delay allowed, it should be OK: limiter does not raise")
         acquire_ok, cost = await async_acquire(limiter, item)
-        logger.info("cost = %s", cost)
         if limiter_delay is None:
-            logger.info("Test#1: No delay allowed, return False immediately")
             assert cost <= 50
             assert not acquire_ok
         else:
-            logger.info("Test#1: Delay allowed up to 500ms, return True after delay")
             assert acquire_ok
     else:
-        logger.info("Test#1: If delay allowed, it should be OK, otherwise raise")
         if limiter_delay is None:
-            logger.info("Test#1: No delay, limiter should raise")
             with pytest.raises(BucketFullException):
                 acquire_ok, cost = await async_acquire(limiter, item)
         else:
-            logger.info("Test#1: Delay allowed, return True, no raise")
             acquire_ok, cost = await async_acquire(limiter, item)
             assert cost > 400
             assert acquire_ok
 
     # # Flush before testing again
     await flushing_bucket(bucket)
-    logger.info("----------- Limiter Test #2")
-    await pre_filling_bucket(limiter, 0, item)
+    logger.info("Limiter Test #2")
+    await prefilling_bucket(limiter, 0, item)
 
     if limiter_should_raise:
-        logger.info("Test#2: Limiter shall raise")
         if limiter_delay == 500:
-            logger.info("Test#2: Limiter shall raise: delay too long")
             with pytest.raises(LimiterDelayException) as err:
                 await async_acquire(limiter, item)
                 assert err.meta_info["allowed_delay"] == 500
@@ -225,7 +222,6 @@ async def test_limiter_01(
             acquire_ok, cost = await async_acquire(limiter, item)
             assert acquire_ok
         else:
-            logger.info("Test#2: Limiter shall raise: no delay")
             with pytest.raises(BucketFullException) as err:
                 await async_acquire(limiter, item)
     else:
@@ -234,17 +230,14 @@ async def test_limiter_01(
 
     # Flush before testing again
     await flushing_bucket(bucket)
-    logger.info("----------- Limiter Test #3: exceeding weight")
-    await pre_filling_bucket(limiter, 0, item)
+    logger.info("Limiter Test #3: exceeding weight")
+    await prefilling_bucket(limiter, 0, item)
 
     if limiter_should_raise:
-        logger.info("Test#3: Exceeding weight, limit should raise")
         with pytest.raises(BucketFullException) as err:
             await async_acquire(limiter, item, 5)
     else:
-        logger.info("Test#3: Exceeding weight, no raise but return False immediately")
         acquire_ok, cost = await async_acquire(limiter, item, 5)
-        logger.info("cost = %s", cost)
         assert cost <= 50
         assert not acquire_ok
 
@@ -269,16 +262,16 @@ async def test_limiter_concurrency(
 
     if not limiter_should_raise:
         if not limiter_delay or limiter_delay == 500:
-            result = await thread_pool_acquire(limiter, items)
-            item_names = await check_items_in_bucket(bucket, 3)
+            result = await concurrent_acquire(limiter, items)
+            item_names = await inspect_bucket_items(bucket, 3)
             logger.info(
                 "(No raise, delay is None or delay > allowed_delay) Result = %s, Item = %s",
                 result,
                 item_names,
             )
         else:
-            result = await thread_pool_acquire(limiter, items)
-            item_names = await check_items_in_bucket(bucket, 3)
+            result = await concurrent_acquire(limiter, items)
+            item_names = await inspect_bucket_items(bucket, 3)
             logger.info(
                 "(No raise, delay < allowed_delay) Result = %s, Item = %s",
                 result,
@@ -287,18 +280,23 @@ async def test_limiter_concurrency(
     else:
         if not limiter_delay:
             with pytest.raises(BucketFullException):
-                await thread_pool_acquire(limiter, items)
+                await concurrent_acquire(limiter, items)
         elif limiter_delay == 500:
             with pytest.raises(LimiterDelayException):
-                await thread_pool_acquire(limiter, items)
+                await concurrent_acquire(limiter, items)
         else:
-            result = await thread_pool_acquire(limiter, items)
-            item_names = await check_items_in_bucket(bucket, 4)
+            result = await concurrent_acquire(limiter, items)
+            item_names = await inspect_bucket_items(bucket, 4)
             logger.info("(Raise, delay) Result = %s, Item = %s", result, item_names)
 
 
 @pytest.mark.asyncio
-async def test_limiter_decorator(clock, create_bucket, limiter_should_raise, limiter_delay):
+async def test_limiter_decorator(
+    clock,
+    create_bucket,
+    limiter_should_raise,
+    limiter_delay,
+):
     bucket = await create_bucket(DEFAULT_RATES)
     factory = DummyBucketFactory(clock, bucket)
     limiter = Limiter(
@@ -313,23 +311,22 @@ async def test_limiter_decorator(clock, create_bucket, limiter_should_raise, lim
 
     counter = 0
 
+    @limiter_wrapper(mapping)
     def inc_counter(num: int):
         nonlocal counter
         counter += num
 
+    @limiter_wrapper(mapping)
     async def async_inc_counter(num: int):
         nonlocal counter
         counter += num
 
-    wrapped_inc_1 = limiter_wrapper(mapping)(inc_counter)
-    wrapped_inc_2 = limiter_wrapper(mapping)(async_inc_counter)
-
-    inc = wrapped_inc_1(1)
+    inc = inc_counter(1)
 
     if isawaitable(inc):
         await inc
 
     assert counter == 1
 
-    await wrapped_inc_2(1)
+    await async_inc_counter(1)
     assert counter == 2
