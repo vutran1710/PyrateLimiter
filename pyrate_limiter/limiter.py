@@ -8,6 +8,7 @@ import asyncio
 import logging
 from functools import wraps
 from inspect import isawaitable
+from threading import RLock
 from time import sleep
 from typing import Any
 from typing import Awaitable
@@ -36,6 +37,7 @@ class Limiter:
     bucket_factory: BucketFactory
     raise_when_fail: bool
     allowed_delay: Optional[int] = None
+    lock: RLock
 
     def __init__(
         self,
@@ -52,6 +54,7 @@ class Limiter:
             assert allowed_delay >= 0, "Allowed delay must not be negative"
 
         self.allowed_delay = allowed_delay
+        self.lock = RLock()
 
     def _raise_bucket_full_if_necessary(
         self,
@@ -197,48 +200,49 @@ class Limiter:
         """Try accquiring an item with name & weight
         Return true on success, false on failure
         """
-        assert weight >= 0, "item's weight must be >= 0"
+        with self.lock:
+            assert weight >= 0, "item's weight must be >= 0"
 
-        if weight == 0:
-            # NOTE: if item is weightless, just let it go through
-            # NOTE: this might change in the futre
-            return True
+            if weight == 0:
+                # NOTE: if item is weightless, just let it go through
+                # NOTE: this might change in the futre
+                return True
 
-        item = self.bucket_factory.wrap_item(name, weight)
+            item = self.bucket_factory.wrap_item(name, weight)
 
-        if isawaitable(item):
+            if isawaitable(item):
 
-            async def _handle_async():
-                nonlocal item
-                item = await item
-                bucket = self.bucket_factory.get(item)
-                assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-                result = self.handle_bucket_put(bucket, item)
+                async def _handle_async():
+                    nonlocal item
+                    item = await item
+                    bucket = self.bucket_factory.get(item)
+                    assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
+                    result = self.handle_bucket_put(bucket, item)
 
-                while isawaitable(result):
-                    result = await result
+                    while isawaitable(result):
+                        result = await result
 
-                return result
+                    return result
 
-            return _handle_async()
+                return _handle_async()
 
-        assert isinstance(item, RateItem)  # NOTE: this is to silence mypy warning
-        bucket = self.bucket_factory.get(item)
-        assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-        result = self.handle_bucket_put(bucket, item)
+            assert isinstance(item, RateItem)  # NOTE: this is to silence mypy warning
+            bucket = self.bucket_factory.get(item)
+            assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
+            result = self.handle_bucket_put(bucket, item)
 
-        if isawaitable(result):
+            if isawaitable(result):
 
-            async def _handle_async_result():
-                nonlocal result
-                while isawaitable(result):
-                    result = await result
+                async def _handle_async_result():
+                    nonlocal result
+                    while isawaitable(result):
+                        result = await result
 
-                return result
+                    return result
 
-            return _handle_async_result()
+                return _handle_async_result()
 
-        return result
+            return result
 
     def as_decorator(self) -> Callable[[ItemMapping], DecoratorWrapper]:
         """Use limiter decorator
