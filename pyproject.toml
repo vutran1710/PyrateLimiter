@@ -44,11 +44,7 @@ docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints",
         "sphinx-copybutton", "sphinxcontrib-apidoc"]
 
 [tool.poetry.dev-dependencies]
-Django = "^3.2.8"
-django-redis = "^5.0.0"
-fakeredis = "^1.1.0"
 flake8_polyfill = "^1.0.2"
-logzero = "^1.5"
 nox = "^2022.1.7"
 nox-poetry = ">=0.8"
 pre-commit = "^2.17.0"
