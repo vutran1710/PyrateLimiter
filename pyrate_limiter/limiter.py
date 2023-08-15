@@ -18,7 +18,6 @@ from typing import Union
 
 from .abstracts import AbstractBucket
 from .abstracts import BucketFactory
-from .abstracts import get_bucket_availability
 from .abstracts import RateItem
 from .exceptions import BucketFullException
 from .exceptions import LimiterDelayException
@@ -69,7 +68,7 @@ class Limiter:
 
             return False
 
-        delay = get_bucket_availability(bucket, item)
+        delay = bucket.waiting(item)
 
         def _handle_reacquire(re_acquire: bool) -> bool:
             if not re_acquire:
