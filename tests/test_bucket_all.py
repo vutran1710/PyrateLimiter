@@ -12,7 +12,6 @@ from .conftest import logger
 from pyrate_limiter import TimeClock
 from pyrate_limiter.abstracts import BucketAsyncWrapper
 from pyrate_limiter.abstracts import Clock
-from pyrate_limiter.abstracts import get_bucket_availability
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
 
@@ -132,7 +131,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     rates = [Rate(3, 500)]
     bucket = await create_bucket(rates)
 
-    logger.info("Testing `get_bucket_availability` with Bucket: %s, \nclock=%s", bucket, clock)
+    logger.info("Testing `bucket.waiting` with Bucket: %s, \nclock=%s", bucket, clock)
 
     bucket = BucketAsyncWrapper(bucket)
 
@@ -163,7 +162,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     logger.info("Elapsed: %s", elapsed)
     assert await bucket.put(await create_item()) is False
 
-    availability = await get_bucket_availability(bucket, await create_item())  # type: ignore
+    availability = await bucket.waiting(await create_item())  # type: ignore
     assert isinstance(availability, int)
     logger.info("1 space available in: %s", availability)
 
@@ -173,7 +172,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     assert await bucket.put(await create_item()) is True
 
     assert await bucket.put(await create_item(2)) is False
-    availability = await get_bucket_availability(bucket, await create_item(2))  # type: ignore
+    availability = await bucket.waiting(await create_item(2))  # type: ignore
     assert isinstance(availability, int)
     logger.info("2 space available in: %s", availability)
 
@@ -183,7 +182,7 @@ async def test_bucket_availability(clock: ClockSet, create_bucket):
     assert await bucket.put(await create_item(2)) is True
 
     assert await bucket.put(await create_item(3)) is False
-    availability = await get_bucket_availability(bucket, await create_item(3))  # type: ignore
+    availability = await bucket.waiting(await create_item(3))  # type: ignore
     assert isinstance(availability, int)
     logger.info("3 space available in: %s", availability)
 
@@ -215,15 +214,16 @@ async def test_bucket_leak(clock: ClockSet, create_bucket):
 @pytest.mark.asyncio
 async def test_bucket_flush(create_bucket):
     """Testing bucket's flush, only need 1 single clock type"""
-    rates = [Rate(5000, 1000)]
+    rates = [Rate(50, 1000)]
     bucket = BucketAsyncWrapper(await create_bucket(rates))
     assert isinstance(bucket.rates[0], Rate)
     clock = TimeClock()
 
-    while await bucket.count() < 5000:
-        await bucket.put(RateItem("item", clock.now()))
+    while await bucket.put(RateItem("item", clock.now())):
+        pass
 
-    bucket.bucket.failing_rate = bucket.rates[0]
+    assert await bucket.count() == 50
+    assert bucket.failing_rate is not None
     await bucket.flush()
     assert await bucket.count() == 0
     assert bucket.failing_rate is None
