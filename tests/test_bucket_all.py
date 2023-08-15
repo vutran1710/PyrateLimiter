@@ -127,7 +127,7 @@ async def test_bucket_03(clock: ClockSet, create_bucket):
 
 
 @pytest.mark.asyncio
-async def test_bucket_availability(clock: ClockSet, create_bucket):
+async def test_bucket_waiting(clock: ClockSet, create_bucket):
     rates = [Rate(3, 500)]
     bucket = await create_bucket(rates)
 
