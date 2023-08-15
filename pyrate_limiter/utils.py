@@ -1,5 +1,8 @@
 import random
+import sqlite3
 import string
+from pathlib import Path
+from tempfile import gettempdir
 from typing import List
 
 from .abstracts import Rate
@@ -57,3 +60,15 @@ def id_generator(
     chars=string.ascii_uppercase + string.digits + string.ascii_lowercase,
 ) -> str:
     return "".join(random.choice(chars) for _ in range(size))
+
+
+def dedicated_sqlite_clock_connection():
+    temp_dir = Path(gettempdir())
+    default_db_path = temp_dir / "pyrate_limiter_clock_only.sqlite"
+
+    conn = sqlite3.connect(
+        default_db_path,
+        isolation_level="EXCLUSIVE",
+        check_same_thread=False,
+    )
+    return conn
