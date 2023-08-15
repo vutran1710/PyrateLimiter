@@ -50,6 +50,41 @@ class AbstractBucket(ABC):
         we can't really tell how many outdated items are still in the queue
         """
 
+    def waiting(self, item: RateItem) -> Union[int, Awaitable[int]]:
+        """Calculate time until bucket become
+        availabe to consume an item again
+        """
+        assert self.failing_rate is not None, "Wrong use!"
+        assert item.weight > 0
+
+        if item.weight > self.failing_rate.limit:
+            return -1
+
+        bound_item = self.peek(self.failing_rate.limit - item.weight)
+        assert bound_item is not None, "Bound-item not found"
+
+        def _calc_waiting(inner_bound_item: RateItem) -> int:
+            nonlocal item
+            assert self.failing_rate is not None  # NOTE: silence mypy
+            lower_time_bound = item.timestamp - self.failing_rate.interval
+            upper_time_bound = inner_bound_item.timestamp
+            return upper_time_bound - lower_time_bound
+
+        async def _calc_waiting_async() -> int:
+            nonlocal item, bound_item
+
+            while isawaitable(bound_item):
+                bound_item = await bound_item
+            # NOTE: if there is a failing rate, then this can't be None!
+            assert isinstance(bound_item, RateItem), "Bound-item not a valid rate-item"
+            return _calc_waiting(bound_item)
+
+        if isawaitable(bound_item):
+            return _calc_waiting_async()
+
+        assert isinstance(bound_item, RateItem)
+        return _calc_waiting(bound_item)
+
 
 class BucketFactory(ABC):
     """Asbtract BucketFactory class
