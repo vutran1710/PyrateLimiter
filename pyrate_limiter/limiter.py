@@ -53,6 +53,31 @@ class Limiter:
 
         self.allowed_delay = allowed_delay
 
+    def _raise_bucket_full_if_necessary(
+        self,
+        bucket: Union[AbstractBucket],
+        item: RateItem,
+    ):
+        if self.raise_when_fail:
+            assert bucket.failing_rate is not None  # NOTE: silence mypy
+            raise BucketFullException(item.name, bucket.failing_rate)
+
+    def _raise_delay_exception_if_necessary(
+        self,
+        bucket: Union[AbstractBucket],
+        item: RateItem,
+        delay: int,
+    ):
+        if self.raise_when_fail:
+            assert bucket.failing_rate is not None  # NOTE: silence mypy
+            assert isinstance(self.allowed_delay, int)
+            raise LimiterDelayException(
+                item.name,
+                bucket.failing_rate,
+                delay,
+                self.allowed_delay,
+            )
+
     def delay_or_raise(
         self,
         bucket: Union[AbstractBucket],
@@ -62,10 +87,7 @@ class Limiter:
         assert bucket.failing_rate is not None
 
         if self.allowed_delay is None:
-            if self.raise_when_fail:
-                assert bucket.failing_rate is not None  # NOTE: silence mypy
-                raise BucketFullException(item.name, bucket.failing_rate)
-
+            self._raise_bucket_full_if_necessary(bucket, item)
             return False
 
         delay = bucket.waiting(item)
@@ -78,16 +100,14 @@ class Limiter:
                 if it failed then either clock or bucket is probably unstable
                 """
                 )
-                if self.raise_when_fail:
-                    assert bucket.failing_rate is not None  # NOTE: silence mypy
-                    raise BucketFullException(item.name, bucket.failing_rate)
+                self._raise_bucket_full_if_necessary(bucket, item)
 
             return re_acquire
 
         if isawaitable(delay):
 
             async def _handle_async():
-                nonlocal delay, item, bucket
+                nonlocal delay
                 delay = await delay
                 assert isinstance(delay, int), "Delay not integer"
                 delay += 50
@@ -98,14 +118,7 @@ class Limiter:
                         delay,
                         self.allowed_delay,
                     )
-                    if self.raise_when_fail:
-                        assert bucket.failing_rate is not None  # NOTE: silence mypy
-                        raise LimiterDelayException(
-                            item.name,
-                            bucket.failing_rate,
-                            delay,
-                            self.allowed_delay,
-                        )
+                    self._raise_delay_exception_if_necessary(bucket, item, delay)
                     return False
 
                 await asyncio.sleep(delay / 1000)
@@ -128,9 +141,7 @@ class Limiter:
                 bucket.failing_rate,
                 bucket,
             )
-            if self.raise_when_fail:
-                raise BucketFullException(item.name, bucket.failing_rate)
-
+            self._raise_bucket_full_if_necessary(bucket, item)
             return False
 
         delay += 50
@@ -141,14 +152,7 @@ class Limiter:
                 delay,
                 self.allowed_delay,
             )
-            if self.raise_when_fail:
-                assert bucket.failing_rate is not None  # NOTE: silence mypy
-                raise LimiterDelayException(
-                    item.name,
-                    bucket.failing_rate,
-                    delay,
-                    self.allowed_delay,
-                )
+            self._raise_delay_exception_if_necessary(bucket, item, delay)
             return False
 
         sleep(delay / 1000)
