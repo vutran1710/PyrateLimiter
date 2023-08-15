@@ -1,4 +1,5 @@
-from threading import RLock as Lock
+"""Naive bucket implementation using built-in list
+"""
 from typing import List
 from typing import Optional
 
@@ -18,59 +19,54 @@ class InMemoryBucket(AbstractBucket):
     """
 
     items: List[RateItem]
-    lock: Lock
     failing_rate: Optional[Rate]
 
     def __init__(self, rates: List[Rate]):
         self.rates = sorted(rates, key=lambda r: r.interval)
         self.items = []
-        self.lock = Lock()
 
     def put(self, item: RateItem) -> bool:
-        with self.lock:
-            for rate in self.rates:
-                lower_bound_value = item.timestamp - rate.interval
-                lower_bound_idx = binary_search(self.items, lower_bound_value)
+        for rate in self.rates:
+            lower_bound_value = item.timestamp - rate.interval
+            lower_bound_idx = binary_search(self.items, lower_bound_value)
 
-                if lower_bound_idx >= 0:
-                    count_existing_items = len(self.items) - lower_bound_idx
-                    space_available = rate.limit - count_existing_items
-                else:
-                    space_available = rate.limit
+            if lower_bound_idx >= 0:
+                count_existing_items = len(self.items) - lower_bound_idx
+                space_available = rate.limit - count_existing_items
+            else:
+                space_available = rate.limit
 
-                if space_available < item.weight:
-                    self.failing_rate = rate
-                    return False
+            if space_available < item.weight:
+                self.failing_rate = rate
+                return False
 
-            self.failing_rate = None
-            self.items.extend(item.weight * [item])
-            return True
+        self.failing_rate = None
+        self.items.extend(item.weight * [item])
+        return True
 
     def leak(self, current_timestamp: Optional[int] = None) -> int:
         assert current_timestamp is not None
-        with self.lock:
-            if self.items:
-                max_interval = self.rates[-1].interval
-                lower_bound = current_timestamp - max_interval
+        if self.items:
+            max_interval = self.rates[-1].interval
+            lower_bound = current_timestamp - max_interval
 
-                if lower_bound > self.items[-1].timestamp:
-                    remove_count = len(self.items)
-                    self.items = []
-                    return remove_count
+            if lower_bound > self.items[-1].timestamp:
+                remove_count = len(self.items)
+                self.items = []
+                return remove_count
 
-                if lower_bound < self.items[0].timestamp:
-                    return 0
+            if lower_bound < self.items[0].timestamp:
+                return 0
 
-                idx = binary_search(self.items, lower_bound)
-                self.items = self.items[idx:]
-                return idx
+            idx = binary_search(self.items, lower_bound)
+            self.items = self.items[idx:]
+            return idx
 
-            return 0
+        return 0
 
     def flush(self) -> None:
-        with self.lock:
-            self.failing_rate = None
-            self.items = []
+        self.failing_rate = None
+        self.items = []
 
     def count(self) -> int:
         return len(self.items)

@@ -1,7 +1,6 @@
 """Bucket implementation using Redis
 """
 from inspect import isawaitable
-from threading import RLock as Lock
 from typing import Awaitable
 from typing import List
 from typing import Optional
@@ -55,7 +54,6 @@ class RedisBucket(AbstractBucket):
 
     rates: List[Rate]
     failing_rate: Optional[Rate]
-    lock: Lock
     bucket_key: str
     script_hash: str
     redis: Union[Redis, AsyncRedis]
@@ -68,7 +66,6 @@ class RedisBucket(AbstractBucket):
         script_hash: str,
     ):
         self.rates = rates
-        self.lock = Lock()
         self.redis = redis
         self.bucket_key = bucket_key
         self.script_hash = script_hash
@@ -130,34 +127,31 @@ class RedisBucket(AbstractBucket):
 
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Add item to key"""
-        with self.lock:
-            failing_rate = self._check_and_insert(item)
-            if isawaitable(failing_rate):
+        failing_rate = self._check_and_insert(item)
+        if isawaitable(failing_rate):
 
-                async def _handle_async():
-                    nonlocal failing_rate
-                    self.failing_rate = await failing_rate
-                    return not bool(self.failing_rate)
+            async def _handle_async():
+                nonlocal failing_rate
+                self.failing_rate = await failing_rate
+                return not bool(self.failing_rate)
 
-                return _handle_async()
+            return _handle_async()
 
-            assert isinstance(failing_rate, Rate) or failing_rate is None
-            self.failing_rate = failing_rate
-            return not bool(self.failing_rate)
+        assert isinstance(failing_rate, Rate) or failing_rate is None
+        self.failing_rate = failing_rate
+        return not bool(self.failing_rate)
 
     def leak(self, current_timestamp: Optional[int] = None) -> Union[int, Awaitable[int]]:
         assert current_timestamp is not None
-        with self.lock:
-            return self.redis.zremrangebyscore(
-                self.bucket_key,
-                0,
-                current_timestamp - self.rates[-1].interval,
-            )
+        return self.redis.zremrangebyscore(
+            self.bucket_key,
+            0,
+            current_timestamp - self.rates[-1].interval,
+        )
 
     def flush(self):
-        with self.lock:
-            self.failing_rate = None
-            return self.redis.delete(self.bucket_key)
+        self.failing_rate = None
+        return self.redis.delete(self.bucket_key)
 
     def count(self):
         return self.redis.zcard(self.bucket_key)
