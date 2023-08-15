@@ -54,14 +54,19 @@ class AbstractBucket(ABC):
         """Calculate time until bucket become
         availabe to consume an item again
         """
-        assert self.failing_rate is not None, "Wrong use!"
-        assert item.weight > 0
+        if self.failing_rate is None:
+            return 0
+
+        assert item.weight > 0, "Item's weight must > 0"
 
         if item.weight > self.failing_rate.limit:
             return -1
 
         bound_item = self.peek(self.failing_rate.limit - item.weight)
-        assert bound_item is not None, "Bound-item not found"
+
+        if bound_item is None:
+            # NOTE: No waiting, bucket is immediately ready
+            return 0
 
         def _calc_waiting(inner_bound_item: RateItem) -> int:
             nonlocal item
@@ -166,6 +171,15 @@ class BucketAsyncWrapper(AbstractBucket):
 
         assert item is None or isinstance(item, RateItem)
         return item
+
+    async def waiting(self, item: RateItem) -> int:
+        wait = super().waiting(item)
+
+        if isawaitable(wait):
+            wait = await wait
+
+        assert isinstance(wait, int)
+        return wait
 
     @property
     def failing_rate(self):

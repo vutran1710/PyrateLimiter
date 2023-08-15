@@ -148,6 +148,8 @@ async def test_bucket_waiting(clock: ClockSet, create_bucket):
     start = await get_now(clock)
     assert start > 0
 
+    assert await bucket.waiting(await create_item()) == 0
+
     for _ in range(3):
         assert await bucket.put(await create_item()) is True
         # NOTE: sleep 100ms between each item
