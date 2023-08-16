@@ -49,9 +49,6 @@ class DummyBucketFactory(BucketFactory):
     def schedule_leak(self):
         pass
 
-    def schedule_flush(self):
-        pass
-
 
 @pytest.fixture(params=[True, False])
 def limiter_should_raise(request):

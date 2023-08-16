@@ -24,19 +24,21 @@ class AbstractBucket(ABC):
 
     @abstractmethod
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
-        """Put an item (typically the current time) in the bucket"""
+        """Put an item (typically the current time) in the bucket
+        return true if successful, otherwise false
+        """
 
     @abstractmethod
     def leak(
         self,
         current_timestamp: Optional[int] = None,
     ) -> Union[int, Awaitable[int]]:
-        """Schedule a leak and run in a task"""
+        """leaking bucket - removing items that are outdated"""
 
     @abstractmethod
     def flush(self) -> Union[None, Awaitable[None]]:
         """Flush the whole bucket
-        Must remove `failing-rate` after flushing
+        - Must remove `failing-rate` after flushing
         """
 
     @abstractmethod
@@ -51,9 +53,7 @@ class AbstractBucket(ABC):
         """
 
     def waiting(self, item: RateItem) -> Union[int, Awaitable[int]]:
-        """Calculate time until bucket become
-        availabe to consume an item again
-        """
+        """Calculate time until bucket become availabe to consume an item again"""
         if self.failing_rate is None:
             return 0
 
@@ -80,8 +80,12 @@ class AbstractBucket(ABC):
 
             while isawaitable(bound_item):
                 bound_item = await bound_item
-            # NOTE: if there is a failing rate, then this can't be None!
-            assert isinstance(bound_item, RateItem), "Bound-item not a valid rate-item"
+
+            if bound_item is None:
+                # NOTE: No waiting, bucket is immediately ready
+                return 0
+
+            assert isinstance(bound_item, RateItem)
             return _calc_waiting(bound_item)
 
         if isawaitable(bound_item):
@@ -92,9 +96,9 @@ class AbstractBucket(ABC):
 
 
 class BucketFactory(ABC):
-    """Asbtract BucketFactory class
-    User must implement this class should
-    he wants to use a custom bucket backend
+    """Asbtract BucketFactory class.
+    It is reserved for user to implement/override this class with
+    his own bucket-routing/creating logic
     """
 
     @abstractmethod
@@ -103,9 +107,9 @@ class BucketFactory(ABC):
         name: str,
         weight: int = 1,
     ) -> Union[RateItem, Awaitable[RateItem]]:
-        """Mark the current timestamp to the receiving item,
-        Wrap it into a RateItem
-        Can return either a coroutine or a RateItem instance
+        """Add the current timestamp to the receiving item using any clock backend
+        - Turn it into a RateItem
+        - Can return either a coroutine or a RateItem instance
         """
 
     @abstractmethod
@@ -115,10 +119,6 @@ class BucketFactory(ABC):
     @abstractmethod
     def schedule_leak(self) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
-
-    @abstractmethod
-    def schedule_flush(self) -> None:
-        """Schedule all the buckets' flush, reset bucket's failing rate"""
 
 
 class BucketAsyncWrapper(AbstractBucket):
