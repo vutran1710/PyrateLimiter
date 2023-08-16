@@ -1,4 +1,4 @@
-"""Initialize this class to define rates for limiter
+"""Unit classes that deals with rate, item & duration
 """
 from enum import Enum
 from typing import Union
