@@ -56,7 +56,7 @@ class Limiter:
 
     def _raise_bucket_full_if_necessary(
         self,
-        bucket: Union[AbstractBucket],
+        bucket: AbstractBucket,
         item: RateItem,
     ):
         if self.raise_when_fail:
@@ -65,7 +65,7 @@ class Limiter:
 
     def _raise_delay_exception_if_necessary(
         self,
-        bucket: Union[AbstractBucket],
+        bucket: AbstractBucket,
         item: RateItem,
         delay: int,
     ):
@@ -81,7 +81,7 @@ class Limiter:
 
     def delay_or_raise(
         self,
-        bucket: Union[AbstractBucket],
+        bucket: AbstractBucket,
         item: RateItem,
     ) -> Union[bool, Awaitable[bool]]:
         """On `try_acquire` failed, handle delay or raise error immediately"""
@@ -165,7 +165,7 @@ class Limiter:
 
     def handle_bucket_put(
         self,
-        bucket: Union[AbstractBucket],
+        bucket: AbstractBucket,
         item: RateItem,
     ) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""

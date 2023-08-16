@@ -7,7 +7,6 @@ from time import sleep
 from time import time
 from typing import List
 from typing import Tuple
-from typing import Union
 
 import pytest
 
@@ -29,7 +28,7 @@ validate_rate_list(DEFAULT_RATES)
 
 
 class SimpleBucketFactory(BucketFactory):
-    def __init__(self, bucket_clock: Clock, *buckets: List[Union[AbstractBucket]]):
+    def __init__(self, bucket_clock: Clock, *buckets: List[AbstractBucket]):
         self.clock = bucket_clock
         self.buckets = buckets
 
@@ -44,7 +43,7 @@ class SimpleBucketFactory(BucketFactory):
 
         return wrap_async() if isawaitable(now) else wrap_sycn()
 
-    def get(self, item: RateItem) -> Union[AbstractBucket]:
+    def get(self, item: RateItem) -> AbstractBucket:
         bucket = self.buckets[0]
         assert isinstance(bucket, AbstractBucket)
         return bucket
@@ -53,14 +52,14 @@ class SimpleBucketFactory(BucketFactory):
 class MultiBucketFactory(SimpleBucketFactory):
     """Multi-bucket factory used for testing schedule-leaks"""
 
-    def __init__(self, bucket_clock: Clock, *buckets: List[Union[AbstractBucket]]):
+    def __init__(self, bucket_clock: Clock, *buckets: List[AbstractBucket]):
         super().__init__(bucket_clock, *buckets)
 
         for bucket in self.buckets:
             assert isinstance(bucket, AbstractBucket)
             self.schedule_leak(bucket, bucket_clock)
 
-    def get(self, item: RateItem) -> Union[AbstractBucket]:
+    def get(self, item: RateItem) -> AbstractBucket:
         idx = 0 if item.name == "b1" else 1
         bucket = self.buckets[idx]
         assert isinstance(bucket, AbstractBucket)
@@ -77,7 +76,7 @@ def limiter_delay(request):
     return request.param
 
 
-async def inspect_bucket_items(bucket: Union[AbstractBucket], expected_item_count: int):
+async def inspect_bucket_items(bucket: AbstractBucket, expected_item_count: int):
     """Inspect items in the bucket
     - Assert number of item == expected-item-count
     - Assert that items are ordered by timestamps, from latest to earliest
@@ -160,7 +159,7 @@ async def prefilling_bucket(limiter: Limiter, sleep_interval: float, item: str):
     assert acquire_ok
 
 
-async def flushing_bucket(bucket: Union[AbstractBucket]):
+async def flushing_bucket(bucket: AbstractBucket):
     flush = bucket.flush()
 
     if isawaitable(flush):
@@ -210,7 +209,6 @@ async def test_factory_leak(clock, create_bucket):
                 is_async = True
                 put_ok = await put_ok
 
-            logger.info("i=%s, bucket=%s", i, bucket)
             assert put_ok
             sleep(0.2)
 

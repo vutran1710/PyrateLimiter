@@ -121,7 +121,7 @@ class BucketFactory(ABC):
         """
 
     @abstractmethod
-    def get(self, item: RateItem) -> Union[AbstractBucket]:
+    def get(self, item: RateItem) -> AbstractBucket:
         """Get the corresponding bucket to this item"""
 
     def create(
@@ -130,7 +130,7 @@ class BucketFactory(ABC):
         bucket_class: Type[AbstractBucket],
         *args,
         **kwargs,
-    ) -> Union[AbstractBucket]:
+    ) -> AbstractBucket:
         """Creating a bucket dynamically"""
         bucket = bucket_class(*args, **kwargs)
         self.schedule_leak(bucket, clock)
@@ -143,7 +143,7 @@ class BucketFactory(ABC):
         assert isinstance(bucket.rates, list) and len(bucket.rates) > 0
         return bucket.rates[-1].interval * 2
 
-    def schedule_leak(self, bucket: Union[AbstractBucket], clock: Clock) -> None:
+    def schedule_leak(self, bucket: AbstractBucket, clock: Clock) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
         assert bucket.rates
 
@@ -183,7 +183,7 @@ class BucketAsyncWrapper(AbstractBucket):
     that turns a async/synchronous bucket into an async one
     """
 
-    def __init__(self, bucket: Union[AbstractBucket]):
+    def __init__(self, bucket: AbstractBucket):
         assert isinstance(bucket, AbstractBucket)
         self.bucket = bucket
 
