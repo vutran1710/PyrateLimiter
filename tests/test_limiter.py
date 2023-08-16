@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from inspect import isawaitable
 from time import sleep
 from time import time
+from typing import Dict
 from typing import List
 from typing import Tuple
 
@@ -15,6 +16,7 @@ from pyrate_limiter import AbstractBucket
 from pyrate_limiter import BucketAsyncWrapper
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import Clock
+from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
@@ -49,20 +51,39 @@ class SimpleBucketFactory(BucketFactory):
         return bucket
 
 
-class MultiBucketFactory(SimpleBucketFactory):
+class MultiBucketFactory(BucketFactory):
     """Multi-bucket factory used for testing schedule-leaks"""
 
-    def __init__(self, bucket_clock: Clock, *buckets: List[AbstractBucket]):
-        super().__init__(bucket_clock, *buckets)
+    buckets: Dict[str, AbstractBucket]
+    clock: Clock
 
-        for bucket in self.buckets:
+    def __init__(self, bucket_clock: Clock, **buckets: AbstractBucket):
+        self.clock = bucket_clock
+        self.buckets = buckets
+
+        for _name, bucket in self.buckets.items():
             assert isinstance(bucket, AbstractBucket)
             self.schedule_leak(bucket, bucket_clock)
 
+    def wrap_item(self, name: str, weight: int = 1):
+        now = self.clock.now()
+
+        async def wrap_async():
+            return RateItem(name, await now, weight=weight)
+
+        def wrap_sycn():
+            return RateItem(name, now, weight=weight)
+
+        return wrap_async() if isawaitable(now) else wrap_sycn()
+
     def get(self, item: RateItem) -> AbstractBucket:
-        idx = 0 if item.name == "b1" else 1
-        bucket = self.buckets[idx]
-        assert isinstance(bucket, AbstractBucket)
+        if item.name in self.buckets:
+            bucket = self.buckets[item.name]
+            assert isinstance(bucket, AbstractBucket)
+            return bucket
+
+        bucket = self.create(self.clock, InMemoryBucket, DEFAULT_RATES)
+        self.buckets.update({item.name: bucket})
         return bucket
 
 
@@ -191,12 +212,14 @@ async def test_factory_leak(clock, create_bucket):
     bucket1 = await create_bucket(DEFAULT_RATES)
     bucket2 = await create_bucket(DEFAULT_RATES)
     assert id(bucket1) != id(bucket2)
-    factory = MultiBucketFactory(clock, bucket1, bucket2)
 
-    for _ in range(2):
-        for i in range(6):
+    factory = MultiBucketFactory(clock, b1=bucket1, b2=bucket2)
+    logger.info("Factory initiated with %s buckets", len(factory.buckets))
+
+    for item_name in ["b1", "b2", "a1"]:
+        for _ in range(3):
             is_async = False
-            item = factory.wrap_item("b1" if i % 2 == 0 else "b2")
+            item = factory.wrap_item(item_name)
 
             if isawaitable(item):
                 is_async = True
@@ -210,10 +233,16 @@ async def test_factory_leak(clock, create_bucket):
                 put_ok = await put_ok
 
             assert put_ok
-            sleep(0.2)
+            sleep(0.1)
 
-        assert await async_count(bucket1) == 3
-        assert await async_count(bucket2) == 3
+        if item_name == "b1":
+            assert await async_count(bucket1) == 3
+
+        if item_name == "b2":
+            assert await async_count(bucket2) == 3
+
+        if item_name == "a1":
+            assert await async_count(factory.buckets[item_name]) == 3
 
         if is_async:
             await asyncio.sleep(6)
@@ -222,6 +251,9 @@ async def test_factory_leak(clock, create_bucket):
 
         assert await async_count(bucket1) == 0
         assert await async_count(bucket2) == 0
+        assert await async_count(factory.buckets[item_name]) == 0
+
+    assert len(factory.buckets) == 3
 
 
 @pytest.mark.asyncio
