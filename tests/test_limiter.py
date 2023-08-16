@@ -29,37 +29,17 @@ DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
 validate_rate_list(DEFAULT_RATES)
 
 
-class SimpleBucketFactory(BucketFactory):
-    def __init__(self, bucket_clock: Clock, *buckets: List[AbstractBucket]):
-        self.clock = bucket_clock
-        self.buckets = buckets
-
-    def wrap_item(self, name: str, weight: int = 1):
-        now = self.clock.now()
-
-        async def wrap_async():
-            return RateItem(name, await now, weight=weight)
-
-        def wrap_sycn():
-            return RateItem(name, now, weight=weight)
-
-        return wrap_async() if isawaitable(now) else wrap_sycn()
-
-    def get(self, item: RateItem) -> AbstractBucket:
-        bucket = self.buckets[0]
-        assert isinstance(bucket, AbstractBucket)
-        return bucket
-
-
-class MultiBucketFactory(BucketFactory):
+class DemoBucketFactory(BucketFactory):
     """Multi-bucket factory used for testing schedule-leaks"""
 
     buckets: Dict[str, AbstractBucket]
     clock: Clock
+    auto_leak: bool
 
-    def __init__(self, bucket_clock: Clock, **buckets: AbstractBucket):
+    def __init__(self, bucket_clock: Clock, auto_leak=False, **buckets: AbstractBucket):
         self.clock = bucket_clock
         self.buckets = buckets
+        self.auto_leak = auto_leak
 
         for _name, bucket in self.buckets.items():
             assert isinstance(bucket, AbstractBucket)
@@ -85,6 +65,10 @@ class MultiBucketFactory(BucketFactory):
         bucket = self.create(self.clock, InMemoryBucket, DEFAULT_RATES)
         self.buckets.update({item.name: bucket})
         return bucket
+
+    def schedule_leak(self, *args):
+        if self.auto_leak:
+            super().schedule_leak(*args)
 
 
 @pytest.fixture(params=[True, False])
@@ -189,9 +173,9 @@ async def flushing_bucket(bucket: AbstractBucket):
 
 @pytest.mark.asyncio
 async def test_factory_01(clock, create_bucket):
-    factory = SimpleBucketFactory(
+    factory = DemoBucketFactory(
         clock,
-        await create_bucket(DEFAULT_RATES),
+        hello=await create_bucket(DEFAULT_RATES),
     )
 
     item = factory.wrap_item("hello", 1)
@@ -213,7 +197,7 @@ async def test_factory_leak(clock, create_bucket):
     bucket2 = await create_bucket(DEFAULT_RATES)
     assert id(bucket1) != id(bucket2)
 
-    factory = MultiBucketFactory(clock, b1=bucket1, b2=bucket2)
+    factory = DemoBucketFactory(clock, auto_leak=True, b1=bucket1, b2=bucket2)
     logger.info("Factory initiated with %s buckets", len(factory.buckets))
 
     for item_name in ["b1", "b2", "a1"]:
@@ -264,7 +248,7 @@ async def test_limiter_01(
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = SimpleBucketFactory(clock, bucket)
+    factory = DemoBucketFactory(clock, demo=bucket)
     bucket = BucketAsyncWrapper(bucket)
     limiter = Limiter(
         factory,
@@ -272,7 +256,7 @@ async def test_limiter_01(
         allowed_delay=limiter_delay,
     )
 
-    item = "hello"
+    item = "demo"
 
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
@@ -343,7 +327,7 @@ async def test_limiter_concurrency(
     limiter_delay,
 ):
     bucket: AbstractBucket = await create_bucket(DEFAULT_RATES)
-    factory = SimpleBucketFactory(clock, bucket)
+    factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -351,7 +335,7 @@ async def test_limiter_concurrency(
     )
 
     logger.info("Test Limiter Concurrency: inserting 4 items")
-    items = [f"item:{i}" for i in range(4)]
+    items = ["demo" for _ in range(4)]
 
     if not limiter_should_raise:
         if not limiter_delay or limiter_delay == 500:
@@ -391,7 +375,7 @@ async def test_limiter_decorator(
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = SimpleBucketFactory(clock, bucket)
+    factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -400,7 +384,7 @@ async def test_limiter_decorator(
     limiter_wrapper = limiter.as_decorator()
 
     def mapping(_: int):
-        return "hello", 1
+        return "demo", 1
 
     counter = 0
 
