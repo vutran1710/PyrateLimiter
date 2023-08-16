@@ -46,7 +46,7 @@ class DummyBucketFactory(BucketFactory):
     def get(self, item: RateItem) -> Union[AbstractBucket]:
         return self.bucket
 
-    def schedule_leak(self):
+    def schedule_leak(self, _):
         pass
 
 

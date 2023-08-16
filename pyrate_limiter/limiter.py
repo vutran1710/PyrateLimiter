@@ -46,7 +46,6 @@ class Limiter:
         allowed_delay: Optional[int] = None,
     ):
         self.bucket_factory = bucket_factory
-        bucket_factory.schedule_leak()
         self.raise_when_fail = raise_when_fail
 
         if allowed_delay is not None:

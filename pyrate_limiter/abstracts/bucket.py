@@ -7,6 +7,7 @@ from inspect import isawaitable
 from typing import Awaitable
 from typing import List
 from typing import Optional
+from typing import Type
 from typing import Union
 
 from .rate import Rate
@@ -114,10 +115,16 @@ class BucketFactory(ABC):
 
     @abstractmethod
     def get(self, item: RateItem) -> Union[AbstractBucket]:
-        """Create or get the corresponding bucket to this item"""
+        """Get the corresponding bucket to this item"""
+
+    def create(self, bucket_class: Type[AbstractBucket], *args, **kwargs):
+        """Creating a bucket dynamically"""
+        bucket = bucket_class(*args, **kwargs)
+        self.schedule_leak(bucket)
+        return bucket
 
     @abstractmethod
-    def schedule_leak(self) -> None:
+    def schedule_leak(self, bucket) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
 
 
