@@ -13,6 +13,8 @@ def test_duration():
     assert Duration.MINUTE * 60 == Duration.HOUR.value == int(Duration.HOUR)
     assert Duration.HOUR * 24 == Duration.DAY.value == int(Duration.DAY)
     assert Duration.DAY * 7 == Duration.WEEK.value == int(Duration.WEEK)
+    assert Duration.DAY + Duration.DAY == Duration.DAY * 2
+    assert Duration.MINUTE + 30000 == 90000
 
 
 def test_readable_duration():

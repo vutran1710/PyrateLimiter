@@ -16,6 +16,9 @@ class Duration(Enum):
     def __mul__(self, mutiplier: float) -> int:
         return int(self.value * mutiplier)
 
+    def __add__(self, another_duration: Union["Duration", int]) -> int:
+        return self.value + int(another_duration)
+
     def __int__(self) -> int:
         return self.value
 
