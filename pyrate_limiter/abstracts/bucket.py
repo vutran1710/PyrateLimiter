@@ -1,15 +1,19 @@
 """ Implement this class to create
 a workable bucket for Limiter to use
 """
+import asyncio
 from abc import ABC
 from abc import abstractmethod
 from inspect import isawaitable
+from threading import Thread
+from time import sleep
 from typing import Awaitable
 from typing import List
 from typing import Optional
 from typing import Type
 from typing import Union
 
+from .clock import Clock
 from .rate import Rate
 from .rate import RateItem
 
@@ -117,15 +121,54 @@ class BucketFactory(ABC):
     def get(self, item: RateItem) -> Union[AbstractBucket]:
         """Get the corresponding bucket to this item"""
 
-    def create(self, bucket_class: Type[AbstractBucket], *args, **kwargs):
+    def create(
+        self,
+        clock: Clock,
+        bucket_class: Type[AbstractBucket],
+        *args,
+        **kwargs,
+    ) -> Union[AbstractBucket]:
         """Creating a bucket dynamically"""
         bucket = bucket_class(*args, **kwargs)
-        self.schedule_leak(bucket)
+        self.schedule_leak(bucket, clock)
         return bucket
 
-    @abstractmethod
-    def schedule_leak(self, bucket) -> None:
+    def leak_interval(self, bucket: AbstractBucket) -> float:
+        """Interval between each leak-task run
+        default-interval = 2 * largest rate's interval (ms)
+        """
+        assert isinstance(bucket.rates, list) and len(bucket.rates) > 0
+        return bucket.rates[-1].interval * 2
+
+    def schedule_leak(self, bucket: Union[AbstractBucket], clock: Clock) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
+        assert bucket.rates
+
+        def _leak_task_sync():
+            while True:
+                now = clock.now()
+                bucket.leak(now)
+                sleep(self.leak_interval(bucket) / 1000)
+
+        async def _leak_task_async():
+            while True:
+                now = clock.now()
+
+                if isawaitable(now):
+                    now = await now
+
+                leak = bucket.leak(now)
+
+                if isawaitable(leak):
+                    await leak
+
+                asyncio.sleep(self.leak_interval(bucket) / 1000)
+
+        if isawaitable(clock.now()) or isawaitable(bucket.leak()):
+            asyncio.create_task(_leak_task_async())
+        else:
+            thread = Thread(target=_leak_task_sync, daemon=True)
+            thread.start()
 
 
 class BucketAsyncWrapper(AbstractBucket):

@@ -46,9 +46,6 @@ class DummyBucketFactory(BucketFactory):
     def get(self, item: RateItem) -> Union[AbstractBucket]:
         return self.bucket
 
-    def schedule_leak(self, _):
-        pass
-
 
 @pytest.fixture(params=[True, False])
 def limiter_should_raise(request):
