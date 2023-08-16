@@ -2,6 +2,7 @@
 a workable bucket for Limiter to use
 """
 import asyncio
+import logging
 from abc import ABC
 from abc import abstractmethod
 from inspect import isawaitable
@@ -16,6 +17,8 @@ from typing import Union
 from .clock import Clock
 from .rate import Rate
 from .rate import RateItem
+
+logger = logging.getLogger("pyrate_limiter")
 
 
 class AbstractBucket(ABC):
@@ -147,7 +150,9 @@ class BucketFactory(ABC):
         def _leak_task_sync():
             while True:
                 now = clock.now()
-                bucket.leak(now)
+                leak = bucket.leak(now)
+                assert isinstance(leak, int)
+                logger.info("(sync)leaking bucket: %s, %s items", bucket, leak)
                 sleep(self.leak_interval(bucket) / 1000)
 
         async def _leak_task_async():
@@ -160,12 +165,14 @@ class BucketFactory(ABC):
                 leak = bucket.leak(now)
 
                 if isawaitable(leak):
-                    await leak
+                    leak = await leak
 
-                asyncio.sleep(self.leak_interval(bucket) / 1000)
+                assert isinstance(leak, int)
+                logger.info("(async)leaking bucket: %s, %s items", bucket, leak)
+                await asyncio.sleep(self.leak_interval(bucket) / 1000)
 
-        if isawaitable(clock.now()) or isawaitable(bucket.leak()):
-            asyncio.create_task(_leak_task_async())
+        if isawaitable(clock.now()) or isawaitable(bucket.leak(0)):
+            asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
         else:
             thread = Thread(target=_leak_task_sync, daemon=True)
             thread.start()

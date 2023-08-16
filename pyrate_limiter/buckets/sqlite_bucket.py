@@ -1,6 +1,7 @@
 """Bucket implementation using SQLite
 """
 import sqlite3
+from threading import RLock
 from typing import List
 from typing import Optional
 
@@ -63,11 +64,13 @@ class SQLiteBucket(AbstractBucket):
     conn: sqlite3.Connection
     table: str
     full_count_query: str
+    lock: RLock
 
     def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str):
         self.conn = conn
         self.table = table
         self.rates = rates
+        self.lock = RLock()
 
     def _build_full_count_query(self, current_timestamp: int) -> str:
         full_query: List[str] = []
@@ -85,52 +88,57 @@ class SQLiteBucket(AbstractBucket):
         return join_full_query
 
     def put(self, item: RateItem) -> bool:
-        query = self._build_full_count_query(item.timestamp)
-        rate_limit_counts = self.conn.execute(query).fetchall()
+        with self.lock:
+            query = self._build_full_count_query(item.timestamp)
+            rate_limit_counts = self.conn.execute(query).fetchall()
 
-        for idx, result in enumerate(rate_limit_counts):
-            interval, count = result
-            rate = self.rates[idx]
-            assert interval == rate.interval
-            space_available = rate.limit - count
+            for idx, result in enumerate(rate_limit_counts):
+                interval, count = result
+                rate = self.rates[idx]
+                assert interval == rate.interval
+                space_available = rate.limit - count
 
-            if space_available < item.weight:
-                self.failing_rate = rate
-                return False
+                if space_available < item.weight:
+                    self.failing_rate = rate
+                    return False
 
-        items = ", ".join([f"('{name}', {item.timestamp})" for name in [item.name] * item.weight])
-        query = Queries.PUT_ITEM.format(table=self.table) % items
-        self.conn.execute(query)
-        self.conn.commit()
-        return True
+            items = ", ".join([f"('{name}', {item.timestamp})" for name in [item.name] * item.weight])
+            query = Queries.PUT_ITEM.format(table=self.table) % items
+            self.conn.execute(query)
+            self.conn.commit()
+            return True
 
     def leak(self, current_timestamp: Optional[int] = None) -> int:
         """Leaking/clean up bucket"""
-        assert current_timestamp is not None
-        query = Queries.COUNT_BEFORE_LEAK.format(
-            table=self.table,
-            interval=self.rates[-1].interval,
-            current_timestamp=current_timestamp,
-        )
-        count = self.conn.execute(query).fetchone()[0]
-        query = Queries.LEAK.format(table=self.table, count=count)
-        self.conn.execute(query)
-        self.conn.commit()
-        return count
+        with self.lock:
+            assert current_timestamp is not None
+            query = Queries.COUNT_BEFORE_LEAK.format(
+                table=self.table,
+                interval=self.rates[-1].interval,
+                current_timestamp=current_timestamp,
+            )
+            count = self.conn.execute(query).fetchone()[0]
+            query = Queries.LEAK.format(table=self.table, count=count)
+            self.conn.execute(query)
+            self.conn.commit()
+            return count
 
     def flush(self) -> None:
-        self.conn.execute(Queries.FLUSH.format(table=self.table))
-        self.conn.commit()
-        self.failing_rate = None
+        with self.lock:
+            self.conn.execute(Queries.FLUSH.format(table=self.table))
+            self.conn.commit()
+            self.failing_rate = None
 
     def count(self) -> int:
-        return self.conn.execute(Queries.COUNT_ALL.format(table=self.table)).fetchone()[0]
+        with self.lock:
+            return self.conn.execute(Queries.COUNT_ALL.format(table=self.table)).fetchone()[0]
 
     def peek(self, index: int) -> Optional[RateItem]:
-        query = Queries.PEEK.format(table=self.table, offset=index)
-        item = self.conn.execute(query).fetchone()
+        with self.lock:
+            query = Queries.PEEK.format(table=self.table, offset=index)
+            item = self.conn.execute(query).fetchone()
 
-        if not item:
-            return None
+            if not item:
+                return None
 
-        return RateItem(item[0], item[1])
+            return RateItem(item[0], item[1])

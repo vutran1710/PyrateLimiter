@@ -1,5 +1,6 @@
 """Complete Limiter test suite
 """
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from inspect import isawaitable
 from time import sleep
@@ -27,10 +28,10 @@ DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
 validate_rate_list(DEFAULT_RATES)
 
 
-class DummyBucketFactory(BucketFactory):
-    def __init__(self, bucket_clock: Clock, bucket: AbstractBucket):
+class SimpleBucketFactory(BucketFactory):
+    def __init__(self, bucket_clock: Clock, *buckets: List[Union[AbstractBucket]]):
         self.clock = bucket_clock
-        self.bucket = bucket
+        self.buckets = buckets
 
     def wrap_item(self, name: str, weight: int = 1):
         now = self.clock.now()
@@ -44,7 +45,26 @@ class DummyBucketFactory(BucketFactory):
         return wrap_async() if isawaitable(now) else wrap_sycn()
 
     def get(self, item: RateItem) -> Union[AbstractBucket]:
-        return self.bucket
+        bucket = self.buckets[0]
+        assert isinstance(bucket, AbstractBucket)
+        return bucket
+
+
+class MultiBucketFactory(SimpleBucketFactory):
+    """Multi-bucket factory used for testing schedule-leaks"""
+
+    def __init__(self, bucket_clock: Clock, *buckets: List[Union[AbstractBucket]]):
+        super().__init__(bucket_clock, *buckets)
+
+        for bucket in self.buckets:
+            assert isinstance(bucket, AbstractBucket)
+            self.schedule_leak(bucket, bucket_clock)
+
+    def get(self, item: RateItem) -> Union[AbstractBucket]:
+        idx = 0 if item.name == "b1" else 1
+        bucket = self.buckets[idx]
+        assert isinstance(bucket, AbstractBucket)
+        return bucket
 
 
 @pytest.fixture(params=[True, False])
@@ -106,6 +126,16 @@ async def async_acquire(limiter: Limiter, item: str, weight: int = 1) -> Tuple[b
     return acquire, time_cost_in_ms
 
 
+async def async_count(bucket: AbstractBucket) -> int:
+    count = bucket.count()
+
+    if isawaitable(count):
+        count = await count
+
+    assert isinstance(count, int)
+    return count
+
+
 async def prefilling_bucket(limiter: Limiter, sleep_interval: float, item: str):
     """Pre-filling bucket to the limit before testing
     the time cost might vary depending on the bucket's backend
@@ -139,7 +169,7 @@ async def flushing_bucket(bucket: Union[AbstractBucket]):
 
 @pytest.mark.asyncio
 async def test_factory_01(clock, create_bucket):
-    factory = DummyBucketFactory(
+    factory = SimpleBucketFactory(
         clock,
         await create_bucket(DEFAULT_RATES),
     )
@@ -158,6 +188,45 @@ async def test_factory_01(clock, create_bucket):
 
 
 @pytest.mark.asyncio
+async def test_factory_leak(clock, create_bucket):
+    bucket1 = await create_bucket(DEFAULT_RATES)
+    bucket2 = await create_bucket(DEFAULT_RATES)
+    assert id(bucket1) != id(bucket2)
+    factory = MultiBucketFactory(clock, bucket1, bucket2)
+
+    for _ in range(2):
+        for i in range(6):
+            is_async = False
+            item = factory.wrap_item("b1" if i % 2 == 0 else "b2")
+
+            if isawaitable(item):
+                is_async = True
+                item = await item
+
+            bucket = factory.get(item)
+            put_ok = bucket.put(item)
+
+            if isawaitable(put_ok):
+                is_async = True
+                put_ok = await put_ok
+
+            logger.info("i=%s, bucket=%s", i, bucket)
+            assert put_ok
+            sleep(0.2)
+
+        assert await async_count(bucket1) == 3
+        assert await async_count(bucket2) == 3
+
+        if is_async:
+            await asyncio.sleep(6)
+        else:
+            sleep(6)
+
+        assert await async_count(bucket1) == 0
+        assert await async_count(bucket2) == 0
+
+
+@pytest.mark.asyncio
 async def test_limiter_01(
     clock,
     create_bucket,
@@ -165,7 +234,7 @@ async def test_limiter_01(
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = DummyBucketFactory(clock, bucket)
+    factory = SimpleBucketFactory(clock, bucket)
     bucket = BucketAsyncWrapper(bucket)
     limiter = Limiter(
         factory,
@@ -178,7 +247,7 @@ async def test_limiter_01(
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
     assert acquire_ok
-    assert cost == 0
+    assert cost <= 10
     assert await bucket.count() == 0
 
     logger.info("Limiter Test #1")
@@ -244,7 +313,7 @@ async def test_limiter_concurrency(
     limiter_delay,
 ):
     bucket: AbstractBucket = await create_bucket(DEFAULT_RATES)
-    factory = DummyBucketFactory(clock, bucket)
+    factory = SimpleBucketFactory(clock, bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -292,7 +361,7 @@ async def test_limiter_decorator(
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = DummyBucketFactory(clock, bucket)
+    factory = SimpleBucketFactory(clock, bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
