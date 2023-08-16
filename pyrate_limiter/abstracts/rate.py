@@ -41,6 +41,8 @@ class Duration(Enum):
 
 
 class RateItem:
+    """RateItem is a wrapper for bucket to work with"""
+
     name: str
     weight: int
     timestamp: int
@@ -71,14 +73,9 @@ class Rate:
         interval: Union[int, Duration],
     ):
         self.limit = limit
-
-        if isinstance(interval, int):
-            self.interval = interval
-
-        if isinstance(interval, Duration):
-            self.interval = interval.value
-
+        self.interval = int(interval)
         assert self.interval
+        assert self.limit
 
     def __str__(self) -> str:
         return f"limit={self.limit}/{Duration.readable(self.interval)}"
