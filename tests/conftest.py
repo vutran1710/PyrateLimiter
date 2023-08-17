@@ -49,7 +49,7 @@ ClockSet = Union[
 
 @pytest.fixture(params=clocks)
 def clock(request):
-    """Parametrization for different time functions."""
+    """Parametrization for different clock."""
     return request.param
 
 
@@ -117,5 +117,5 @@ async def create_sqlite_bucket(rates: List[Rate]):
     ]
 )
 def create_bucket(request):
-    """Parametrization for different time functions."""
+    """Parametrization for different bucket."""
     return request.param
