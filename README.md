@@ -66,6 +66,7 @@ conda install --channel conda-forge pyrate-limiter
 ### Key Components
 
 ![](https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/docs/_static/components.jpg)
+![](./docs/_static/components.jpg)
 
 
 #### Clock
