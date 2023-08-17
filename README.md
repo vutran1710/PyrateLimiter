@@ -146,7 +146,7 @@ redis_connection = Redis(host='localhost')
 redis_bucket = await RedisBucket.init(rates, redis_connection, "my-bucket-name")
 ```
 
-If you only need only single Bucket for everything, and python's built-in `time()` is enough for you, then pass the bucket to Limiter then ready to roll!
+If you only need a single Bucket for everything, and python's built-in `time()` is enough for you, then pass the bucket to Limiter then ready to roll!
 
 ```python
 from pyrate_limiter import Limiter
@@ -164,14 +164,15 @@ If you want to have finer grain control with routing & clocks etc, then you shou
 
 ### Defining Clock & routing logic with BucketFactory
 
-Now as you already have your buckets, it's time to define what `Time` is (funny?!). Most of the time, you can use the existing Clock backend provided by **pyrate_limiter**.
+If you need more than one type of Bucket, and be able to route items to different buckets based on some condition, you can use BucketFactory to do that.
+
+From the above steps, you already have your buckets. Now it's time to define what `Time` is (funny?!). Most of the time (again!?), you can use the existing Clock backend provided by **pyrate_limiter**.
 
 ```python
 from pyrate_limiter.clock import TimeClock, MonotonicClock, SQLiteClock
 
 base_clock = TimeClock()
 ```
-
 
 
 **PyrateLimiter** makes no assumption about users logic, so to map coming items to their correct buckets, implement your own **BucketFactory** class! At minimum, there are only 2 methods require implementing
