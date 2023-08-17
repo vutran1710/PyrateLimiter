@@ -12,14 +12,14 @@ from typing import Tuple
 import pytest
 
 from .conftest import logger
-from pyrate_limiter import AbstractBucket
-from pyrate_limiter import BucketAsyncWrapper
-from pyrate_limiter import BucketFactory
-from pyrate_limiter import Clock
-from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
-from pyrate_limiter import Rate
-from pyrate_limiter import RateItem
+from pyrate_limiter.abstracts import AbstractBucket
+from pyrate_limiter.abstracts import BucketAsyncWrapper
+from pyrate_limiter.abstracts import BucketFactory
+from pyrate_limiter.abstracts import Clock
+from pyrate_limiter.abstracts.rate import Rate
+from pyrate_limiter.abstracts.rate import RateItem
+from pyrate_limiter.buckets import InMemoryBucket
 from pyrate_limiter.exceptions import BucketFullException
 from pyrate_limiter.exceptions import LimiterDelayException
 from pyrate_limiter.utils import validate_rate_list

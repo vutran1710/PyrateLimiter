@@ -15,7 +15,7 @@ from redis import Redis
 from redis.asyncio import ConnectionPool as AsyncConnectionPool
 from redis.asyncio import Redis as AsyncRedis
 
-from pyrate_limiter import Rate
+from pyrate_limiter.abstracts.rate import Rate
 from pyrate_limiter.buckets import InMemoryBucket
 from pyrate_limiter.buckets import RedisBucket
 from pyrate_limiter.buckets import SQLiteBucket

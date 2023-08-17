@@ -9,11 +9,11 @@ import pytest
 
 from .conftest import ClockSet
 from .conftest import logger
-from pyrate_limiter import TimeClock
 from pyrate_limiter.abstracts import BucketAsyncWrapper
 from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.abstracts import Rate
 from pyrate_limiter.abstracts import RateItem
+from pyrate_limiter.clocks import TimeClock
 
 
 async def get_now(clock: Clock) -> int:
