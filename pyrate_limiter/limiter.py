@@ -61,7 +61,7 @@ class Limiter:
     ):
         if self.raise_when_fail:
             assert bucket.failing_rate is not None  # NOTE: silence mypy
-            raise BucketFullException(item.name, bucket.failing_rate)
+            raise BucketFullException(item, bucket.failing_rate)
 
     def _raise_delay_exception_if_necessary(
         self,
@@ -73,7 +73,7 @@ class Limiter:
             assert bucket.failing_rate is not None  # NOTE: silence mypy
             assert isinstance(self.allowed_delay, int)
             raise LimiterDelayException(
-                item.name,
+                item,
                 bucket.failing_rate,
                 delay,
                 self.allowed_delay,

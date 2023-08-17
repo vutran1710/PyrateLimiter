@@ -3,28 +3,31 @@ from typing import Dict
 from typing import Union
 
 from .abstracts.rate import Rate
+from .abstracts.rate import RateItem
 
 
 class BucketFullException(Exception):
-    def __init__(self, name: str, rate: Rate):
-        error = f"Bucket for {name} with Rate {rate} is already full"
+    def __init__(self, item: RateItem, rate: Rate):
+        error = f"Bucket for {item.name} with Rate {rate} is already full"
         self.meta_info: Dict[str, Union[str, float]] = {
             "error": error,
-            "name": name,
+            "name": item.name,
+            "weight": item.weight,
             "rate": str(rate),
         }
         super().__init__(error)
 
 
 class LimiterDelayException(Exception):
-    def __init__(self, name: str, rate: Rate, actual_delay: int, allowed_delay: int):
+    def __init__(self, item: RateItem, rate: Rate, actual_delay: int, allowed_delay: int):
         error = f"""
         Actual delay exceeded allowance: actual={actual_delay}, allowed={allowed_delay}
-        Bucket for {name} with Rate {rate} is already full
+        Bucket for {item.name} with Rate {rate} is already full
         """
         self.meta_info: Dict[str, Union[str, float]] = {
             "error": error,
-            "name": name,
+            "name": item.name,
+            "weight": item.weight,
             "rate": str(rate),
             "allowed_delay": allowed_delay,
             "actual_delay": actual_delay,

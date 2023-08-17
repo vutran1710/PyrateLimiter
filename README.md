@@ -256,6 +256,7 @@ quick summary:
 By default, a `BucketFullException` will be raised when a rate limit is exceeded.
 The error contains a `meta_info` attribute with the following information:
 * `name`: The name of item it received
+* `weight`: The weight of item it received
 * `rate`: The specific rate that has been exceeded
 
 Here's an example that will raise an exception on the 4th request:
@@ -281,12 +282,12 @@ limiter = Limiter(MyBucketFactory())
 
 for _ in range(4):
     try:
-        limiter.try_acquire('item')
+        limiter.try_acquire('item', weight=2)
     except BucketFullException as err:
         print(err)
         # Output: Bucket with Rate 3/1.0s is already full
         print(err.meta_info)
-        # Output: {'name': 'item', 'rate': '3/1.0s', 'error': 'Bucket with Rate 3/1.0s is already full'}
+        # Output: {'name': 'item', 'weight': 2, 'rate': '3/1.0s', 'error': 'Bucket with Rate 3/1.0s is already full'}
 ```
 
 The rate part of the output is constructed as: `limit / interval`. On the above example, the limit
@@ -300,12 +301,28 @@ them. In that case you pass the `allowed_delay` argument the maximum value of de
 limiter = Limiter(factory, allowed_delay=500) # Allow to delay up to 500ms
 ```
 
-When `allowed_delay` is passed as a numeric value, when ingesting item, limiter will:
+As `allowed_delay` has been passed as a numeric value, when ingesting item, limiter will:
 - First, try to ingest such item using the routed bucket
-- If it fails to put item into the bucket, it will call `wait(item)` on the bucket to see how much time will be until the bucket can consume the item again?
+- If it fails to put item into the bucket, it will call `wait(item)` on the bucket to see how much time remains until the bucket can consume the item again?
 - Comparing the `wait` value to the `allowed_delay`.
-- if `allowed_delay` >= `wait`: delay (wait + 50ms as latency-tolerance) until the bucket can consume again
+- if `allowed_delay` >= `wait`: delay (wait + 50ms as latency-tolerance) using either `asyncio.sleep` or `time.sleep` until the bucket can consume again
 - if `allowed_delay` < `wait`: it raises `LimiterDelayException` if Limiter's `raise_when_fail=True`, otherwise silently fail and return False
+
+Example:
+```python
+from pyrate_limiter.exceptions import LimiterDelayException
+
+for _ in range(4):
+    try:
+        limiter.try_acquire('item', weight=2, allowed_delay=200)
+    except LimiterDelayException as err:
+        print(err)
+        # Output:
+        # Actual delay exceeded allowance: actual=500, allowed=200
+        # Bucket for 'item' with Rate 3/1.0s is already full
+        print(err.meta_info)
+        # Output: {'name': 'item', 'weight': 2, 'rate': '3/1.0s', 'allowed_delay': 200, 'actual_delay': 500}
+```
 
 ## Additional knowledge
 
