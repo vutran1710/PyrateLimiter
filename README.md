@@ -65,7 +65,8 @@ conda install --channel conda-forge pyrate-limiter
 ## Understanding design
 ### Key Components
 
-![Components](./docs/_static/components.jpg)
+![](https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/docs/_static/components.jpg)
+
 
 #### Clock
 - Timestamp-ing items
