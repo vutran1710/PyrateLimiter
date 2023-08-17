@@ -50,6 +50,8 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
   multiple threads, or application restarts
 
 ## Installation
+**PyrateLimiter** supports **python ^3.8**
+
 Install using pip:
 ```
 pip install pyrate-limiter
