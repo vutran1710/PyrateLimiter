@@ -234,6 +234,10 @@ BigItem(weight=5, name="item", timestamp=100) => [
 ]
 ```
 
+Yet, putting this big, heavy item into bucket is expected to be transactional & atomic - meaning either all 5 items will be consumed or none of them will. This is made possible as bucket `put(item)` always check for available space before ingesting. All of the Bucket's implementations provided by **PyrateLimiter** follows this rule.
+
+Any additional, custom implementation of Bucket are expected to behave alike - as we have unit tests to cover the case.
+
 See [Additional usage options](#additional-usage-options) below for more details.
 
 ## Handling exceeded limits
