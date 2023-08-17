@@ -23,6 +23,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
     - [Defining rate limits](#defining-rate-limits)
     - [Defining clock & routing logic](#defining-clock--routing-logic-with-bucketfactory)
     - [Wrapping all up with Limiter](#wrapping-all-up-with-limiter)
+    - [Weight](#weight)
   - [Handling exceeded limits](#handling-exceeded-limits)
     - [Bucket analogy](#bucket-analogy)
     - [Rate limit exceptions](#rate-limit-exceptions)
@@ -217,6 +218,22 @@ async def async_request_function(some_number: int):
     requests.get('https://example.com')
 ```
 
+### Weight
+
+Item can have weight. By default item's weight = 1, but you can modify the weight before passing to `limiter.try_acquire`.
+
+Item with weight W > 1 when consumed will be multiplied to (W) items with the same timestamp and weight = 1. Example with a big item with weight W=5, when put to bucket, it will be divided to 5 items with weight=1 + following names
+
+```
+BigItem(weight=5, name="item", timestamp=100) => [
+    item(weight=1, name="item", timestamp=100),
+    item(weight=1, name="item", timestamp=100),
+    item(weight=1, name="item", timestamp=100),
+    item(weight=1, name="item", timestamp=100),
+    item(weight=1, name="item", timestamp=100),
+]
+```
+
 See [Additional usage options](#additional-usage-options) below for more details.
 
 ## Handling exceeded limits
@@ -233,6 +250,7 @@ quick summary:
 * The bucket "leaks" at a constant rate. For web services, this represents the **ideal or permitted request rate**.
 * The bucket is "filled" at an intermittent, unpredicatble rate, representing the **actual rate of requests**.
 * When the bucket is "full", it will overflow, representing **canceled or delayed requests**.
+* Item can have weight. Consuming a single item with weight W > 1 is the same as consuming W smaller, unit items - each with weight=1, with the same timestamp and maybe same name (depending on however user choose to implement it)
 
 ### Rate limit exceptions
 By default, a `BucketFullException` will be raised when a rate limit is exceeded.
