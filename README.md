@@ -75,13 +75,13 @@ conda install --channel conda-forge pyrate-limiter
 #### Bucket
 - Hold timestamped items.
 - Behave like a FIFO queue
-- It can `leak` - popping items that are no longer relevant to the rate-limit business out of the queue
+- It can `leak` - popping items that are no longer relevant out of the queue
 
 #### BucketFactory
 - An application may use more than just one type of Bucket
 - An application may use more than just one type of Clock
 - BucketFactory keeps refererences to buckets & clocks: it timestamps received items, and routes them to their corresponding buckets
-- Create background tasks to run buckets' `leak` intervally to make sure buckets wont be overflown
+- Help create background tasks to run buckets' `leak` intervally to make sure buckets wont explode
 - Most of the time, it is the only place where users go to to implement their own logic
 
 #### Limiter
@@ -89,7 +89,7 @@ conda install --channel conda-forge pyrate-limiter
 - It sums up all the underlying logic to a simple, intuitive API to work with
 - It helps dealing with async/sync context (everything just `works` by adding/removing `async/await` keyword to the user's code)
 - It provides different ways of interacting with the underlying BucketFactory *(plain method call, decorator, context-manager (TBA))*
-- It provides thread-safe use by using RLock
+- It provides thread-safety using RLock
 
 
 ## Basic usage
