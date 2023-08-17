@@ -20,6 +20,7 @@ from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.abstracts.rate import Rate
 from pyrate_limiter.abstracts.rate import RateItem
 from pyrate_limiter.buckets import InMemoryBucket
+from pyrate_limiter.clocks import TimeClock
 from pyrate_limiter.exceptions import BucketFullException
 from pyrate_limiter.exceptions import LimiterDelayException
 from pyrate_limiter.utils import validate_rate_list
@@ -240,9 +241,50 @@ async def test_factory_leak(clock, create_bucket):
     assert len(factory.buckets) == 3
 
 
-@pytest.fixture(params=[True, False])
-def limiter_single_bucket(request):
-    return request.param
+@pytest.mark.asyncio
+async def test_limiter_constructor(
+    clock,
+    create_bucket,
+    limiter_should_raise,
+    limiter_delay,
+):
+    bucket = await create_bucket(DEFAULT_RATES)
+
+    limiter = Limiter(bucket)
+    assert isinstance(limiter.bucket_factory, BucketFactory)
+    assert isinstance(limiter.bucket_factory.clock, TimeClock)
+    assert limiter.allowed_delay is None
+    assert limiter.raise_when_fail is True
+
+    limiter = Limiter(
+        bucket,
+        clock=clock,
+        raise_when_fail=limiter_should_raise,
+        allowed_delay=limiter_delay,
+    )
+
+    assert isinstance(limiter.bucket_factory, BucketFactory)
+    assert limiter.bucket_factory.clock is clock
+    assert limiter.raise_when_fail == limiter_should_raise
+    assert limiter.allowed_delay == limiter_delay
+
+    acquire_ok = limiter.try_acquire("example")
+
+    if isawaitable(acquire_ok):
+        acquire_ok = await acquire_ok
+
+    assert acquire_ok
+
+    factory = DemoBucketFactory(clock, demo=bucket)
+    limiter = Limiter(
+        factory,
+        raise_when_fail=limiter_should_raise,
+        allowed_delay=limiter_delay,
+    )
+    assert limiter.bucket_factory is factory
+    assert limiter.bucket_factory.clock is clock
+    assert limiter.raise_when_fail == limiter_should_raise
+    assert limiter.allowed_delay == limiter_delay
 
 
 @pytest.mark.asyncio
@@ -251,25 +293,14 @@ async def test_limiter_01(
     create_bucket,
     limiter_should_raise,
     limiter_delay,
-    limiter_single_bucket,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-
-    if limiter_single_bucket:
-        limiter = Limiter(
-            bucket,
-            clock=clock,
-            raise_when_fail=limiter_should_raise,
-            allowed_delay=limiter_delay,
-        )
-    else:
-        factory = DemoBucketFactory(clock, demo=bucket)
-        limiter = Limiter(
-            factory,
-            raise_when_fail=limiter_should_raise,
-            allowed_delay=limiter_delay,
-        )
-
+    factory = DemoBucketFactory(clock, demo=bucket)
+    limiter = Limiter(
+        factory,
+        raise_when_fail=limiter_should_raise,
+        allowed_delay=limiter_delay,
+    )
     bucket = BucketAsyncWrapper(bucket)
     item = "demo"
 
