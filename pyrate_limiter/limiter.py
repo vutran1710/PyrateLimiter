@@ -19,7 +19,9 @@ from typing import Union
 
 from .abstracts import AbstractBucket
 from .abstracts import BucketFactory
+from .abstracts import Clock
 from .abstracts import RateItem
+from .clocks import TimeClock
 from .exceptions import BucketFullException
 from .exceptions import LimiterDelayException
 
@@ -27,6 +29,32 @@ logger = logging.getLogger("pyrate_limiter")
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
 DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
+
+
+class SingleBucketFactory(BucketFactory):
+    """Single-bucket factory for quick use with Limiter"""
+
+    bucket: AbstractBucket
+    clock: Clock
+
+    def __init__(self, bucket: AbstractBucket, clock: Clock):
+        self.clock = clock
+        self.bucket = bucket
+        self.schedule_leak(bucket, clock)
+
+    def wrap_item(self, name: str, weight: int = 1):
+        now = self.clock.now()
+
+        async def wrap_async():
+            return RateItem(name, await now, weight=weight)
+
+        def wrap_sycn():
+            return RateItem(name, now, weight=weight)
+
+        return wrap_async() if isawaitable(now) else wrap_sycn()
+
+    def get(self, _: RateItem) -> AbstractBucket:
+        return self.bucket
 
 
 class Limiter:
@@ -41,10 +69,16 @@ class Limiter:
 
     def __init__(
         self,
-        bucket_factory: BucketFactory,
+        bucket_factory: Union[BucketFactory, AbstractBucket],
+        clock: Clock = TimeClock(),
         raise_when_fail: bool = True,
         allowed_delay: Optional[int] = None,
     ):
+        """Init Limiter using a single bucket of multiple-bucket factory"""
+        if isinstance(bucket_factory, AbstractBucket):
+            bucket_factory = SingleBucketFactory(bucket_factory, clock)
+
+        assert isinstance(bucket_factory, BucketFactory), "Not a valid bucket-factory"
         self.bucket_factory = bucket_factory
         self.raise_when_fail = raise_when_fail
 

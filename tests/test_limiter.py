@@ -240,22 +240,37 @@ async def test_factory_leak(clock, create_bucket):
     assert len(factory.buckets) == 3
 
 
+@pytest.fixture(params=[True, False])
+def limiter_single_bucket(request):
+    return request.param
+
+
 @pytest.mark.asyncio
 async def test_limiter_01(
     clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
+    limiter_single_bucket,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(clock, demo=bucket)
-    bucket = BucketAsyncWrapper(bucket)
-    limiter = Limiter(
-        factory,
-        raise_when_fail=limiter_should_raise,
-        allowed_delay=limiter_delay,
-    )
 
+    if limiter_single_bucket:
+        limiter = Limiter(
+            bucket,
+            clock=clock,
+            raise_when_fail=limiter_should_raise,
+            allowed_delay=limiter_delay,
+        )
+    else:
+        factory = DemoBucketFactory(clock, demo=bucket)
+        limiter = Limiter(
+            factory,
+            raise_when_fail=limiter_should_raise,
+            allowed_delay=limiter_delay,
+        )
+
+    bucket = BucketAsyncWrapper(bucket)
     item = "demo"
 
     logger.info("If weight = 0, it just passes thru")

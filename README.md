@@ -118,7 +118,16 @@ Rates must be properly ordered:
 - Rates' intervals & limits must be ordered from least to greatest
 - Rates' ratio of **limit/interval** must be ordered from greatest to least
 
+Existing implementations of Bucket come with rate-validation when init. If you are to use your own implementation, use the validator provided by the lib
+
+```python
+from pyrate_limiter.utils import validate_rate_list
+
+assert validate_rate_list(my_rates)
+```
+
 Then, add the rates to the bucket of your choices
+
 ```python
 from pyrate_limiter.buckets import InMemoryBucket, RedisBucket
 
@@ -137,13 +146,21 @@ redis_connection = Redis(host='localhost')
 redis_bucket = await RedisBucket.init(rates, redis_connection, "my-bucket-name")
 ```
 
-Existing implementations of Bucket come with rate-validation when init. If you are to use your own implementation, use the validator provided by the lib
+If you only need only single Bucket for everything, and python's built-in `time()` is enough for you, then pass the bucket to Limiter then ready to roll!
 
 ```python
-from pyrate_limiter.utils import validate_rate_list
+from pyrate_limiter import Limiter
 
-assert validate_rate_list(my_rates)
+# Limiter constructor accepts single bucket as the only parameter,
+# the rest are 3 optional parameters with default values as following
+# Limiter(bucket, clock=TimeClock(), raise_when_fail=True, allowed_delay=None)
+limiter = Limiter(bucket)
+
+# Limiter is now ready to work!
+limiter.try_acquire("hello world")
 ```
+
+If you want to have finer grain control with routing & clocks etc, then you should use `BucketFactory`.
 
 ### Defining Clock & routing logic with BucketFactory
 
@@ -155,7 +172,9 @@ from pyrate_limiter.clock import TimeClock, MonotonicClock, SQLiteClock
 base_clock = TimeClock()
 ```
 
-**PyrateLimiter** makes no assumption about users logic, so to map coming items to their correct buckets, implement your own **BucketFactory** class. Don't worry, it's very easy! At minimum, there are only 2 methods require implementing
+
+
+**PyrateLimiter** makes no assumption about users logic, so to map coming items to their correct buckets, implement your own **BucketFactory** class! At minimum, there are only 2 methods require implementing
 
 ```python
 from pyrate_limiter.abstracts import BucketFactory
