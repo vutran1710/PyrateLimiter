@@ -18,8 +18,8 @@ from typing import Tuple
 from typing import Union
 
 from .abstracts import AbstractBucket
+from .abstracts import AbstractClock
 from .abstracts import BucketFactory
-from .abstracts import Clock
 from .abstracts import RateItem
 from .clocks import TimeClock
 from .exceptions import BucketFullException
@@ -35,9 +35,9 @@ class SingleBucketFactory(BucketFactory):
     """Single-bucket factory for quick use with Limiter"""
 
     bucket: AbstractBucket
-    clock: Clock
+    clock: AbstractClock
 
-    def __init__(self, bucket: AbstractBucket, clock: Clock):
+    def __init__(self, bucket: AbstractBucket, clock: AbstractClock):
         self.clock = clock
         self.bucket = bucket
         self.schedule_leak(bucket, clock)
@@ -70,7 +70,7 @@ class Limiter:
     def __init__(
         self,
         bucket_factory: Union[BucketFactory, AbstractBucket],
-        clock: Clock = TimeClock(),
+        clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
         allowed_delay: Optional[int] = None,
     ):

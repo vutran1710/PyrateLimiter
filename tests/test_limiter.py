@@ -14,9 +14,9 @@ import pytest
 from .conftest import logger
 from pyrate_limiter import Limiter
 from pyrate_limiter.abstracts import AbstractBucket
+from pyrate_limiter.abstracts import AbstractClock
 from pyrate_limiter.abstracts import BucketAsyncWrapper
 from pyrate_limiter.abstracts import BucketFactory
-from pyrate_limiter.abstracts import Clock
 from pyrate_limiter.abstracts.rate import Rate
 from pyrate_limiter.abstracts.rate import RateItem
 from pyrate_limiter.buckets import InMemoryBucket
@@ -34,10 +34,10 @@ class DemoBucketFactory(BucketFactory):
     """Multi-bucket factory used for testing schedule-leaks"""
 
     buckets: Dict[str, AbstractBucket]
-    clock: Clock
+    clock: AbstractClock
     auto_leak: bool
 
-    def __init__(self, bucket_clock: Clock, auto_leak=False, **buckets: AbstractBucket):
+    def __init__(self, bucket_clock: AbstractClock, auto_leak=False, **buckets: AbstractBucket):
         self.clock = bucket_clock
         self.buckets = buckets
         self.auto_leak = auto_leak

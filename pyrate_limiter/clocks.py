@@ -4,11 +4,11 @@ import sqlite3
 from time import monotonic
 from time import time
 
-from .abstracts import Clock
+from .abstracts import AbstractClock
 from .utils import dedicated_sqlite_clock_connection
 
 
-class MonotonicClock(Clock):
+class MonotonicClock(AbstractClock):
     def __init__(self):
         monotonic()
 
@@ -16,19 +16,19 @@ class MonotonicClock(Clock):
         return int(1000 * monotonic())
 
 
-class TimeClock(Clock):
+class TimeClock(AbstractClock):
     def now(self):
         return int(1000 * time())
 
 
-class TimeAsyncClock(Clock):
+class TimeAsyncClock(AbstractClock):
     """Time Async Clock, meant for testing only"""
 
     async def now(self) -> int:
         return int(1000 * time())
 
 
-class SQLiteClock(Clock):
+class SQLiteClock(AbstractClock):
     """Get timestamp using SQLite as remote clock backend"""
 
     conn: sqlite3.Connection

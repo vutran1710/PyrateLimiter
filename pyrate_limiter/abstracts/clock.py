@@ -4,7 +4,7 @@ from typing import Awaitable
 from typing import Union
 
 
-class Clock(ABC):
+class AbstractClock(ABC):
     """Clock that return timestamp for `now`"""
 
     @abstractmethod

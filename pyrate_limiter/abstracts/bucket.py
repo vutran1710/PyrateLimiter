@@ -14,7 +14,7 @@ from typing import Optional
 from typing import Type
 from typing import Union
 
-from .clock import Clock
+from .clock import AbstractClock
 from .rate import Rate
 from .rate import RateItem
 
@@ -126,7 +126,7 @@ class BucketFactory(ABC):
 
     def create(
         self,
-        clock: Clock,
+        clock: AbstractClock,
         bucket_class: Type[AbstractBucket],
         *args,
         **kwargs,
@@ -143,7 +143,7 @@ class BucketFactory(ABC):
         assert isinstance(bucket.rates, list) and len(bucket.rates) > 0
         return bucket.rates[-1].interval * 2
 
-    def schedule_leak(self, bucket: AbstractBucket, clock: Clock) -> None:
+    def schedule_leak(self, bucket: AbstractBucket, clock: AbstractClock) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
         assert bucket.rates
 
