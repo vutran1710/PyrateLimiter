@@ -105,7 +105,7 @@ Consider some public API (like LinkedIn, GitHub, etc.) that has rate limits like
 
 You can define these rates using the `Rate` class. `Rate` class has 2 properties only: **limit** and **interval**
 ``` python
-from pyrate_limiter.abstracts.rate import Duration, Rate
+from pyrate_limiter import Duration, Rate
 
 hourly_rate = Rate(500, Duration.HOUR) # 500 requests per hour
 daily_rate = Rate(1000, Duration.DAY) # 1000 requests per day
@@ -121,7 +121,7 @@ Rates must be properly ordered:
 Existing implementations of Bucket come with rate-validation when init. If you are to use your own implementation, use the validator provided by the lib
 
 ```python
-from pyrate_limiter.utils import validate_rate_list
+from pyrate_limiter import validate_rate_list
 
 assert validate_rate_list(my_rates)
 ```
@@ -129,7 +129,7 @@ assert validate_rate_list(my_rates)
 Then, add the rates to the bucket of your choices
 
 ```python
-from pyrate_limiter.buckets import InMemoryBucket, RedisBucket
+from pyrate_limiter import InMemoryBucket, RedisBucket
 
 basic_bucket = InMemoryBucket(rates)
 
@@ -178,8 +178,8 @@ base_clock = TimeClock()
 **PyrateLimiter** makes no assumption about users logic, so to map coming items to their correct buckets, implement your own **BucketFactory** class! At minimum, there are only 2 methods require implementing
 
 ```python
-from pyrate_limiter.abstracts import BucketFactory
-from pyrate_limiter.abstracts import AbstractBucket
+from pyrate_limiter import BucketFactory
+from pyrate_limiter import AbstractBucket
 
 
 class MyBucketFactory(BucketFactory):
@@ -334,7 +334,7 @@ As `allowed_delay` has been passed as a numeric value, when ingesting item, limi
 
 Example:
 ```python
-from pyrate_limiter.exceptions import LimiterDelayException
+from pyrate_limiter import LimiterDelayException
 
 for _ in range(4):
     try:
@@ -355,8 +355,8 @@ for _ in range(4):
 Time source can be anything from anywhere: be it python's built-in time, or monotonic clock, sqliteclock, or crawling from world time server(well we dont have that, but you can!).
 
 ```python
-from pyrate_limiter.clocks import TimeClock      # use python' time.time()
-from pyrate_limiter.clocks import MonotonicClock # use python time.monotonic()
+from pyrate_limiter import TimeClock      # use python' time.time()
+from pyrate_limiter import MonotonicClock # use python time.monotonic()
 ```
 
 Clock's abstract interface only requires implementing a method `now() -> int`. And it can be both sync or async.
@@ -418,7 +418,7 @@ A few different bucket backends are available:
 The default bucket is stored in memory, using python `list`
 
 ```python
-from pyrate_limiter.buckets import InMemoryBucket
+from pyrate_limiter import InMemoryBucket
 ```
 
 This bucket only availabe in `sync` mode. The only constructor argument is `List[Rate]`.
@@ -428,7 +428,7 @@ RedisBucket uses `Sorted-Set` to store items with key being item's name and scor
 Because it is intended to work with both async & sync, we provide a classmethod `init` for it
 
 ```python
-from pyrate_limiter.buckets import RedisBucket
+from pyrate_limiter import RedisBucket
 
 class RedisBucket
     ...other implementations
@@ -451,7 +451,7 @@ If you need to persist the bucket state, a SQLite backend is available.
 Manully create a connection to Sqlite and pass it along with the table name to the bucket class:
 
 ```python
-from pyrate_limiter.buckets import SQLiteBucket
+from pyrate_limiter import SQLiteBucket
 
 class SQLiteBucket(AbstractBucket):
     ...other implementations
@@ -468,7 +468,7 @@ class SQLiteBucket(AbstractBucket):
 Generally, Lock is provided at Limiter's level, except SQLiteBucket case.
 
 ### Add new, custom backends
-If these don't suit your needs, you can also create your own bucket backend by implementing `pyrate_limiter.abstracts.AbstractBucket` class.
+If these don't suit your needs, you can also create your own bucket backend by implementing `pyrate_limiter.AbstractBucket` class.
 
 One of **PyrateLimiter** design goals is powerful extensibility and maximum ease of development.
 
@@ -477,7 +477,7 @@ It must be not only be a ready-to-use tool, but also a guide-line, or a framewor
 Due to the composition nature of the library, it is possbile to write minimum code and validate the result:
 
 - Fork the repo
-- Implement `pyrate_limiter.abstracts.AbstractBucket`
+- Implement `pyrate_limiter.AbstractBucket`
 - Add your own `create_bucket` method in `tests/conftest.py` and pass it to the `create_bucket` fixture
 - Run the test suite to validate the result
 

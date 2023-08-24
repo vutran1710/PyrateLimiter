@@ -15,16 +15,16 @@ from redis import Redis
 from redis.asyncio import ConnectionPool as AsyncConnectionPool
 from redis.asyncio import Redis as AsyncRedis
 
-from pyrate_limiter.abstracts.rate import Rate
-from pyrate_limiter.buckets import InMemoryBucket
-from pyrate_limiter.buckets import RedisBucket
-from pyrate_limiter.buckets import SQLiteBucket
-from pyrate_limiter.buckets import SQLiteQueries as Queries
-from pyrate_limiter.clocks import MonotonicClock
-from pyrate_limiter.clocks import SQLiteClock
-from pyrate_limiter.clocks import TimeAsyncClock
-from pyrate_limiter.clocks import TimeClock
-from pyrate_limiter.utils import id_generator
+from pyrate_limiter import id_generator
+from pyrate_limiter import InMemoryBucket
+from pyrate_limiter import MonotonicClock
+from pyrate_limiter import Rate
+from pyrate_limiter import RedisBucket
+from pyrate_limiter import SQLiteBucket
+from pyrate_limiter import SQLiteClock
+from pyrate_limiter import SQLiteQueries as Queries
+from pyrate_limiter import TimeAsyncClock
+from pyrate_limiter import TimeClock
 
 # Make log messages visible on test failure (or with pytest -s)
 basicConfig(level="INFO")

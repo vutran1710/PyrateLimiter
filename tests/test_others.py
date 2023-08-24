@@ -1,8 +1,8 @@
-from pyrate_limiter.abstracts import RateItem
-from pyrate_limiter.abstracts.rate import Duration
-from pyrate_limiter.abstracts.rate import Rate
-from pyrate_limiter.utils import binary_search
-from pyrate_limiter.utils import validate_rate_list
+from pyrate_limiter import binary_search
+from pyrate_limiter import Duration
+from pyrate_limiter import Rate
+from pyrate_limiter import RateItem
+from pyrate_limiter import validate_rate_list
 
 
 def test_duration():
