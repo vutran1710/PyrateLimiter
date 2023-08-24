@@ -253,20 +253,20 @@ async def test_limiter_constructor(
     limiter = Limiter(bucket)
     assert isinstance(limiter.bucket_factory, BucketFactory)
     assert isinstance(limiter.bucket_factory.clock, TimeClock)
-    assert limiter.allowed_delay is None
+    assert limiter.max_delay is None
     assert limiter.raise_when_fail is True
 
     limiter = Limiter(
         bucket,
         clock=clock,
         raise_when_fail=limiter_should_raise,
-        allowed_delay=limiter_delay,
+        max_delay=limiter_delay,
     )
 
     assert isinstance(limiter.bucket_factory, BucketFactory)
     assert limiter.bucket_factory.clock is clock
     assert limiter.raise_when_fail == limiter_should_raise
-    assert limiter.allowed_delay == limiter_delay
+    assert limiter.max_delay == limiter_delay
 
     acquire_ok = limiter.try_acquire("example")
 
@@ -279,12 +279,12 @@ async def test_limiter_constructor(
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
-        allowed_delay=limiter_delay,
+        max_delay=limiter_delay,
     )
     assert limiter.bucket_factory is factory
     assert limiter.bucket_factory.clock is clock
     assert limiter.raise_when_fail == limiter_should_raise
-    assert limiter.allowed_delay == limiter_delay
+    assert limiter.max_delay == limiter_delay
 
 
 @pytest.mark.asyncio
@@ -299,7 +299,7 @@ async def test_limiter_01(
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
-        allowed_delay=limiter_delay,
+        max_delay=limiter_delay,
     )
     bucket = BucketAsyncWrapper(bucket)
     item = "demo"
@@ -338,7 +338,7 @@ async def test_limiter_01(
         if limiter_delay == 500:
             with pytest.raises(LimiterDelayException) as err:
                 await async_acquire(limiter, item)
-                assert err.meta_info["allowed_delay"] == 500
+                assert err.meta_info["max_delay"] == 500
                 assert err.meta_info["actual_delay"] > 600
                 assert err.meta_info["name"] == item
         elif limiter_delay == 2000:
@@ -377,7 +377,7 @@ async def test_limiter_concurrency(
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
-        allowed_delay=limiter_delay,
+        max_delay=limiter_delay,
     )
 
     logger.info("Test Limiter Concurrency: inserting 4 items")
@@ -388,7 +388,7 @@ async def test_limiter_concurrency(
             result = await concurrent_acquire(limiter, items)
             item_names = await inspect_bucket_items(bucket, 3)
             logger.info(
-                "(No raise, delay is None or delay > allowed_delay) Result = %s, Item = %s",
+                "(No raise, delay is None or delay > max_delay) Result = %s, Item = %s",
                 result,
                 item_names,
             )
@@ -396,7 +396,7 @@ async def test_limiter_concurrency(
             result = await concurrent_acquire(limiter, items)
             item_names = await inspect_bucket_items(bucket, 3)
             logger.info(
-                "(No raise, delay < allowed_delay) Result = %s, Item = %s",
+                "(No raise, delay < max_delay) Result = %s, Item = %s",
                 result,
                 item_names,
             )
@@ -425,7 +425,7 @@ async def test_limiter_decorator(
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
-        allowed_delay=limiter_delay,
+        max_delay=limiter_delay,
     )
     limiter_wrapper = limiter.as_decorator()
 

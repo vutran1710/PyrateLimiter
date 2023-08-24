@@ -19,9 +19,9 @@ class BucketFullException(Exception):
 
 
 class LimiterDelayException(Exception):
-    def __init__(self, item: RateItem, rate: Rate, actual_delay: int, allowed_delay: int):
+    def __init__(self, item: RateItem, rate: Rate, actual_delay: int, max_delay: int):
         error = f"""
-        Actual delay exceeded allowance: actual={actual_delay}, allowed={allowed_delay}
+        Actual delay exceeded allowance: actual={actual_delay}, allowed={max_delay}
         Bucket for {item.name} with Rate {rate} is already full
         """
         self.meta_info: Dict[str, Union[str, float]] = {
@@ -29,7 +29,7 @@ class LimiterDelayException(Exception):
             "name": item.name,
             "weight": item.weight,
             "rate": str(rate),
-            "allowed_delay": allowed_delay,
+            "max_delay": max_delay,
             "actual_delay": actual_delay,
         }
         super().__init__(error)

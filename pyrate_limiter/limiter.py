@@ -64,7 +64,7 @@ class Limiter:
 
     bucket_factory: BucketFactory
     raise_when_fail: bool
-    allowed_delay: Optional[int] = None
+    max_delay: Optional[int] = None
     lock: RLock
 
     def __init__(
@@ -72,7 +72,7 @@ class Limiter:
         bucket_factory: Union[BucketFactory, AbstractBucket],
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
-        allowed_delay: Optional[int] = None,
+        max_delay: Optional[int] = None,
     ):
         """Init Limiter using a single bucket of multiple-bucket factory"""
         if isinstance(bucket_factory, AbstractBucket):
@@ -82,10 +82,10 @@ class Limiter:
         self.bucket_factory = bucket_factory
         self.raise_when_fail = raise_when_fail
 
-        if allowed_delay is not None:
-            assert allowed_delay >= 0, "Allowed delay must not be negative"
+        if max_delay is not None:
+            assert max_delay >= 0, "Allowed delay must not be negative"
 
-        self.allowed_delay = allowed_delay
+        self.max_delay = max_delay
         self.lock = RLock()
 
     def _raise_bucket_full_if_necessary(
@@ -105,12 +105,12 @@ class Limiter:
     ):
         if self.raise_when_fail:
             assert bucket.failing_rate is not None  # NOTE: silence mypy
-            assert isinstance(self.allowed_delay, int)
+            assert isinstance(self.max_delay, int)
             raise LimiterDelayException(
                 item,
                 bucket.failing_rate,
                 delay,
-                self.allowed_delay,
+                self.max_delay,
             )
 
     def delay_or_raise(
@@ -121,7 +121,7 @@ class Limiter:
         """On `try_acquire` failed, handle delay or raise error immediately"""
         assert bucket.failing_rate is not None
 
-        if self.allowed_delay is None:
+        if self.max_delay is None:
             self._raise_bucket_full_if_necessary(bucket, item)
             return False
 
@@ -147,11 +147,11 @@ class Limiter:
                 assert isinstance(delay, int), "Delay not integer"
                 delay += 50
 
-                if delay > self.allowed_delay:
+                if delay > self.max_delay:
                     logger.error(
                         "Required delay too large: actual=%s, expected=%s",
                         delay,
-                        self.allowed_delay,
+                        self.max_delay,
                     )
                     self._raise_delay_exception_if_necessary(bucket, item, delay)
                     return False
@@ -181,11 +181,11 @@ class Limiter:
 
         delay += 50
 
-        if delay > self.allowed_delay:
+        if delay > self.max_delay:
             logger.error(
                 "Required delay too large: actual=%s, expected=%s",
                 delay,
-                self.allowed_delay,
+                self.max_delay,
             )
             self._raise_delay_exception_if_necessary(bucket, item, delay)
             return False

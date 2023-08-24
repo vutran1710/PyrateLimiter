@@ -153,7 +153,7 @@ from pyrate_limiter import Limiter
 
 # Limiter constructor accepts single bucket as the only parameter,
 # the rest are 3 optional parameters with default values as following
-# Limiter(bucket, clock=TimeClock(), raise_when_fail=True, allowed_delay=None)
+# Limiter(bucket, clock=TimeClock(), raise_when_fail=True, max_delay=None)
 limiter = Limiter(bucket)
 
 # Limiter is now ready to work!
@@ -205,7 +205,7 @@ from pyrate_limiter import Limiter
 limiter = Limiter(
     bucket_factory,
     raise_when_fail=False,  # Default = True
-    allowed_delay=1000,     # Default = None
+    max_delay=1000,     # Default = None
 )
 
 item = "the-earth"
@@ -319,18 +319,18 @@ is 3 and the interval is 1, hence the `Rate 3/1`.
 
 ### Rate limit delays
 You may want to simply slow down your requests to stay within the rate limits instead of canceling
-them. In that case you pass the `allowed_delay` argument the maximum value of delay (typically in *ms* when use human-clock).
+them. In that case you pass the `max_delay` argument the maximum value of delay (typically in *ms* when use human-clock).
 
 ```python
-limiter = Limiter(factory, allowed_delay=500) # Allow to delay up to 500ms
+limiter = Limiter(factory, max_delay=500) # Allow to delay up to 500ms
 ```
 
-As `allowed_delay` has been passed as a numeric value, when ingesting item, limiter will:
+As `max_delay` has been passed as a numeric value, when ingesting item, limiter will:
 - First, try to ingest such item using the routed bucket
 - If it fails to put item into the bucket, it will call `wait(item)` on the bucket to see how much time remains until the bucket can consume the item again?
-- Comparing the `wait` value to the `allowed_delay`.
-- if `allowed_delay` >= `wait`: delay (wait + 50ms as latency-tolerance) using either `asyncio.sleep` or `time.sleep` until the bucket can consume again
-- if `allowed_delay` < `wait`: it raises `LimiterDelayException` if Limiter's `raise_when_fail=True`, otherwise silently fail and return False
+- Comparing the `wait` value to the `max_delay`.
+- if `max_delay` >= `wait`: delay (wait + 50ms as latency-tolerance) using either `asyncio.sleep` or `time.sleep` until the bucket can consume again
+- if `max_delay` < `wait`: it raises `LimiterDelayException` if Limiter's `raise_when_fail=True`, otherwise silently fail and return False
 
 Example:
 ```python
@@ -338,14 +338,14 @@ from pyrate_limiter import LimiterDelayException
 
 for _ in range(4):
     try:
-        limiter.try_acquire('item', weight=2, allowed_delay=200)
+        limiter.try_acquire('item', weight=2, max_delay=200)
     except LimiterDelayException as err:
         print(err)
         # Output:
         # Actual delay exceeded allowance: actual=500, allowed=200
         # Bucket for 'item' with Rate 3/1.0s is already full
         print(err.meta_info)
-        # Output: {'name': 'item', 'weight': 2, 'rate': '3/1.0s', 'allowed_delay': 200, 'actual_delay': 500}
+        # Output: {'name': 'item', 'weight': 2, 'rate': '3/1.0s', 'max_delay': 200, 'actual_delay': 500}
 ```
 
 ## Additional knowledge
