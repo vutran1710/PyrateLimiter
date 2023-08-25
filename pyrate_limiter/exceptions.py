@@ -8,7 +8,7 @@ from .abstracts.rate import RateItem
 
 class BucketFullException(Exception):
     def __init__(self, item: RateItem, rate: Rate):
-        error = f"Bucket for {item.name} with Rate {rate} is already full"
+        error = f"Bucket for item={item.name} with Rate {rate} is already full"
         self.meta_info: Dict[str, Union[str, float]] = {
             "error": error,
             "name": item.name,
