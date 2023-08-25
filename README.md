@@ -18,28 +18,28 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
   - [Contents](#contents)
   - [Features](#features)
   - [Installation](#installation)
-  - [Understanding design](#understanding-design)
+  - [Quickstart](#quickstart)
   - [Basic usage](#basic-usage)
-    - [Defining rate limits](#defining-rate-limits)
+    - [Key concepts](#key-concepts)
+    - [Defining rate limits & buckets](#defining-rate-limits-and-buckets)
     - [Defining clock & routing logic](#defining-clock--routing-logic-with-bucketfactory)
     - [Wrapping all up with Limiter](#wrapping-all-up-with-limiter)
     - [Weight](#weight)
-  - [Handling exceeded limits](#handling-exceeded-limits)
-    - [Bucket analogy](#bucket-analogy)
-    - [Rate limit exceptions](#rate-limit-exceptions)
-    - [Rate limit delays](#rate-limit-delays)
-  - [Additional knowledge](#additional-knowledge)
-    - [Clock as Time source](#clock-as-time-sources)
-    - [Leaking](#leaking)
-    - [Async decorator/contextmanager](#async-decoratorcontextmanager)
-  - [Backends](#backends)
-    - [Memory](#memory)
-    - [SQLite](#sqlite)
-    - [Redis](#redis)
-    - [Custom backends / Bucket contribution](#add-new-custom-backends)
-  - [Additional features](#additional-features)
+    - [Handling exceeded limits](#handling-exceeded-limits)
+      - [Bucket analogy](#bucket-analogy)
+      - [Rate limit exceptions](#rate-limit-exceptions)
+       - [Rate limit delays](#rate-limit-delays)
+    - [Backends](#backends)
+      - [InMemoryBucket](#inmemorybucket)
+      - [SQLiteBucket](#sqlitebucket)
+      - [RedisBucket](#redisbucket)
+  - [Advance Usage](#advance-usage)
+    - [Component-level Diagram](#component-level-diagram)
     - [Time sources](#time-sources)
-  - [Examples](#examples)
+    - [Leaking](#leaking)
+    - [Concurrency](#concurrency)
+    - [Custom backend](#custom-backend)
+
 
 ## Features
 * Tracks any number of rate limits and intervals you want to define
@@ -63,39 +63,57 @@ Or using conda:
 conda install --channel conda-forge pyrate-limiter
 ```
 
-## Understanding design
-### Key Components
+## Quickstart
+Let's say you want to limit 5 requests over 2 seconds, and raise an exception if the limit is exceeded:
+``` python
+from pyrate_limiter import Duration, Rate, InMemoryBucket, Limiter, BucketFullException
 
-![](https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/docs/_static/components.jpg)
-![](./docs/_static/components.jpg)
+rates = [Rate(5, Duration.SECOND * 2)]
+bucket = InMemoryBucket(rates)
+limiter = Limiter(bucket)
 
+for request in range(6):
+    try:
+        limiter.try_acquire(request)
+    except BucketFullException as err:
+        print(err)
+        print(err.meta_info)
+# True
+# True
+# True
+# True
+# True
+# Bucket for item=5 with Rate limit=5/2.0s is already full
+# {'error': 'Bucket for item=5 with Rate limit=5/2.0s is already full', 'name': 5, 'weight': 1, 'rate': 'limit=5/2.0s'}
+```
+
+## Basic Usage
+### Key concepts
 
 #### Clock
-- Timestamp-ing items
+-  Timestamp items
 
 #### Bucket
-- Hold timestamped items.
+- Hold items with timestamps.
 - Behave like a FIFO queue
 - It can `leak` - popping items that are no longer relevant out of the queue
 
 #### BucketFactory
-- An application may use more than just one type of Bucket
-- An application may use more than just one type of Clock
-- BucketFactory keeps refererences to buckets & clocks: it timestamps received items, and routes them to their corresponding buckets
-- Help create background tasks to run buckets' `leak` intervally to make sure buckets wont explode
-- Most of the time, it is the only place where users go to to implement their own logic
+- BucketFactory keeps references to buckets & clocks: determine the exact time that items arrive then route them to their corresponding buckets
+- Help schedule background tasks to run buckets' `leak` periodically to make sure buckets will not explode from containing too many items
+- Where user define his own logic: routing, condition-checking, timing etc...
 
 #### Limiter
-- Its most important responsibility is to make user's life as much easy as it should be
-- It sums up all the underlying logic to a simple, intuitive API to work with
-- It helps dealing with async/sync context (everything just `works` by adding/removing `async/await` keyword to the user's code)
-- It provides different ways of interacting with the underlying BucketFactory *(plain method call, decorator, context-manager (TBA))*
-- It provides thread-safety using RLock
+The Limiter's most important responsibility is to make user's life as easiest as possible:
+- Sums up all the underlying logic to a simple, intuitive API to work with
+- Handles async/sync context seamlessly (everything just `works` by adding/removing `async/await` keyword to the user's code)
+- Provides different ways of interacting with the underlying **BucketFactory** *(plain method call, decorator, context-manager (TBA))*
+- Provides thread-safety using RLock
 
 
-## Basic usage
 
-### Defining rate limits & buckets
+
+### Defining rate limits and buckets
 Consider some public API (like LinkedIn, GitHub, etc.) that has rate limits like the following:
 ```
 - 500 requests per hour
@@ -109,7 +127,7 @@ from pyrate_limiter import Duration, Rate
 
 hourly_rate = Rate(500, Duration.HOUR) # 500 requests per hour
 daily_rate = Rate(1000, Duration.DAY) # 1000 requests per day
-monthly_rate = Rate(10000, Duration.MONTH) # 10000 requests per month
+monthly_rate = Rate(10000, Duration.WEEK * 4) # 10000 requests per month
 
 rates = [hourly_rate, daily_rate, monthly_rate]
 ```
@@ -260,10 +278,10 @@ Any additional, custom implementation of Bucket are expected to behave alike - a
 
 See [Additional usage options](#additional-usage-options) below for more details.
 
-## Handling exceeded limits
+### Handling exceeded limits
 When a rate limit is exceeded, you have two options: raise an exception, or add delays.
 
-### Bucket analogy
+#### Bucket analogy
 <img height="300" align="right" src="https://upload.wikimedia.org/wikipedia/commons/c/c4/Leaky_bucket_analogy.JPG">
 
 At this point it's useful to introduce the analogy of "buckets" used for rate-limiting. Here is a
@@ -276,7 +294,7 @@ quick summary:
 * When the bucket is "full", it will overflow, representing **canceled or delayed requests**.
 * Item can have weight. Consuming a single item with weight W > 1 is the same as consuming W smaller, unit items - each with weight=1, with the same timestamp and maybe same name (depending on however user choose to implement it)
 
-### Rate limit exceptions
+#### Rate limit exceptions
 By default, a `BucketFullException` will be raised when a rate limit is exceeded.
 The error contains a `meta_info` attribute with the following information:
 * `name`: The name of item it received
@@ -317,7 +335,7 @@ for _ in range(4):
 The rate part of the output is constructed as: `limit / interval`. On the above example, the limit
 is 3 and the interval is 1, hence the `Rate 3/1`.
 
-### Rate limit delays
+#### Rate limit delays
 You may want to simply slow down your requests to stay within the rate limits instead of canceling
 them. In that case you pass the `max_delay` argument the maximum value of delay (typically in *ms* when use human-clock).
 
@@ -348,11 +366,80 @@ for _ in range(4):
         # Output: {'name': 'item', 'weight': 2, 'rate': '3/1.0s', 'max_delay': 200, 'actual_delay': 500}
 ```
 
-## Additional knowledge
+### Backends
+A few different bucket backends are available:
+- InMemoryBucket using python built-in list as bucket
+- RedisBucket, using err... redis, with both async/sync support
+- SQLite, using sqlite3
 
+#### InMemoryBucket
+The default bucket is stored in memory, using python `list`
 
-### Clock as Time sources
-Time source can be anything from anywhere: be it python's built-in time, or monotonic clock, sqliteclock, or crawling from world time server(well we dont have that, but you can!).
+```python
+from pyrate_limiter import InMemoryBucket, Rate, Duration
+
+rates = [Rate(5, Duration.MINUTE * 2)]
+bucket = InMemoryBucket(rates)
+```
+
+This bucket only availabe in `sync` mode. The only constructor argument is `List[Rate]`.
+
+#### RedisBucket
+RedisBucket uses `Sorted-Set` to store items with key being item's name and score item's timestamp
+Because it is intended to work with both async & sync, we provide a classmethod `init` for it
+
+```python
+from pyrate_limiter import RedisBucket, Rate, Duration
+
+# Using synchronous redis
+from redis import ConnectionPool
+from redis import Redis
+
+rates = [Rate(5, Duration.MINUTE * 2)]
+pool = ConnectionPool.from_url("redis://localhost:6379")
+redis_db = Redis(connection_pool=pool)
+bucket_key = "bucket-key"
+bucket = RedisBucket.init(rates, redis_db, bucket_key)
+
+# Using asynchronous redis
+from redis.asyncio import ConnectionPool as AsyncConnectionPool
+from redis.asyncio import Redis as AsyncRedis
+
+pool = AsyncConnectionPool.from_url("redis://localhost:6379")
+redis_db = AsyncRedis(connection_pool=pool)
+bucket_key = "bucket-key"
+bucket = await RedisBucket.init(rates, redis_db, bucket_key)
+```
+
+The API are the same, regardless of sync/async. If AsyncRedis is being used, calling `await bucket.method_name(args)` would just work!
+
+#### SQLiteBucket
+If you need to persist the bucket state, a SQLite backend is available.
+
+Manully create a connection to Sqlite and pass it along with the table name to the bucket class:
+
+```python
+from pyrate_limiter import SQLiteBucket, Rate, Duration
+import sqlite3
+
+rates = [Rate(5, Duration.MINUTE * 2)]
+conn = sqlite3.connect(
+    "/var/mydb.sqlite",
+    isolation_level="EXCLUSIVE",
+    check_same_thread=False,
+)
+table = "my-bucket-table"
+bucket = SQLiteBucket(rates, conn, table)
+```
+
+## Advance Usage
+
+### Component level diagram
+![](https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/docs/_static/components.jpg)
+![](./docs/_static/components.jpg)
+
+### Time sources
+Time source can be anything from anywhere: be it python's built-in time, or monotonic clock, sqliteclock, or crawling from world time server(well we don't have that, but you can!).
 
 ```python
 from pyrate_limiter import TimeClock      # use python' time.time()
@@ -363,11 +450,11 @@ Clock's abstract interface only requires implementing a method `now() -> int`. A
 
 
 ### Leaking
-Typically bucket should not hold items forever. Therefore Bucket's abstract interface requires its implementation must be provided with `leak(current_timestamp: Optional[int] = None)`.
+Typically bucket should not hold items forever. Bucket's abstract interface requires its implementation must be provided with `leak(current_timestamp: Optional[int] = None)`.
 
-The `leak` method just needs to be a function that will remove outdated items at that very momement it gets called. During the limiter lifetime, every bucket `leak` should be called periodically to clean up.
+The `leak` method when called is expected to remove any items considered outdated  at that moment. During Limiter lifetime, all the buckets' `leak` should be called periodically.
 
-BucketFactory provide a method called `schedule_leak` to help deal with this matter. Basically, it will run **1(one)** background task for the specific bucket, where interval between `leak` call = the bucket's last rate's interval * 2.
+**BucketFactory** provide a method called `schedule_leak` to help deal with this matter. Basically, it will run **1(one)** background task for a specific bucket, where interval between `leak` call by default is the bucket's longest rate's interval * 2.
 
 ```python
 # Runnning a background task (whether it is sync/async - doesnt matter)
@@ -406,68 +493,10 @@ class MyBucketFactory(BucketFactory):
 
 ```
 
-After this, our buckets are safe to use without worrying about them exploding ever!
-
-## Backends
-A few different bucket backends are available:
-- InMemoryBucket using python built-in list as bucket
-- RedisBucket, using err... redis, with both async/sync support
-- SQLite, using sqlite3
-
-### InMemoryBucket
-The default bucket is stored in memory, using python `list`
-
-```python
-from pyrate_limiter import InMemoryBucket
-```
-
-This bucket only availabe in `sync` mode. The only constructor argument is `List[Rate]`.
-
-### RedisBucket
-RedisBucket uses `Sorted-Set` to store items with key being item's name and score item's timestamp
-Because it is intended to work with both async & sync, we provide a classmethod `init` for it
-
-```python
-from pyrate_limiter import RedisBucket
-
-class RedisBucket
-    ...other implementations
-
-    @classmethod
-    def init(
-        cls,
-        rates: List[Rate],
-        redis: Union[Redis, AsyncRedis],
-        bucket_key: str,
-    ):
-        pass
-```
-
-The API are the same, regardless of sync/async. If AsyncRedis is being used, calling `await bucket.method_name(args)` would just work!
-
-### SQLite
-If you need to persist the bucket state, a SQLite backend is available.
-
-Manully create a connection to Sqlite and pass it along with the table name to the bucket class:
-
-```python
-from pyrate_limiter import SQLiteBucket
-
-class SQLiteBucket(AbstractBucket):
-    ...other implementations
-
-    def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str):
-        self.conn = conn
-        self.table = table
-        self.rates = rates
-        self.lock = RLock()
-
-```
-
-#### Concurrency
+### Concurrency
 Generally, Lock is provided at Limiter's level, except SQLiteBucket case.
 
-### Add new, custom backends
+### Custom backends
 If these don't suit your needs, you can also create your own bucket backend by implementing `pyrate_limiter.AbstractBucket` class.
 
 One of **PyrateLimiter** design goals is powerful extensibility and maximum ease of development.
@@ -482,7 +511,3 @@ Due to the composition nature of the library, it is possbile to write minimum co
 - Run the test suite to validate the result
 
 If the tests pass through, the you are just good to go with your new, fancy bucket!
-
-
-## Examples
-For more complete examples, you can refer to [test_suites](./tests/test_limiter.py )
