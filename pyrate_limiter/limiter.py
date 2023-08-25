@@ -78,12 +78,12 @@ class Limiter:
         if isinstance(bucket_factory, AbstractBucket):
             bucket_factory = SingleBucketFactory(bucket_factory, clock)
 
-        assert isinstance(bucket_factory, BucketFactory), "Not a valid bucket-factory"
+        assert isinstance(bucket_factory, BucketFactory), "Not a valid bucket/bucket-factory"
         self.bucket_factory = bucket_factory
         self.raise_when_fail = raise_when_fail
 
         if max_delay is not None:
-            assert max_delay >= 0, "Allowed delay must not be negative"
+            assert max_delay >= 0, "Max-delay must not be negative"
 
         self.max_delay = max_delay
         self.lock = RLock()
