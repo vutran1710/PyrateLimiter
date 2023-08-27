@@ -33,6 +33,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
       - [InMemoryBucket](#inmemorybucket)
       - [SQLiteBucket](#sqlitebucket)
       - [RedisBucket](#redisbucket)
+    - [Decorator](#decorator)
   - [Advance Usage](#advance-usage)
     - [Component-level Diagram](#component-level-diagram)
     - [Time sources](#time-sources)
@@ -109,8 +110,6 @@ The Limiter's most important responsibility is to make user's life as easiest as
 - Handles async/sync context seamlessly (everything just `works` by adding/removing `async/await` keyword to the user's code)
 - Provides different ways of interacting with the underlying **BucketFactory** *(plain method call, decorator, context-manager (TBA))*
 - Provides thread-safety using RLock
-
-
 
 
 ### Defining rate limits and buckets
@@ -430,6 +429,27 @@ conn = sqlite3.connect(
 )
 table = "my-bucket-table"
 bucket = SQLiteBucket(rates, conn, table)
+```
+
+### Decorator
+
+Limiter can be used as decorator, but you have to provide a `mapping` function that maps the wrapped function's arguments to `limiter.try_acquire` function arguments. The mapping function must return either a tuple of `(str, int)` or just a `str`
+
+The decorator can work with both sync & async function
+
+```python
+decorator = limiter.as_decorator()
+
+def mapping(*args, **kwargs):
+    return "demo", 1
+
+@decorator(mapping)
+def handle_something(*args, **kwargs):
+    """function logic"""
+
+@decorator(mapping)
+async def handle_something_async(*args, **kwargs):
+    """function logic"""
 ```
 
 ## Advance Usage
