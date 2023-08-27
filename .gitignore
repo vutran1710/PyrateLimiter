@@ -13,3 +13,4 @@ test-reports/
 .vscode/
 .idea/
 .coveralls.yml
+.DS_Store

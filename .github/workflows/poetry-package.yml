@@ -9,16 +9,29 @@ on:
       - master
 
 env:
-  LATEST_PY_VERSION: '3.11'
+  LATEST_PY_VERSION: '3.10'
+  REDIS: 'redis://localhost:6379'
 
 jobs:
   check:
-
     runs-on: ubuntu-latest
+    services:
+      pyrate_redis:
+        image: bitnami/redis:latest
+        env:
+          ALLOW_EMPTY_PASSWORD: yes
+        ports:
+          - 6379:6379
+        # Set health checks to wait until redis has started
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.7", "3.11"]
+        python-version: ["3.8", "3.10"]
 
     steps:
     - uses: actions/checkout@v3

@@ -17,7 +17,7 @@ repos:
     rev: v0.930
     hooks:
     -   id: mypy
-        additional_dependencies: [types-filelock]
+        additional_dependencies: [types-filelock, types-redis]
 -   repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.9.0
     hooks:

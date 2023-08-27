@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.0.0] - 2023-08-18
+ Third major release with API breaking changes:
+- Drop python 3.7 (only python ^3.8)
+- Bucket must be initialized before passing to Limiter
+- Auto leaking (provided by BucketFactory)
+- Decorator API changes
+- Limiter workable with both async/sync out-of-the-box
+- Async RedisBucket built-in
+- Contextmanager not available yet
+
 ## [2.10.0] - 2023-02-26
 ### Updates
 * Add change log to sdist
