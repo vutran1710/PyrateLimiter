@@ -22,6 +22,12 @@ class Duration(Enum):
     def __int__(self) -> int:
         return self.value
 
+    def __eq__(self, duration: object) -> bool:
+        if not isinstance(duration, (Duration, int)):
+            return NotImplemented
+
+        return self.value == int(duration)
+
     @staticmethod
     def readable(value: int) -> str:
         notes = [

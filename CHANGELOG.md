@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.1.0] - 2023-08-28
+* Allow to pass rates directly to Limiter to use default ImMemoryBucket with Limiter
+* Allow to pass *Duration* to `max_delay` argument of Limiter
+
 ## [3.0.2] - 2023-08-28
 * Critical bug fix: importing redis fail crashing apps
 

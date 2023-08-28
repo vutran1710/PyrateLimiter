@@ -1,8 +1,4 @@
-"""
-Limiter class implementation
-- Smart logic,
-- Switching async/sync context
-- Can be used as decorator
+"""Limiter class implementation
 """
 import asyncio
 import logging
@@ -13,6 +9,7 @@ from time import sleep
 from typing import Any
 from typing import Awaitable
 from typing import Callable
+from typing import List
 from typing import Optional
 from typing import Tuple
 from typing import Union
@@ -20,7 +17,10 @@ from typing import Union
 from .abstracts import AbstractBucket
 from .abstracts import AbstractClock
 from .abstracts import BucketFactory
+from .abstracts import Duration
+from .abstracts import Rate
 from .abstracts import RateItem
+from .buckets import InMemoryBucket
 from .clocks import TimeClock
 from .exceptions import BucketFullException
 from .exceptions import LimiterDelayException
@@ -69,24 +69,46 @@ class Limiter:
 
     def __init__(
         self,
-        bucket_factory: Union[BucketFactory, AbstractBucket],
+        argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
-        max_delay: Optional[int] = None,
+        max_delay: Optional[Union[int, Duration]] = None,
     ):
-        """Init Limiter using a single bucket of multiple-bucket factory"""
-        if isinstance(bucket_factory, AbstractBucket):
-            bucket_factory = SingleBucketFactory(bucket_factory, clock)
-
-        assert isinstance(bucket_factory, BucketFactory), "Not a valid bucket/bucket-factory"
-        self.bucket_factory = bucket_factory
+        """Init Limiter using either a single bucket / multiple-bucket factory
+        / single rate / rate list
+        """
+        self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
 
         if max_delay is not None:
+            if isinstance(max_delay, Duration):
+                max_delay = int(max_delay)
+
             assert max_delay >= 0, "Max-delay must not be negative"
 
         self.max_delay = max_delay
         self.lock = RLock()
+
+    def _init_bucket_factory(
+        self,
+        argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
+        clock: AbstractClock,
+    ) -> BucketFactory:
+        if isinstance(argument, Rate):
+            argument = [argument]
+
+        if isinstance(argument, list):
+            assert len(argument) > 0, "Rates must not be empty"
+            assert isinstance(argument[0], Rate), "Not valid rates list"
+            rates = argument
+            logger.info("Initializing default bucket(InMemoryBucket) with rates: %s", rates)
+            argument = InMemoryBucket(rates)
+
+        if isinstance(argument, AbstractBucket):
+            argument = SingleBucketFactory(argument, clock)
+
+        assert isinstance(argument, BucketFactory), "Not a valid bucket/bucket-factory"
+        return argument
 
     def _raise_bucket_full_if_necessary(
         self,
