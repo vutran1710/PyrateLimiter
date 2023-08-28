@@ -1,5 +1,6 @@
 """Bucket implementation using Redis
 """
+import logging
 from inspect import isawaitable
 from typing import Awaitable
 from typing import List
@@ -7,13 +8,19 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-from redis import Redis
-from redis.asyncio import Redis as AsyncRedis
-
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from ..utils import id_generator
+
+
+logger = logging.getLogger(__name__)
+
+try:
+    from redis import Redis
+    from redis.asyncio import Redis as AsyncRedis
+except ImportError:
+    logger.error("Redis-py is required")
 
 
 class LuaScript:
