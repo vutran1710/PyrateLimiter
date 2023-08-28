@@ -1,8 +1,4 @@
-"""
-Limiter class implementation
-- Smart logic,
-- Switching async/sync context
-- Can be used as decorator
+"""Limiter class implementation
 """
 import asyncio
 import logging
@@ -78,7 +74,9 @@ class Limiter:
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
     ):
-        """Init Limiter using either a single bucket / multiple-bucket factory / single rate / rate list"""
+        """Init Limiter using either a single bucket / multiple-bucket factory
+        / single rate / rate list
+        """
         if isinstance(limiter_argument, Rate):
             limiter_argument = [limiter_argument]
 
@@ -92,10 +90,8 @@ class Limiter:
         if isinstance(limiter_argument, AbstractBucket):
             limiter_argument = SingleBucketFactory(limiter_argument, clock)
 
-        bucket_factory = limiter_argument
-
-        assert isinstance(bucket_factory, BucketFactory), "Not a valid bucket/bucket-factory"
-        self.bucket_factory = bucket_factory
+        assert isinstance(limiter_argument, BucketFactory), "Not a valid bucket/bucket-factory"
+        self.bucket_factory = limiter_argument
         self.raise_when_fail = raise_when_fail
 
         if max_delay is not None:
