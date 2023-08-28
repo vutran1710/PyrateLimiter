@@ -10,10 +10,6 @@ from typing import List
 from typing import Union
 
 import pytest
-from redis import ConnectionPool
-from redis import Redis
-from redis.asyncio import ConnectionPool as AsyncConnectionPool
-from redis.asyncio import Redis as AsyncRedis
 
 from pyrate_limiter import id_generator
 from pyrate_limiter import InMemoryBucket
@@ -25,6 +21,7 @@ from pyrate_limiter import SQLiteClock
 from pyrate_limiter import SQLiteQueries as Queries
 from pyrate_limiter import TimeAsyncClock
 from pyrate_limiter import TimeClock
+
 
 # Make log messages visible on test failure (or with pytest -s)
 basicConfig(level="INFO")
@@ -58,6 +55,9 @@ async def create_in_memory_bucket(rates: List[Rate]):
 
 
 async def create_redis_bucket(rates: List[Rate]):
+    from redis import ConnectionPool
+    from redis import Redis
+
     pool = ConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
     redis_db = Redis(connection_pool=pool)
     bucket_key = f"test-bucket/{id_generator()}"
@@ -68,6 +68,9 @@ async def create_redis_bucket(rates: List[Rate]):
 
 
 async def create_async_redis_bucket(rates: List[Rate]):
+    from redis.asyncio import ConnectionPool as AsyncConnectionPool
+    from redis.asyncio import Redis as AsyncRedis
+
     pool = AsyncConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
     redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)
     bucket_key = f"test-bucket/{id_generator()}"
