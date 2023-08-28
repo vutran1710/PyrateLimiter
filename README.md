@@ -525,8 +525,8 @@ It must be not only be a ready-to-use tool, but also a guide-line, or a framewor
 Due to the composition nature of the library, it is possbile to write minimum code and validate the result:
 
 - Fork the repo
-- Implement `pyrate_limiter.AbstractBucket`
+- Implement your bucket with `pyrate_limiter.AbstractBucket`
 - Add your own `create_bucket` method in `tests/conftest.py` and pass it to the `create_bucket` fixture
 - Run the test suite to validate the result
 
-If the tests pass through, the you are just good to go with your new, fancy bucket!
+If the tests pass through, then you are just good to go with your new, fancy bucket!
