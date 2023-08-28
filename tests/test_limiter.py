@@ -17,6 +17,7 @@ from pyrate_limiter import AbstractClock
 from pyrate_limiter import BucketAsyncWrapper
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import BucketFullException
+from pyrate_limiter import Duration
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import LimiterDelayException
@@ -77,7 +78,7 @@ def limiter_should_raise(request):
     return request.param
 
 
-@pytest.fixture(params=[None, 500, 2000])
+@pytest.fixture(params=[None, 500, Duration.SECOND * 2, Duration.MINUTE])
 def limiter_delay(request):
     return request.param
 
@@ -344,12 +345,18 @@ async def test_limiter_01(
         elif limiter_delay == 2000:
             acquire_ok, cost = await async_acquire(limiter, item)
             assert acquire_ok
+        elif limiter_delay == Duration.MINUTE:
+            acquire_ok, cost = await async_acquire(limiter, item)
+            assert acquire_ok
         else:
             with pytest.raises(BucketFullException) as err:
                 await async_acquire(limiter, item)
     else:
         acquire_ok, cost = await async_acquire(limiter, item)
-        assert acquire_ok if limiter_delay == 2000 else not acquire_ok
+        if limiter_delay == 500 or limiter_delay is None:
+            assert not acquire_ok
+        else:
+            assert acquire_ok
 
     # Flush before testing again
     await flushing_bucket(bucket)

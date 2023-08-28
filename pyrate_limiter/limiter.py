@@ -20,6 +20,7 @@ from typing import Union
 from .abstracts import AbstractBucket
 from .abstracts import AbstractClock
 from .abstracts import BucketFactory
+from .abstracts import Duration
 from .abstracts import RateItem
 from .clocks import TimeClock
 from .exceptions import BucketFullException
@@ -72,7 +73,7 @@ class Limiter:
         bucket_factory: Union[BucketFactory, AbstractBucket],
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
-        max_delay: Optional[int] = None,
+        max_delay: Optional[Union[int, Duration]] = None,
     ):
         """Init Limiter using a single bucket of multiple-bucket factory"""
         if isinstance(bucket_factory, AbstractBucket):
@@ -83,6 +84,9 @@ class Limiter:
         self.raise_when_fail = raise_when_fail
 
         if max_delay is not None:
+            if isinstance(max_delay, Duration):
+                max_delay = int(max_delay)
+
             assert max_delay >= 0, "Max-delay must not be negative"
 
         self.max_delay = max_delay
