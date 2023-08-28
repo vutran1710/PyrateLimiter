@@ -69,9 +69,12 @@ Let's say you want to limit 5 requests over 2 seconds, and raise an exception if
 ``` python
 from pyrate_limiter import Duration, Rate, InMemoryBucket, Limiter, BucketFullException
 
-rates = [Rate(5, Duration.SECOND * 2)]
-bucket = InMemoryBucket(rates)
-limiter = Limiter(bucket)
+rate = Rate(5, Duration.SECOND * 2)
+limiter = Limiter(rate)
+
+# Or you can pass multiple rates
+# rates = [Rate(5, Duration.SECOND * 2), Rate(10, Duration.MINUTE)]
+# limiter = Limiter(rates)
 
 for request in range(6):
     try:
@@ -79,11 +82,6 @@ for request in range(6):
     except BucketFullException as err:
         print(err)
         print(err.meta_info)
-# True
-# True
-# True
-# True
-# True
 # Bucket for item=5 with Rate limit=5/2.0s is already full
 # {'error': 'Bucket for item=5 with Rate limit=5/2.0s is already full', 'name': 5, 'weight': 1, 'rate': 'limit=5/2.0s'}
 ```
