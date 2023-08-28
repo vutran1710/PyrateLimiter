@@ -160,12 +160,12 @@ class BucketFactory(ABC):
             while True:
                 now = clock.now()
 
-                if isawaitable(now):
+                while isawaitable(now):
                     now = await now
 
                 leak = bucket.leak(now)
 
-                if isawaitable(leak):
+                while isawaitable(leak):
                     leak = await leak
 
                 assert isinstance(leak, int)
