@@ -456,7 +456,6 @@ async def handle_something_async(*args, **kwargs):
 
 ### Component level diagram
 ![](https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/docs/_static/components.jpg)
-![](./docs/_static/components.jpg)
 
 ### Time sources
 Time source can be anything from anywhere: be it python's built-in time, or monotonic clock, sqliteclock, or crawling from world time server(well we don't have that, but you can!).
@@ -526,8 +525,8 @@ It must be not only be a ready-to-use tool, but also a guide-line, or a framewor
 Due to the composition nature of the library, it is possbile to write minimum code and validate the result:
 
 - Fork the repo
-- Implement `pyrate_limiter.AbstractBucket`
+- Implement your bucket with `pyrate_limiter.AbstractBucket`
 - Add your own `create_bucket` method in `tests/conftest.py` and pass it to the `create_bucket` fixture
 - Run the test suite to validate the result
 
-If the tests pass through, the you are just good to go with your new, fancy bucket!
+If the tests pass through, then you are just good to go with your new, fancy bucket!

@@ -3,6 +3,7 @@ a workable bucket for Limiter to use
 """
 import asyncio
 import logging
+import warnings
 from abc import ABC
 from abc import abstractmethod
 from inspect import isawaitable
@@ -159,23 +160,25 @@ class BucketFactory(ABC):
             while True:
                 now = clock.now()
 
-                if isawaitable(now):
+                while isawaitable(now):
                     now = await now
 
                 leak = bucket.leak(now)
 
-                if isawaitable(leak):
+                while isawaitable(leak):
                     leak = await leak
 
                 assert isinstance(leak, int)
                 logger.info("(async)leaking bucket: %s, %s items", bucket, leak)
                 await asyncio.sleep(self.leak_interval(bucket) / 1000)
 
-        if isawaitable(clock.now()) or isawaitable(bucket.leak(0)):
-            asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
-        else:
-            thread = Thread(target=_leak_task_sync, daemon=True)
-            thread.start()
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="ignore", category=RuntimeWarning)
+            if isawaitable(clock.now()) or isawaitable(bucket.leak(0)):
+                asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
+            else:
+                thread = Thread(target=_leak_task_sync, daemon=True)
+                thread.start()
 
 
 class BucketAsyncWrapper(AbstractBucket):
