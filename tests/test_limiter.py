@@ -243,7 +243,22 @@ async def test_factory_leak(clock, create_bucket):
 
 
 @pytest.mark.asyncio
-async def test_limiter_constructor(
+async def test_limiter_constructor_01(clock):
+    limiter = Limiter(DEFAULT_RATES[0], clock=clock)
+    assert isinstance(limiter.bucket_factory, BucketFactory)
+    assert isinstance(limiter.bucket_factory.bucket, InMemoryBucket)
+    assert limiter.bucket_factory.bucket.rates == [DEFAULT_RATES[0]]
+    assert limiter.bucket_factory.clock == clock
+
+    limiter = Limiter(DEFAULT_RATES, clock=clock)
+    assert isinstance(limiter.bucket_factory, BucketFactory)
+    assert isinstance(limiter.bucket_factory.bucket, InMemoryBucket)
+    assert limiter.bucket_factory.bucket.rates == DEFAULT_RATES
+    assert limiter.bucket_factory.clock == clock
+
+
+@pytest.mark.asyncio
+async def test_limiter_constructor_02(
     clock,
     create_bucket,
     limiter_should_raise,

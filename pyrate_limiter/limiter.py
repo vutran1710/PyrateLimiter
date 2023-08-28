@@ -13,6 +13,7 @@ from time import sleep
 from typing import Any
 from typing import Awaitable
 from typing import Callable
+from typing import List
 from typing import Optional
 from typing import Tuple
 from typing import Union
@@ -21,7 +22,9 @@ from .abstracts import AbstractBucket
 from .abstracts import AbstractClock
 from .abstracts import BucketFactory
 from .abstracts import Duration
+from .abstracts import Rate
 from .abstracts import RateItem
+from .buckets import InMemoryBucket
 from .clocks import TimeClock
 from .exceptions import BucketFullException
 from .exceptions import LimiterDelayException
@@ -70,14 +73,26 @@ class Limiter:
 
     def __init__(
         self,
-        bucket_factory: Union[BucketFactory, AbstractBucket],
+        limiter_argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
     ):
-        """Init Limiter using a single bucket of multiple-bucket factory"""
-        if isinstance(bucket_factory, AbstractBucket):
-            bucket_factory = SingleBucketFactory(bucket_factory, clock)
+        """Init Limiter using either a single bucket / multiple-bucket factory / single rate / rate list"""
+        if isinstance(limiter_argument, Rate):
+            limiter_argument = [limiter_argument]
+
+        if isinstance(limiter_argument, list):
+            assert len(limiter_argument) > 0, "Rates must not be empty"
+            assert isinstance(limiter_argument[0], Rate), "Not valid rates list"
+            rates = limiter_argument
+            logger.info("Initializing default bucket(InMemoryBucket) with rates: %s", rates)
+            limiter_argument = InMemoryBucket(rates)
+
+        if isinstance(limiter_argument, AbstractBucket):
+            limiter_argument = SingleBucketFactory(limiter_argument, clock)
+
+        bucket_factory = limiter_argument
 
         assert isinstance(bucket_factory, BucketFactory), "Not a valid bucket/bucket-factory"
         self.bucket_factory = bucket_factory
