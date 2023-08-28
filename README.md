@@ -456,7 +456,6 @@ async def handle_something_async(*args, **kwargs):
 
 ### Component level diagram
 ![](https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/docs/_static/components.jpg)
-![](./docs/_static/components.jpg)
 
 ### Time sources
 Time source can be anything from anywhere: be it python's built-in time, or monotonic clock, sqliteclock, or crawling from world time server(well we don't have that, but you can!).
