@@ -69,7 +69,7 @@ class Limiter:
 
     def __init__(
         self,
-        limiter_argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
+        argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
@@ -77,21 +77,7 @@ class Limiter:
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list
         """
-        if isinstance(limiter_argument, Rate):
-            limiter_argument = [limiter_argument]
-
-        if isinstance(limiter_argument, list):
-            assert len(limiter_argument) > 0, "Rates must not be empty"
-            assert isinstance(limiter_argument[0], Rate), "Not valid rates list"
-            rates = limiter_argument
-            logger.info("Initializing default bucket(InMemoryBucket) with rates: %s", rates)
-            limiter_argument = InMemoryBucket(rates)
-
-        if isinstance(limiter_argument, AbstractBucket):
-            limiter_argument = SingleBucketFactory(limiter_argument, clock)
-
-        assert isinstance(limiter_argument, BucketFactory), "Not a valid bucket/bucket-factory"
-        self.bucket_factory = limiter_argument
+        self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
 
         if max_delay is not None:
@@ -102,6 +88,27 @@ class Limiter:
 
         self.max_delay = max_delay
         self.lock = RLock()
+
+    def _init_bucket_factory(
+        self,
+        argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
+        clock: AbstractClock,
+    ) -> BucketFactory:
+        if isinstance(argument, Rate):
+            argument = [argument]
+
+        if isinstance(argument, list):
+            assert len(argument) > 0, "Rates must not be empty"
+            assert isinstance(argument[0], Rate), "Not valid rates list"
+            rates = argument
+            logger.info("Initializing default bucket(InMemoryBucket) with rates: %s", rates)
+            argument = InMemoryBucket(rates)
+
+        if isinstance(argument, AbstractBucket):
+            argument = SingleBucketFactory(argument, clock)
+
+        assert isinstance(argument, BucketFactory), "Not a valid bucket/bucket-factory"
+        return argument
 
     def _raise_bucket_full_if_necessary(
         self,
