@@ -250,7 +250,7 @@ class Limiter:
 
         return _handle_result(acquire)  # type: ignore
 
-    def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
+    async def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
         """Try accquiring an item with name & weight
         Return true on success, false on failure
         """
