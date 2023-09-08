@@ -67,7 +67,7 @@ conda install --channel conda-forge pyrate-limiter
 ## Quickstart
 Let's say you want to limit 5 requests over 2 seconds, and raise an exception if the limit is exceeded:
 ``` python
-from pyrate_limiter import Duration, Rate, InMemoryBucket, Limiter, BucketFullException
+from pyrate_limiter import Duration, Rate, Limiter, BucketFullException
 
 rate = Rate(5, Duration.SECOND * 2)
 limiter = Limiter(rate)
