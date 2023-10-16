@@ -9,12 +9,12 @@ def test_duration():
     assert int(Duration.SECOND) == 1000
     assert Duration.SECOND.value == 1000
 
-    assert Duration.SECOND * 60 == Duration.MINUTE.value == int(Duration.MINUTE)
-    assert Duration.MINUTE * 60 == Duration.HOUR.value == int(Duration.HOUR)
-    assert Duration.HOUR * 24 == Duration.DAY.value == int(Duration.DAY)
-    assert Duration.DAY * 7 == Duration.WEEK.value == int(Duration.WEEK)
+    assert Duration.SECOND * 60 == 60 * Duration.SECOND == Duration.MINUTE.value == int(Duration.MINUTE)
+    assert Duration.MINUTE * 60 == 60 * Duration.MINUTE == Duration.HOUR.value == int(Duration.HOUR)
+    assert Duration.HOUR * 24 == 24 * Duration.DAY == Duration.DAY.value == int(Duration.DAY)
+    assert Duration.DAY * 7 == 7 * Duration.DAY == Duration.WEEK.value == int(Duration.WEEK)
     assert Duration.DAY + Duration.DAY == Duration.DAY * 2
-    assert Duration.MINUTE + 30000 == 90000
+    assert Duration.MINUTE + 30000 == 30000 + Duration.MINUTE == 90000
 
 
 def test_readable_duration():
