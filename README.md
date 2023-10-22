@@ -34,7 +34,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
       - [SQLiteBucket](#sqlitebucket)
       - [RedisBucket](#redisbucket)
     - [Decorator](#decorator)
-  - [Advance Usage](#advance-usage)
+  - [Advanced Usage](#advanced-usage)
     - [Component-level Diagram](#component-level-diagram)
     - [Time sources](#time-sources)
     - [Leaking](#leaking)
@@ -273,7 +273,7 @@ Yet, putting this big, heavy item into bucket is expected to be transactional & 
 
 Any additional, custom implementation of Bucket are expected to behave alike - as we have unit tests to cover the case.
 
-See [Additional usage options](#additional-usage-options) below for more details.
+See [Advanced usage options](#advanced-usage) below for more details.
 
 ### Handling exceeded limits
 When a rate limit is exceeded, you have two options: raise an exception, or add delays.
@@ -450,7 +450,7 @@ async def handle_something_async(*args, **kwargs):
     """function logic"""
 ```
 
-## Advance Usage
+## Advanced Usage
 
 ### Component level diagram
 ![](https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/docs/_static/components.jpg)
