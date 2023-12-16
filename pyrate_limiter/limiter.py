@@ -6,7 +6,7 @@ from functools import wraps
 from inspect import isawaitable
 from threading import RLock
 from time import sleep
-from typing import Any
+from typing import Any, TypeVar
 from typing import Awaitable
 from typing import Callable
 from typing import List
@@ -27,8 +27,9 @@ from .exceptions import LimiterDelayException
 
 logger = logging.getLogger("pyrate_limiter")
 
+F = TypeVar("F", bound=Callable[..., Any])
 ItemMapping = Callable[[Any], Tuple[str, int]]
-DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
+DecoratorWrapper = Callable[[F], F]
 
 
 class SingleBucketFactory(BucketFactory):
@@ -303,8 +304,8 @@ class Limiter:
         Use with both sync & async function
         """
 
-        def with_mapping_func(mapping: ItemMapping) -> DecoratorWrapper:
-            def decorator_wrapper(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
+        def with_mapping_func(mapping: ItemMapping):
+            def decorator_wrapper(func: F) -> F:
                 """Actual function warpper"""
 
                 @wraps(func)
