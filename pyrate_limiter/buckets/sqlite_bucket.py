@@ -2,7 +2,7 @@
 """
 import sqlite3
 from threading import RLock
-from typing import List
+from typing import List, Self
 from typing import Optional
 
 from ..abstracts import AbstractBucket
@@ -103,7 +103,7 @@ class SQLiteBucket(AbstractBucket):
                     return False
 
             items = ", ".join([f"('{name}', {item.timestamp})" for name in [item.name] * item.weight])
-            query = Queries.PUT_ITEM.format(table=self.table) % items
+            query = (Queries.PUT_ITEM.format(table=self.table)) % items
             self.conn.execute(query)
             self.conn.commit()
             return True
@@ -142,3 +142,21 @@ class SQLiteBucket(AbstractBucket):
                 return None
 
             return RateItem(item[0], item[1])
+
+    @classmethod
+    def init_from_file(cls, rates: List[Rate], table: str, create_new_table=True) -> Self:
+        sqlite_connection = sqlite3.connect(
+            "./mydb.sqlite",
+            isolation_level="EXCLUSIVE",
+            check_same_thread=False,
+        )
+        if create_new_table:
+            cursor = sqlite_connection.cursor()
+            cursor.execute(Queries.CREATE_BUCKET_TABLE.format(table=table))
+
+        return cls(
+                rates,
+                sqlite_connection,
+                table=table,
+            )
+
