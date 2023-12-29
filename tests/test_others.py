@@ -11,7 +11,7 @@ def test_duration():
 
     assert Duration.SECOND * 60 == 60 * Duration.SECOND == Duration.MINUTE.value == int(Duration.MINUTE)
     assert Duration.MINUTE * 60 == 60 * Duration.MINUTE == Duration.HOUR.value == int(Duration.HOUR)
-    assert Duration.HOUR * 24 == 24 * Duration.DAY == Duration.DAY.value == int(Duration.DAY)
+    assert Duration.HOUR * 24 == 24 * Duration.HOUR == Duration.DAY.value == int(Duration.DAY)
     assert Duration.DAY * 7 == 7 * Duration.DAY == Duration.WEEK.value == int(Duration.WEEK)
     assert Duration.DAY + Duration.DAY == Duration.DAY * 2
     assert Duration.MINUTE + 30000 == 30000 + Duration.MINUTE == 90000

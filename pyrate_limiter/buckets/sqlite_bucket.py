@@ -4,6 +4,7 @@ import sqlite3
 from threading import RLock
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
@@ -21,21 +22,18 @@ class Queries:
     CREATE INDEX IF NOT EXISTS '{index_name}' ON '{table_name}' (item_timestamp)
     """
     COUNT_BEFORE_INSERT = """
-    SELECT {interval} as interval, COUNT(*) FROM '{table}'
-    WHERE item_timestamp >= {current_timestamp} - {interval}
+    SELECT :interval{index} as interval, COUNT(*) FROM '{table}'
+    WHERE item_timestamp >= :current_timestamp - :interval{index}
     """
     PUT_ITEM = """
     INSERT INTO '{table}' (name, item_timestamp) VALUES %s
     """
     LEAK = """
-    DELETE FROM '{table}' ORDER BY item_timestamp ASC LIMIT {count}
-    """
-    COUNT_BEFORE_LEAK = """
-    SELECT COUNT(*) FROM '{table}' WHERE item_timestamp < {current_timestamp} - {interval}
-    """
-    FLUSH = """
-    DELETE FROM '{table}'
-    """
+    DELETE FROM "{table}" WHERE rowid IN (
+    SELECT rowid FROM "{table}" ORDER BY item_timestamp ASC LIMIT {count});
+    """.strip()
+    COUNT_BEFORE_LEAK = """SELECT COUNT(*) FROM '{table}' WHERE item_timestamp < {current_timestamp} - {interval}"""
+    FLUSH = """DELETE FROM '{table}'"""
     # The below sqls are for testing only
     DROP_TABLE = "DROP TABLE IF EXISTS '{table}'"
     DROP_INDEX = "DROP INDEX IF EXISTS '{index}'"
@@ -51,7 +49,7 @@ class Queries:
     LIMIT 1
     )
     """
-    PEEK = "SELECT * FROM '{table}' ORDER BY item_timestamp DESC LIMIT 1 OFFSET {offset}"
+    PEEK = 'SELECT * FROM "{table}" ORDER BY item_timestamp DESC LIMIT 1 OFFSET {count}'
 
 
 class SQLiteBucket(AbstractBucket):
@@ -72,25 +70,23 @@ class SQLiteBucket(AbstractBucket):
         self.rates = rates
         self.lock = RLock()
 
-    def _build_full_count_query(self, current_timestamp: int) -> str:
+    def _build_full_count_query(self, current_timestamp: int) -> Tuple[str, dict]:
         full_query: List[str] = []
 
-        for rate in self.rates:
-            query = Queries.COUNT_BEFORE_INSERT.format(
-                table=self.table,
-                interval=rate.interval,
-                current_timestamp=current_timestamp,
-            )
+        parameters = {"current_timestamp": current_timestamp}
 
+        for index, rate in enumerate(self.rates):
+            parameters[f"interval{index}"] = rate.interval
+            query = Queries.COUNT_BEFORE_INSERT.format(table=self.table, index=index)
             full_query.append(query)
 
         join_full_query = " union ".join(full_query) if len(full_query) > 1 else full_query[0]
-        return join_full_query
+        return join_full_query, parameters
 
     def put(self, item: RateItem) -> bool:
         with self.lock:
-            query = self._build_full_count_query(item.timestamp)
-            rate_limit_counts = self.conn.execute(query).fetchall()
+            query, parameters = self._build_full_count_query(item.timestamp)
+            rate_limit_counts = self.conn.execute(query, parameters).fetchall()
 
             for idx, result in enumerate(rate_limit_counts):
                 interval, count = result
@@ -103,7 +99,7 @@ class SQLiteBucket(AbstractBucket):
                     return False
 
             items = ", ".join([f"('{name}', {item.timestamp})" for name in [item.name] * item.weight])
-            query = Queries.PUT_ITEM.format(table=self.table) % items
+            query = (Queries.PUT_ITEM.format(table=self.table)) % items
             self.conn.execute(query)
             self.conn.commit()
             return True
@@ -135,10 +131,27 @@ class SQLiteBucket(AbstractBucket):
 
     def peek(self, index: int) -> Optional[RateItem]:
         with self.lock:
-            query = Queries.PEEK.format(table=self.table, offset=index)
+            query = Queries.PEEK.format(table=self.table, count=index)
             item = self.conn.execute(query).fetchone()
 
             if not item:
                 return None
 
             return RateItem(item[0], item[1])
+
+    @classmethod
+    def init_from_file(cls, rates: List[Rate], table: str, create_new_table=True) -> "SQLiteBucket":
+        sqlite_connection = sqlite3.connect(
+            "./mydb.sqlite",
+            isolation_level="EXCLUSIVE",
+            check_same_thread=False,
+        )
+        if create_new_table:
+            cursor = sqlite_connection.cursor()
+            cursor.execute(Queries.CREATE_BUCKET_TABLE.format(table=table))
+
+        return cls(
+            rates,
+            sqlite_connection,
+            table=table,
+        )
