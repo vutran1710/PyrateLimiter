@@ -2,7 +2,7 @@
 """
 import sqlite3
 from threading import RLock
-from typing import List, Self
+from typing import List, Self, Tuple
 from typing import Optional
 
 from ..abstracts import AbstractBucket
@@ -69,7 +69,7 @@ class SQLiteBucket(AbstractBucket):
         self.rates = rates
         self.lock = RLock()
 
-    def _build_full_count_query(self, current_timestamp: int) -> tuple[str, dict]:
+    def _build_full_count_query(self, current_timestamp: int) -> Tuple[str, dict]:
         full_query: List[str] = []
 
         parameters = {"current_timestamp": current_timestamp}
