@@ -11,7 +11,6 @@ sphinx:
   configuration: docs/conf.py
 
 python:
-  system_packages: True
   install:
     - method: pip
       path: .
