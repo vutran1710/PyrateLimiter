@@ -2,8 +2,9 @@
 """
 import sqlite3
 from threading import RLock
-from typing import List, Self, Tuple
+from typing import List
 from typing import Optional
+from typing import Tuple
 
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
@@ -27,10 +28,10 @@ class Queries:
     PUT_ITEM = """
     INSERT INTO '{table}' (name, item_timestamp) VALUES %s
     """
-    LEAK = '''
+    LEAK = """
     DELETE FROM "{table}" WHERE rowid IN (
     SELECT rowid FROM "{table}" ORDER BY item_timestamp ASC LIMIT {count});
-    '''.strip()
+    """.strip()
     COUNT_BEFORE_LEAK = """SELECT COUNT(*) FROM '{table}' WHERE item_timestamp < {current_timestamp} - {interval}"""
     FLUSH = """DELETE FROM '{table}'"""
     # The below sqls are for testing only
@@ -139,7 +140,7 @@ class SQLiteBucket(AbstractBucket):
             return RateItem(item[0], item[1])
 
     @classmethod
-    def init_from_file(cls, rates: List[Rate], table: str, create_new_table=True) -> Self:
+    def init_from_file(cls, rates: List[Rate], table: str, create_new_table=True) -> "SQLiteBucket":
         sqlite_connection = sqlite3.connect(
             "./mydb.sqlite",
             isolation_level="EXCLUSIVE",
@@ -150,8 +151,7 @@ class SQLiteBucket(AbstractBucket):
             cursor.execute(Queries.CREATE_BUCKET_TABLE.format(table=table))
 
         return cls(
-                rates,
-                sqlite_connection,
-                table=table,
-            )
-
+            rates,
+            sqlite_connection,
+            table=table,
+        )
