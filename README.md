@@ -1,7 +1,7 @@
 <img align="left" width="95" height="120" src="https://raw.githubusercontent.com/vutran1710/PyrateLimiter/master/docs/_static/logo.png">
 
 # PyrateLimiter
-The request rate limiter using Leaky-bucket algorithm.
+The request rate limiter using Leaky-bucket Algorithm.
 
 Full project documentation can be found at [pyratelimiter.readthedocs.io](https://pyratelimiter.readthedocs.io).
 

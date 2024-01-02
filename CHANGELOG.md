@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.1.1] - 2024-01-02
+* Fix broken SqliteBucket following issue [#132](https://github.com/vutran1710/PyrateLimiter/issues/132)
+
 ## [3.1.0] - 2023-08-28
 * Allow to pass rates directly to Limiter to use default ImMemoryBucket with Limiter
 * Allow to pass *Duration* to `max_delay` argument of Limiter
