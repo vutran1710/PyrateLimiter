@@ -153,7 +153,7 @@ class BucketFactory(ABC):
                 now = clock.now()
                 leak = bucket.leak(now)
                 assert isinstance(leak, int)
-                logger.info("(sync)leaking bucket: %s, %s items", bucket, leak)
+                logger.debug("(sync)leaking bucket: %s, %s items", bucket, leak)
                 sleep(self.leak_interval(bucket) / 1000)
 
         async def _leak_task_async():
