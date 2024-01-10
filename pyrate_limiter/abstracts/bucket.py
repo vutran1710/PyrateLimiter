@@ -7,7 +7,7 @@ import warnings
 from abc import ABC
 from abc import abstractmethod
 from inspect import isawaitable
-from threading import Thread
+from multiprocessing.pool import ThreadPool
 from time import sleep
 from typing import Awaitable
 from typing import List
@@ -144,7 +144,7 @@ class BucketFactory(ABC):
         assert isinstance(bucket.rates, list) and len(bucket.rates) > 0
         return bucket.rates[-1].interval * 2
 
-    def schedule_leak(self, bucket: AbstractBucket, clock: AbstractClock) -> None:
+    def schedule_leak(self, bucket: AbstractBucket, clock: AbstractClock, pool: ThreadPool = None) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
         assert bucket.rates
 
@@ -177,8 +177,8 @@ class BucketFactory(ABC):
             if isawaitable(clock.now()) or isawaitable(bucket.leak(0)):
                 asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
             else:
-                thread = Thread(target=_leak_task_sync, daemon=True)
-                thread.start()
+                assert pool is not None, "threadpool must not be None"
+                pool.apply(_leak_task_sync)
 
 
 class BucketAsyncWrapper(AbstractBucket):
