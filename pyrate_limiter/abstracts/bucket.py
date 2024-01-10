@@ -169,7 +169,7 @@ class BucketFactory(ABC):
                     leak = await leak
 
                 assert isinstance(leak, int)
-                logger.info("(async)leaking bucket: %s, %s items", bucket, leak)
+                logger.debug("(async)leaking bucket: %s, %s items", bucket, leak)
                 await asyncio.sleep(self.leak_interval(bucket) / 1000)
 
         with warnings.catch_warnings():
