@@ -7,7 +7,7 @@ import warnings
 from abc import ABC
 from abc import abstractmethod
 from inspect import isawaitable
-from threading import Thread
+from multiprocessing.pool import ThreadPool
 from time import sleep
 from typing import Awaitable
 from typing import List
@@ -110,6 +110,8 @@ class BucketFactory(ABC):
     his own bucket-routing/creating logic
     """
 
+    thread_pool: Optional[ThreadPool]
+
     @abstractmethod
     def wrap_item(
         self,
@@ -177,8 +179,8 @@ class BucketFactory(ABC):
             if isawaitable(clock.now()) or isawaitable(bucket.leak(0)):
                 asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
             else:
-                thread = Thread(target=_leak_task_sync, daemon=True)
-                thread.start()
+                assert self.thread_pool is not None, "BucketFactory's thread-pool must not be None"
+                self.thread_pool.apply_async(_leak_task_sync)
 
 
 class BucketAsyncWrapper(AbstractBucket):
