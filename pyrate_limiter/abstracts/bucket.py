@@ -178,7 +178,7 @@ class BucketFactory(ABC):
                 asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
             else:
                 assert pool is not None, "threadpool must not be None"
-                pool.apply(_leak_task_sync)
+                pool.apply_async(_leak_task_sync)
 
 
 class BucketAsyncWrapper(AbstractBucket):

@@ -4,6 +4,7 @@ import asyncio
 import logging
 from functools import wraps
 from inspect import isawaitable
+from multiprocessing.pool import ThreadPool
 from threading import RLock
 from time import sleep
 from typing import Any
@@ -40,7 +41,7 @@ class SingleBucketFactory(BucketFactory):
     def __init__(self, bucket: AbstractBucket, clock: AbstractClock):
         self.clock = clock
         self.bucket = bucket
-        self.schedule_leak(bucket, clock)
+        self.schedule_leak(bucket, clock, pool=ThreadPool(processes=1))
 
     def wrap_item(self, name: str, weight: int = 1):
         now = self.clock.now()
