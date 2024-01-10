@@ -38,13 +38,12 @@ class DemoBucketFactory(BucketFactory):
     buckets: Dict[str, AbstractBucket]
     clock: AbstractClock
     auto_leak: bool
-    pool: ThreadPool
 
     def __init__(self, bucket_clock: AbstractClock, auto_leak=False, **buckets: AbstractBucket):
         self.clock = bucket_clock
         self.buckets = buckets
         self.auto_leak = auto_leak
-        self.pool = ThreadPool(processes=10)
+        self.thread_pool = ThreadPool(processes=10)
 
         for _name, bucket in self.buckets.items():
             assert isinstance(bucket, AbstractBucket)
@@ -73,7 +72,7 @@ class DemoBucketFactory(BucketFactory):
 
     def schedule_leak(self, *args):
         if self.auto_leak:
-            super().schedule_leak(*args, pool=self.pool)
+            super().schedule_leak(*args)
 
 
 @pytest.fixture(params=[True, False])

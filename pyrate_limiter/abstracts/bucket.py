@@ -110,6 +110,8 @@ class BucketFactory(ABC):
     his own bucket-routing/creating logic
     """
 
+    thread_pool: Optional[ThreadPool]
+
     @abstractmethod
     def wrap_item(
         self,
@@ -144,7 +146,7 @@ class BucketFactory(ABC):
         assert isinstance(bucket.rates, list) and len(bucket.rates) > 0
         return bucket.rates[-1].interval * 2
 
-    def schedule_leak(self, bucket: AbstractBucket, clock: AbstractClock, pool: ThreadPool = None) -> None:
+    def schedule_leak(self, bucket: AbstractBucket, clock: AbstractClock) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
         assert bucket.rates
 
@@ -177,8 +179,8 @@ class BucketFactory(ABC):
             if isawaitable(clock.now()) or isawaitable(bucket.leak(0)):
                 asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
             else:
-                assert pool is not None, "threadpool must not be None"
-                pool.apply_async(_leak_task_sync)
+                assert self.thread_pool is not None, "BucketFactory's thread-pool must not be None"
+                self.thread_pool.apply_async(_leak_task_sync)
 
 
 class BucketAsyncWrapper(AbstractBucket):

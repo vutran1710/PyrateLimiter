@@ -41,7 +41,8 @@ class SingleBucketFactory(BucketFactory):
     def __init__(self, bucket: AbstractBucket, clock: AbstractClock):
         self.clock = clock
         self.bucket = bucket
-        self.schedule_leak(bucket, clock, pool=ThreadPool(processes=1))
+        self.thread_pool = ThreadPool(processes=1)
+        self.schedule_leak(bucket, clock)
 
     def wrap_item(self, name: str, weight: int = 1):
         now = self.clock.now()
@@ -67,6 +68,7 @@ class Limiter:
     raise_when_fail: bool
     max_delay: Optional[int] = None
     lock: RLock
+    number_of_leak_threads: int
 
     def __init__(
         self,
@@ -74,10 +76,12 @@ class Limiter:
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
+        number_of_leak_threads: int = 4,
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list
         """
+        self.number_of_leak_threads = number_of_leak_threads
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
 
@@ -109,6 +113,10 @@ class Limiter:
             argument = SingleBucketFactory(argument, clock)
 
         assert isinstance(argument, BucketFactory), "Not a valid bucket/bucket-factory"
+
+        if argument.thread_pool is None:
+            argument.thread_pool = ThreadPool(processes=self.number_of_leak_threads)
+
         return argument
 
     def _raise_bucket_full_if_necessary(
