@@ -88,6 +88,7 @@ class Limiter:
             self.bucket_factory.thread_pool = thread_pool
 
         if self.bucket_factory.thread_pool is None:
+            logger.info("Create default thread-pool for Limiter with 10 processes")
             self.bucket_factory.thread_pool = ThreadPool(processes=10)
 
         self.raise_when_fail = raise_when_fail
