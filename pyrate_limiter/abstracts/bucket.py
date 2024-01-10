@@ -7,7 +7,7 @@ import warnings
 from abc import ABC
 from abc import abstractmethod
 from inspect import isawaitable
-from threading import Thread
+from multiprocessing.pool import ThreadPool
 from time import sleep
 from typing import Awaitable
 from typing import List
@@ -110,6 +110,8 @@ class BucketFactory(ABC):
     his own bucket-routing/creating logic
     """
 
+    thread_pool: Optional[ThreadPool]
+
     @abstractmethod
     def wrap_item(
         self,
@@ -153,7 +155,7 @@ class BucketFactory(ABC):
                 now = clock.now()
                 leak = bucket.leak(now)
                 assert isinstance(leak, int)
-                logger.info("(sync)leaking bucket: %s, %s items", bucket, leak)
+                logger.debug("(sync)leaking bucket: %s, %s items", bucket, leak)
                 sleep(self.leak_interval(bucket) / 1000)
 
         async def _leak_task_async():
@@ -169,7 +171,7 @@ class BucketFactory(ABC):
                     leak = await leak
 
                 assert isinstance(leak, int)
-                logger.info("(async)leaking bucket: %s, %s items", bucket, leak)
+                logger.debug("(async)leaking bucket: %s, %s items", bucket, leak)
                 await asyncio.sleep(self.leak_interval(bucket) / 1000)
 
         with warnings.catch_warnings():
@@ -177,8 +179,8 @@ class BucketFactory(ABC):
             if isawaitable(clock.now()) or isawaitable(bucket.leak(0)):
                 asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
             else:
-                thread = Thread(target=_leak_task_sync, daemon=True)
-                thread.start()
+                assert self.thread_pool is not None, "BucketFactory's thread-pool must not be None"
+                self.thread_pool.apply_async(_leak_task_sync)
 
 
 class BucketAsyncWrapper(AbstractBucket):

@@ -4,6 +4,7 @@ import asyncio
 import logging
 from functools import wraps
 from inspect import isawaitable
+from multiprocessing.pool import ThreadPool
 from threading import RLock
 from time import sleep
 from typing import Any
@@ -40,6 +41,7 @@ class SingleBucketFactory(BucketFactory):
     def __init__(self, bucket: AbstractBucket, clock: AbstractClock):
         self.clock = clock
         self.bucket = bucket
+        self.thread_pool = ThreadPool(processes=1)
         self.schedule_leak(bucket, clock)
 
     def wrap_item(self, name: str, weight: int = 1):
@@ -66,6 +68,7 @@ class Limiter:
     raise_when_fail: bool
     max_delay: Optional[int] = None
     lock: RLock
+    thread_pool: Optional[ThreadPool] = None
 
     def __init__(
         self,
@@ -73,11 +76,21 @@ class Limiter:
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
+        thread_pool: Optional[ThreadPool] = None,
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list
         """
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
+
+        if thread_pool:
+            logger.info("Overriding BucketFactory's local thread-pool with Limiter's thread-pool")
+            self.bucket_factory.thread_pool = thread_pool
+
+        if self.bucket_factory.thread_pool is None:
+            logger.info("Create default thread-pool for Limiter with 10 processes")
+            self.bucket_factory.thread_pool = ThreadPool(processes=10)
+
         self.raise_when_fail = raise_when_fail
 
         if max_delay is not None:
@@ -108,6 +121,7 @@ class Limiter:
             argument = SingleBucketFactory(argument, clock)
 
         assert isinstance(argument, BucketFactory), "Not a valid bucket/bucket-factory"
+
         return argument
 
     def _raise_bucket_full_if_necessary(

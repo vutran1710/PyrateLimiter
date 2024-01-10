@@ -3,6 +3,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from inspect import isawaitable
+from multiprocessing.pool import ThreadPool
 from time import sleep
 from time import time
 from typing import Dict
@@ -42,6 +43,7 @@ class DemoBucketFactory(BucketFactory):
         self.clock = bucket_clock
         self.buckets = buckets
         self.auto_leak = auto_leak
+        self.thread_pool = ThreadPool(processes=10)
 
         for _name, bucket in self.buckets.items():
             assert isinstance(bucket, AbstractBucket)
