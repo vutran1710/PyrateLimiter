@@ -6,12 +6,13 @@ from functools import wraps
 from inspect import isawaitable
 from threading import RLock
 from time import sleep
-from typing import Any, TypeVar
+from typing import Any
 from typing import Awaitable
 from typing import Callable
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import TypeVar
 from typing import Union
 
 from .abstracts import AbstractBucket
@@ -305,7 +306,7 @@ class Limiter:
         """
 
         def with_mapping_func(mapping: ItemMapping):
-            def decorator_wrapper(func: F) -> F:
+            def decorator_wrapper(func: F):
                 """Actual function warpper"""
 
                 @wraps(func)
