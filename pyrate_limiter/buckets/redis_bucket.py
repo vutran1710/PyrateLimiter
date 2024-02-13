@@ -25,20 +25,20 @@ class LuaScript:
     """Scripts that deal with bucket operations"""
 
     PUT_ITEM = """
+    local bucket = KEYS[1]
     local now = ARGV[1]
     local space_required = tonumber(ARGV[2])
-    local bucket = ARGV[3]
-    local item_name = ARGV[4]
+    local item_name = ARGV[3]
+    local rates_count = tonumber(ARGV[4])
 
-    for idx, key in ipairs(KEYS) do
-        if idx > 4 then
-            local interval = tonumber(key)
-            local limit = tonumber(ARGV[idx])
-            local count = redis.call('ZCOUNT', bucket, now - interval, now)
-            local space_available = limit - tonumber(count)
-            if space_available < space_required then
-                return idx - 5
-            end
+    for i=1,rates_count do
+        local offset = (i - 1) * 2
+        local interval = tonumber(ARGV[5 + offset])
+        local limit = tonumber(ARGV[5 + offset + 1])
+        local count = redis.call('ZCOUNT', bucket, now - interval, now)
+        local space_available = limit - tonumber(count)
+        if space_available < space_required then
+            return i - 1
         end
     end
 
@@ -98,20 +98,16 @@ class RedisBucket(AbstractBucket):
 
     def _check_and_insert(self, item: RateItem) -> Union[Rate, None, Awaitable[Optional[Rate]]]:
         keys = [
-            "timestamp",
-            "weight",
-            "bucket",
-            "name",
-            *[rate.interval for rate in self.rates],
+            self.bucket_key
         ]
 
         args = [
             item.timestamp,
             item.weight,
-            self.bucket_key,
             # NOTE: this is to avoid key collision since we are using ZSET
             f"{item.name}:{id_generator()}:",
-            *[rate.limit for rate in self.rates],
+            len(self.rates),
+            *[value for rate in self.rates for value in (rate.interval, rate.limit)]
         ]
 
         idx = self.redis.evalsha(self.script_hash, len(keys), *keys, *args)
