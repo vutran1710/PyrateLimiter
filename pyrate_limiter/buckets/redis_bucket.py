@@ -97,9 +97,7 @@ class RedisBucket(AbstractBucket):
         return cls(rates, redis, bucket_key, script_hash)
 
     def _check_and_insert(self, item: RateItem) -> Union[Rate, None, Awaitable[Optional[Rate]]]:
-        keys = [
-            self.bucket_key
-        ]
+        keys = [self.bucket_key]
 
         args = [
             item.timestamp,
@@ -107,7 +105,7 @@ class RedisBucket(AbstractBucket):
             # NOTE: this is to avoid key collision since we are using ZSET
             f"{item.name}:{id_generator()}:",
             len(self.rates),
-            *[value for rate in self.rates for value in (rate.interval, rate.limit)]
+            *[value for rate in self.rates for value in (rate.interval, rate.limit)],
         ]
 
         idx = self.redis.evalsha(self.script_hash, len(keys), *keys, *args)
