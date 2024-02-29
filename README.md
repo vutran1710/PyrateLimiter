@@ -213,14 +213,31 @@ class MyBucketFactory(BucketFactory):
 
 #### Having more than 1(single) buckets using names like bucket-ids
 
-If more than one buckets is needed, the bucket-routing logic should go to BucketFactory `get(..)` method. When creating buckets on the fly, it is needed to schedule leak for each newly created buckets. An example is as following:
+If more than one buckets is needed, the bucket-routing logic should go to BucketFactory `get(..)` method. 
+
+When creating buckets on the fly, it is needed to schedule leak for each newly created buckets. To support this, BucketFactory comes with a predefined method call `self.create(..)`. It is meant to create the bucket and schedule that bucket for leaking using the Factory's clock
+
+```python
+def create(
+        self,
+        clock: AbstractClock,
+        bucket_class: Type[AbstractBucket],
+        *args,
+        **kwargs,
+    ) -> AbstractBucket:
+        """Creating a bucket dynamically"""
+        bucket = bucket_class(*args, **kwargs)
+        self.schedule_leak(bucket, clock)
+        return bucket
+```
+
+By utilizing this, we can modify the code as following:
 
 ```python
 class MultiBucketFactory(BucketFactory):
     def __init__(self, clock):
         self.clock = clock
         self.buckets = {}
-        self.default_bucket = YourBucketClass(...)
 
     def wrap_item(self, name: str, weight: int = 1) -> RateItem:
         """Time-stamping item, return a RateItem"""
@@ -232,7 +249,8 @@ class MultiBucketFactory(BucketFactory):
             # Use `self.create(..)` method to both initialize new bucket and calling `schedule_leak` on that bucket
             # We can create different buckets with different types/classes here as well
             new_bucket = self.create(YourBucketClass, *your-arguments, **your-keyword-arguments)
-            self.buckets[item.name] = new_bucket
+            self.buckets.update({item.name: new_bucket})
+            
         return self.buckets[item.name]
 ```
 
