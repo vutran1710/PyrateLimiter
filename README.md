@@ -211,6 +211,31 @@ class MyBucketFactory(BucketFactory):
         return bucket
 ```
 
+#### Having more than 1(single) buckets using names like bucket-ids
+
+If more than one buckets is needed, the bucket-routing logic should go to BucketFactory `get(..)` method. When creating buckets on the fly, it is needed to schedule leak for each newly created buckets. An example is as following:
+
+```python
+class MultiBucketFactory(BucketFactory):
+    def __init__(self, clock):
+        self.clock = clock
+        self.buckets = {}
+        self.default_bucket = YourBucketClass(...)
+
+    def wrap_item(self, name: str, weight: int = 1) -> RateItem:
+        """Time-stamping item, return a RateItem"""
+        now = clock.now()
+        return RateItem(name, now, weight=weight)
+
+    def get(self, item: RateItem) -> AbstractBucket:
+        if item.name not in self.buckets:
+            # Use `self.create(..)` method to both initialize new bucket and calling `schedule_leak` on that bucket
+            # We can create different buckets with different types/classes here as well
+            new_bucket = self.create(YourBucketClass, *your-arguments, **your-keyword-arguments)
+            self.buckets[item.name] = new_bucket
+        return self.buckets[item.name]
+```
+
 ### Wrapping all up with Limiter
 
 Pass your bucket-factory to Limiter, and ready to roll!
