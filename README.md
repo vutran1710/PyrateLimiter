@@ -211,6 +211,51 @@ class MyBucketFactory(BucketFactory):
         return bucket
 ```
 
+#### Creating buckets dynamically
+
+If more than one bucket is needed, the bucket-routing logic should go to BucketFactory `get(..)` method. 
+
+When creating buckets dynamically, it is needed to schedule leak for each newly created buckets. 
+
+To support this, BucketFactory comes with a predefined method call `self.create(..)`. It is meant to create the bucket and schedule that bucket for leaking using the Factory's clock
+
+```python
+def create(
+        self,
+        clock: AbstractClock,
+        bucket_class: Type[AbstractBucket],
+        *args,
+        **kwargs,
+    ) -> AbstractBucket:
+        """Creating a bucket dynamically"""
+        bucket = bucket_class(*args, **kwargs)
+        self.schedule_leak(bucket, clock)
+        return bucket
+```
+
+By utilizing this, we can modify the code as following:
+
+```python
+class MultiBucketFactory(BucketFactory):
+    def __init__(self, clock):
+        self.clock = clock
+        self.buckets = {}
+
+    def wrap_item(self, name: str, weight: int = 1) -> RateItem:
+        """Time-stamping item, return a RateItem"""
+        now = clock.now()
+        return RateItem(name, now, weight=weight)
+
+    def get(self, item: RateItem) -> AbstractBucket:
+        if item.name not in self.buckets:
+            # Use `self.create(..)` method to both initialize new bucket and calling `schedule_leak` on that bucket
+            # We can create different buckets with different types/classes here as well
+            new_bucket = self.create(YourBucketClass, *your-arguments, **your-keyword-arguments)
+            self.buckets.update({item.name: new_bucket})
+            
+        return self.buckets[item.name]
+```
+
 ### Wrapping all up with Limiter
 
 Pass your bucket-factory to Limiter, and ready to roll!
