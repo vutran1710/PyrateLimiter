@@ -211,11 +211,13 @@ class MyBucketFactory(BucketFactory):
         return bucket
 ```
 
-#### Having more than 1(single) buckets using names like bucket-ids
+#### Creating buckets dynamically
 
-If more than one buckets is needed, the bucket-routing logic should go to BucketFactory `get(..)` method. 
+If more than one bucket is needed, the bucket-routing logic should go to BucketFactory `get(..)` method. 
 
-When creating buckets on the fly, it is needed to schedule leak for each newly created buckets. To support this, BucketFactory comes with a predefined method call `self.create(..)`. It is meant to create the bucket and schedule that bucket for leaking using the Factory's clock
+When creating buckets dynamically, it is needed to schedule leak for each newly created buckets. 
+
+To support this, BucketFactory comes with a predefined method call `self.create(..)`. It is meant to create the bucket and schedule that bucket for leaking using the Factory's clock
 
 ```python
 def create(
