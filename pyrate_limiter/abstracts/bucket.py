@@ -9,11 +9,11 @@ from collections import defaultdict
 from inspect import isawaitable
 from threading import Thread
 from typing import Awaitable
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Type
 from typing import Union
-from typing_extensions import Dict
 
 from .clock import AbstractClock
 from .rate import Rate
@@ -125,8 +125,7 @@ class Leaker(Thread):
         super().__init__()
 
     def register(self, bucket: AbstractBucket, clock: AbstractClock):
-        """Register a new bucket with its associated clock
-        """
+        """Register a new bucket with its associated clock"""
         assert self.sync_buckets is not None
         assert self.clocks is not None
         assert self.async_buckets is not None
