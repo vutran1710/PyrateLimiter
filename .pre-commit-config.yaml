@@ -9,10 +9,11 @@ repos:
     -   id: check-yaml
     -   id: end-of-file-fixer
     -   id: trailing-whitespace
--   repo: https://github.com/pycqa/flake8
-    rev: '4.0.1'
+-   repo: https://github.com/PyCQA/flake8
+    rev: 5.0.4
     hooks:
     -   id: flake8
+        additional_dependencies: [flake8-typing-imports==1.10.0]
 -   repo: https://github.com/pre-commit/mirrors-mypy
     rev: v0.930
     hooks:
