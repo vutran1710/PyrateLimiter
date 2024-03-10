@@ -3,11 +3,11 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from inspect import isawaitable
-from multiprocessing.pool import ThreadPool
 from time import sleep
 from time import time
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Tuple
 
 import pytest
@@ -35,19 +35,20 @@ validate_rate_list(DEFAULT_RATES)
 class DemoBucketFactory(BucketFactory):
     """Multi-bucket factory used for testing schedule-leaks"""
 
-    buckets: Dict[str, AbstractBucket]
+    buckets: Optional[Dict[str, AbstractBucket]] = None
     clock: AbstractClock
     auto_leak: bool
+    leak_interval = 300
 
     def __init__(self, bucket_clock: AbstractClock, auto_leak=False, **buckets: AbstractBucket):
-        self.clock = bucket_clock
-        self.buckets = buckets
         self.auto_leak = auto_leak
-        self.thread_pool = ThreadPool(processes=10)
+        self.clock = bucket_clock
+        self.buckets = {}
 
-        for _name, bucket in self.buckets.items():
+        for item_name_pattern, bucket in buckets.items():
             assert isinstance(bucket, AbstractBucket)
             self.schedule_leak(bucket, bucket_clock)
+            self.buckets[item_name_pattern] = bucket
 
     def wrap_item(self, name: str, weight: int = 1):
         now = self.clock.now()
@@ -61,13 +62,15 @@ class DemoBucketFactory(BucketFactory):
         return wrap_async() if isawaitable(now) else wrap_sycn()
 
     def get(self, item: RateItem) -> AbstractBucket:
+        assert self.buckets is not None
+
         if item.name in self.buckets:
             bucket = self.buckets[item.name]
             assert isinstance(bucket, AbstractBucket)
             return bucket
 
         bucket = self.create(self.clock, InMemoryBucket, DEFAULT_RATES)
-        self.buckets.update({item.name: bucket})
+        self.buckets[item.name] = bucket
         return bucket
 
     def schedule_leak(self, *args):
@@ -202,6 +205,9 @@ async def test_factory_leak(clock, create_bucket):
     assert id(bucket1) != id(bucket2)
 
     factory = DemoBucketFactory(clock, auto_leak=True, b1=bucket1, b2=bucket2)
+    assert len(factory.buckets) == 2
+    assert len(factory._buckets) == 2
+    assert len(factory._clocks) == 2
     logger.info("Factory initiated with %s buckets", len(factory.buckets))
 
     for item_name in ["b1", "b2", "a1"]:
