@@ -9,7 +9,6 @@ from collections import defaultdict
 from inspect import isawaitable
 from threading import Thread
 from typing import Awaitable
-from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Type
@@ -157,10 +156,19 @@ class BucketFactory(ABC):
     his own bucket-routing/creating logic
     """
 
-    leak_interval: int = 10_000
-    _buckets: Optional[Dict[int, AbstractBucket]] = None
-    _clocks: Optional[Dict[int, AbstractClock]] = None
     _leaker: Optional[Leaker] = None
+
+    @property
+    def leak_interval(self) -> int:
+        """Retrieve leak-interval from inner Leaker task"""
+        assert self._leaker is not None
+        return self._leaker.leak_interval
+
+    @leak_interval.setter
+    def leak_interval(self, value: int):
+        """Set leak-interval for inner Leaker task"""
+        assert self._leaker is not None
+        self._leaker.leak_interval = value
 
     @abstractmethod
     def wrap_item(
