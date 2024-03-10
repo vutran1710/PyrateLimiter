@@ -153,7 +153,7 @@ class Leaker(Thread):
                 assert isinstance(leak, int)
 
                 if leak > 0:
-                    logger.debug("(%s) leaking bucket: %s, %s items", "sync" if sync else "async",bucket, leak)
+                    logger.debug("> Leaking (%s) bucket: %s, %s items", "sync" if sync else "async",bucket, leak)
 
             await asyncio.sleep(self.leak_interval / 1000)
 
@@ -163,7 +163,7 @@ class Leaker(Thread):
 
         if not self.is_async_leak_started:
             self.is_async_leak_started = True
-            asyncio.run_coroutine_threadsafe(self._leak(sync=False), asyncio.get_running_loop())
+            asyncio.create_task(self._leak(sync=False))
 
     def run(self) -> None:
         assert self.sync_buckets
