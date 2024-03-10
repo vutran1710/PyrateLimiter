@@ -157,18 +157,22 @@ class BucketFactory(ABC):
     """
 
     _leaker: Optional[Leaker] = None
+    _leak_interval: int = 10_000
 
     @property
     def leak_interval(self) -> int:
         """Retrieve leak-interval from inner Leaker task"""
-        assert self._leaker is not None
+        if not self._leaker:
+            return self._leak_interval
         return self._leaker.leak_interval
 
     @leak_interval.setter
     def leak_interval(self, value: int):
         """Set leak-interval for inner Leaker task"""
-        assert self._leaker is not None
-        self._leaker.leak_interval = value
+        if self._leaker:
+            self._leaker.leak_interval = value
+
+        self._leak_interval = value
 
     @abstractmethod
     def wrap_item(
