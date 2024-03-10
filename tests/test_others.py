@@ -58,13 +58,14 @@ def test_binary_search():
     # Normal list of items
     items = [RateItem("item", nth * 2) for nth in range(5)]
 
-    for item in items:
-        print(item)
+    print([item.timestamp for item in items])
 
     assert binary_search(items, 0) == 0
     assert binary_search(items, 1) == 1
     assert binary_search(items, 2) == 1
     assert binary_search(items, 3) == 2
+    assert binary_search(items, 9) == -1
+    assert binary_search(items, 8) == 4
 
     # If the value is larger than the last item, idx would be -1
     assert binary_search(items, 11) == -1

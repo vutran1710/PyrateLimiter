@@ -17,22 +17,28 @@ def binary_search(items: List[RateItem], value: int) -> int:
     if not items:
         return 0
 
-    if value == items[0].timestamp:
-        return 0
-
     if value > items[-1].timestamp:
         return -1
 
-    pivot = int(len(items) / 2)
-    left, right = items[pivot - 1], items[pivot]
+    if value <= items[0].timestamp:
+        return 0
 
-    if left.timestamp >= value:
-        return binary_search(items[:pivot], value)
+    left_pointer, right_pointer, mid = 0, len(items) - 1, -2
 
-    if right.timestamp < value:
-        return pivot + binary_search(items[pivot:], value)
+    while left_pointer <= right_pointer:
+        mid = (left_pointer + right_pointer) // 2
+        left, right = items[mid - 1].timestamp, items[mid].timestamp
 
-    return pivot
+        if left < value <= right:
+            break
+
+        if left >= value:
+            right_pointer = mid
+
+        if right < value:
+            left_pointer = mid + 1
+
+    return mid
 
 
 def validate_rate_list(rates: List[Rate]) -> bool:

@@ -3,13 +3,13 @@ a workable bucket for Limiter to use
 """
 import asyncio
 import logging
-import warnings
 from abc import ABC
 from abc import abstractmethod
+from collections import defaultdict
 from inspect import isawaitable
-from multiprocessing.pool import ThreadPool
-from time import sleep
+from threading import Thread
 from typing import Awaitable
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Type
@@ -104,13 +104,102 @@ class AbstractBucket(ABC):
         return _calc_waiting(bound_item)
 
 
+class Leaker(Thread):
+    """Responsible for scheduling buckets' leaking at the background either
+    through a daemon task(for sync buckets) or a task using asyncio.Task
+    """
+
+    daemon = True
+    name = "PyrateLimiter's Leaker"
+    sync_buckets: Optional[Dict[int, AbstractBucket]] = None
+    async_buckets: Optional[Dict[int, AbstractBucket]] = None
+    clocks: Optional[Dict[int, AbstractClock]] = None
+    leak_interval: int = 10_000
+    is_async_leak_started = False
+
+    def __init__(self, leak_interval: int):
+        self.sync_buckets = defaultdict()
+        self.async_buckets = defaultdict()
+        self.clocks = defaultdict()
+        self.leak_interval = leak_interval
+        super().__init__()
+
+    def register(self, bucket: AbstractBucket, clock: AbstractClock):
+        """Register a new bucket with its associated clock"""
+        assert self.sync_buckets is not None
+        assert self.clocks is not None
+        assert self.async_buckets is not None
+
+        if isawaitable(bucket.leak(0)):
+            self.async_buckets[id(bucket)] = bucket
+        else:
+            self.sync_buckets[id(bucket)] = bucket
+
+        self.clocks[id(bucket)] = clock
+
+    async def _leak(self, sync=True) -> None:
+        assert self.clocks
+
+        while True:
+            buckets = self.sync_buckets if sync else self.async_buckets
+            assert buckets
+
+            for bucket_id, bucket in list(buckets.items()):
+                clock = self.clocks[bucket_id]
+                now = clock.now()
+
+                while isawaitable(now):
+                    now = await now
+
+                assert isinstance(now, int)
+                leak = bucket.leak(now)
+
+                while isawaitable(leak):
+                    leak = await leak
+
+                assert isinstance(leak, int)
+
+                bucket_type = "sync" if sync else "async"
+                logger.debug("> Leaking (%s) bucket: %s, %s items", bucket_type, bucket, leak)
+
+            await asyncio.sleep(self.leak_interval / 1000)
+
+    def leak_async(self):
+        if self.async_buckets and not self.is_async_leak_started:
+            self.is_async_leak_started = True
+            asyncio.create_task(self._leak(sync=False))
+
+    def run(self) -> None:
+        assert self.sync_buckets
+        asyncio.run(self._leak(sync=True))
+
+    def start(self) -> None:
+        if self.sync_buckets and not self.is_alive():
+            super().start()
+
+
 class BucketFactory(ABC):
     """Asbtract BucketFactory class.
     It is reserved for user to implement/override this class with
     his own bucket-routing/creating logic
     """
 
-    thread_pool: Optional[ThreadPool]
+    _leaker: Optional[Leaker] = None
+    _leak_interval: int = 10_000
+
+    @property
+    def leak_interval(self) -> int:
+        """Retrieve leak-interval from inner Leaker task"""
+        if not self._leaker:
+            return self._leak_interval
+        return self._leaker.leak_interval
+
+    @leak_interval.setter
+    def leak_interval(self, value: int):
+        """Set leak-interval for inner Leaker task"""
+        if self._leaker:
+            self._leaker.leak_interval = value
+        self._leak_interval = value
 
     @abstractmethod
     def wrap_item(
@@ -139,48 +228,16 @@ class BucketFactory(ABC):
         self.schedule_leak(bucket, clock)
         return bucket
 
-    def leak_interval(self, bucket: AbstractBucket) -> float:
-        """Interval between each leak-task run
-        default-interval = 2 * largest rate's interval (ms)
-        """
-        assert isinstance(bucket.rates, list) and len(bucket.rates) > 0
-        return bucket.rates[-1].interval * 2
-
-    def schedule_leak(self, bucket: AbstractBucket, clock: AbstractClock) -> None:
+    def schedule_leak(self, new_bucket: AbstractBucket, associated_clock: AbstractClock) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
-        assert bucket.rates
+        assert new_bucket.rates
 
-        def _leak_task_sync():
-            while True:
-                now = clock.now()
-                leak = bucket.leak(now)
-                assert isinstance(leak, int)
-                logger.debug("(sync)leaking bucket: %s, %s items", bucket, leak)
-                sleep(self.leak_interval(bucket) / 1000)
+        if not self._leaker:
+            self._leaker = Leaker(self.leak_interval)
 
-        async def _leak_task_async():
-            while True:
-                now = clock.now()
-
-                while isawaitable(now):
-                    now = await now
-
-                leak = bucket.leak(now)
-
-                while isawaitable(leak):
-                    leak = await leak
-
-                assert isinstance(leak, int)
-                logger.debug("(async)leaking bucket: %s, %s items", bucket, leak)
-                await asyncio.sleep(self.leak_interval(bucket) / 1000)
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings(action="ignore", category=RuntimeWarning)
-            if isawaitable(clock.now()) or isawaitable(bucket.leak(0)):
-                asyncio.run_coroutine_threadsafe(_leak_task_async(), asyncio.get_running_loop())
-            else:
-                assert self.thread_pool is not None, "BucketFactory's thread-pool must not be None"
-                self.thread_pool.apply_async(_leak_task_sync)
+        self._leaker.register(new_bucket, associated_clock)
+        self._leaker.start()
+        self._leaker.leak_async()
 
 
 class BucketAsyncWrapper(AbstractBucket):
