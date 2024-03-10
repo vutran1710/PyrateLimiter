@@ -130,7 +130,7 @@ async def create_sqlite_bucket(rates: List[Rate]):
         create_in_memory_bucket,
         create_redis_bucket,
         create_sqlite_bucket,
-        # create_async_redis_bucket,
+        create_async_redis_bucket,
     ]
 )
 def create_bucket(request):

@@ -13,6 +13,7 @@ from typing import List
 from typing import Optional
 from typing import Type
 from typing import Union
+from typing_extensions import Dict
 
 from .clock import AbstractClock
 from .rate import Rate
@@ -106,48 +107,74 @@ class AbstractBucket(ABC):
 class Leaker(Thread):
     daemon = True
     name = "PyrateLimiter's Leaker"
-    buckets = None
-    clocks = None
+    sync_buckets: Optional[Dict[int, AbstractBucket]] = None
+    async_buckets: Optional[Dict[int, AbstractBucket]] = None
+    clocks: Optional[Dict[int, AbstractClock]] = None
     leak_interval: int = 10_000
+    is_async_leak_started = False
 
     def __init__(self, leak_interval: int):
-        self.buckets = defaultdict()
+        self.sync_buckets = defaultdict()
+        self.async_buckets = defaultdict()
         self.clocks = defaultdict()
         self.leak_interval = leak_interval
         super().__init__()
 
     def register(self, bucket: AbstractBucket, clock: AbstractClock):
-        assert self.buckets is not None
+        assert self.sync_buckets is not None
         assert self.clocks is not None
-        self.buckets[id(bucket)] = bucket
+        assert self.async_buckets is not None
+        if isawaitable(bucket.leak(0)):
+            self.async_buckets[id(bucket)] = bucket
+        else:
+            self.sync_buckets[id(bucket)] = bucket
         self.clocks[id(bucket)] = clock
 
+    async def _leak(self, sync = True) -> None:
+        assert self.clocks
+
+        while True:
+            buckets = self.sync_buckets if sync else self.async_buckets
+            assert buckets
+            for bucket_id, bucket in list(buckets.items()):
+                clock = self.clocks[bucket_id]
+                now = clock.now()
+
+                while isawaitable(now):
+                    now = await now
+
+                assert isinstance(now, int)
+                leak = bucket.leak(now)
+
+                while isawaitable(leak):
+                    is_bucket_async = True
+                    leak = await leak
+
+                assert isinstance(leak, int)
+
+                if leak > 0:
+                    logger.warning("(%s) leaking bucket: %s, %s items", "sync" if sync else "async",bucket, leak)
+
+            await asyncio.sleep(self.leak_interval / 1000)
+
+    def leak_async(self):
+        if not self.async_buckets:
+            return
+
+        if not self.is_async_leak_started:
+            self.is_async_leak_started = True
+            asyncio.run_coroutine_threadsafe(self._leak(sync=False), asyncio.get_running_loop())
+
     def run(self) -> None:
-        async def _background_leak():
-            assert self.clocks
-            assert self.buckets
-            while True:
-                for bucket_id, bucket in list(self.buckets.items()):
-                    clock = self.clocks[bucket_id]
-                    now = clock.now()
+        assert self.sync_buckets
+        asyncio.run(self._leak(sync=True))
 
-                    while isawaitable(now):
-                        now = await now
+    def start(self) -> None:
+        if not self.sync_buckets:
+            return
 
-                    assert isinstance(now, int)
-                    leak = bucket.leak(now)
-
-                    while isawaitable(leak):
-                        leak = await leak
-
-                    assert isinstance(leak, int)
-
-                    if leak > 0:
-                        logger.warning(">>>>>>>>>>>>>>>>>>>>> leaking bucket: %s, %s items", bucket, leak)
-
-                await asyncio.sleep(self.leak_interval / 1000)
-
-        asyncio.run(_background_leak())
+        if not self.is_alive():
+            return super().start()
 
 
 class BucketFactory(ABC):
@@ -171,7 +198,6 @@ class BucketFactory(ABC):
         """Set leak-interval for inner Leaker task"""
         if self._leaker:
             self._leaker.leak_interval = value
-
         self._leak_interval = value
 
     @abstractmethod
@@ -209,11 +235,8 @@ class BucketFactory(ABC):
             self._leaker = Leaker(self.leak_interval)
 
         self._leaker.register(new_bucket, associated_clock)
-
-        if self._leaker.is_alive():
-            return
-
         self._leaker.start()
+        self._leaker.leak_async()
 
 
 class BucketAsyncWrapper(AbstractBucket):
