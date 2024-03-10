@@ -47,7 +47,7 @@ class Duration(Enum):
         for note, shorten in notes:
             if value >= note.value:
                 decimal_value = value / note.value
-                return f"{decimal_value:0.1f}{shorten}"
+                return f"{decimal_value:0.1f}{shorten}"  # noqa: E231
 
         return f"{value}ms"
 

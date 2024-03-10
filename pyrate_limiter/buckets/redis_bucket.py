@@ -103,7 +103,7 @@ class RedisBucket(AbstractBucket):
             item.timestamp,
             item.weight,
             # NOTE: this is to avoid key collision since we are using ZSET
-            f"{item.name}:{id_generator()}:",
+            f"{item.name}:{id_generator()}:",  # noqa: E231
             len(self.rates),
             *[value for rate in self.rates for value in (rate.interval, rate.limit)],
         ]
