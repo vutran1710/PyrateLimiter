@@ -105,6 +105,10 @@ class AbstractBucket(ABC):
 
 
 class Leaker(Thread):
+    """Responsible for scheduling buckets' leaking at the background either
+    through a daemon task(for sync buckets) or a task using asyncio.Task
+    """
+
     daemon = True
     name = "PyrateLimiter's Leaker"
     sync_buckets: Optional[Dict[int, AbstractBucket]] = None
@@ -121,21 +125,26 @@ class Leaker(Thread):
         super().__init__()
 
     def register(self, bucket: AbstractBucket, clock: AbstractClock):
+        """Register a new bucket with its associated clock
+        """
         assert self.sync_buckets is not None
         assert self.clocks is not None
         assert self.async_buckets is not None
+
         if isawaitable(bucket.leak(0)):
             self.async_buckets[id(bucket)] = bucket
         else:
             self.sync_buckets[id(bucket)] = bucket
+
         self.clocks[id(bucket)] = clock
 
-    async def _leak(self, sync = True) -> None:
+    async def _leak(self, sync=True) -> None:
         assert self.clocks
 
         while True:
             buckets = self.sync_buckets if sync else self.async_buckets
             assert buckets
+
             for bucket_id, bucket in list(buckets.items()):
                 clock = self.clocks[bucket_id]
                 now = clock.now()
@@ -147,21 +156,17 @@ class Leaker(Thread):
                 leak = bucket.leak(now)
 
                 while isawaitable(leak):
-                    is_bucket_async = True
                     leak = await leak
 
                 assert isinstance(leak, int)
 
-                if leak > 0:
-                    logger.debug("> Leaking (%s) bucket: %s, %s items", "sync" if sync else "async",bucket, leak)
+                bucket_type = "sync" if sync else "async"
+                logger.debug("> Leaking (%s) bucket: %s, %s items", bucket_type, bucket, leak)
 
             await asyncio.sleep(self.leak_interval / 1000)
 
     def leak_async(self):
-        if not self.async_buckets:
-            return
-
-        if not self.is_async_leak_started:
+        if self.async_buckets and not self.is_async_leak_started:
             self.is_async_leak_started = True
             asyncio.create_task(self._leak(sync=False))
 
@@ -170,11 +175,8 @@ class Leaker(Thread):
         asyncio.run(self._leak(sync=True))
 
     def start(self) -> None:
-        if not self.sync_buckets:
-            return
-
-        if not self.is_alive():
-            return super().start()
+        if self.sync_buckets and not self.is_alive():
+            super().start()
 
 
 class BucketFactory(ABC):
