@@ -206,8 +206,8 @@ async def test_factory_leak(clock, create_bucket):
 
     factory = DemoBucketFactory(clock, auto_leak=True, b1=bucket1, b2=bucket2)
     assert len(factory.buckets) == 2
-    assert len(factory._buckets) == 2
-    assert len(factory._clocks) == 2
+    assert len(factory._leaker.buckets) == 2
+    assert len(factory._leaker.clocks) == 2
     logger.info("Factory initiated with %s buckets", len(factory.buckets))
 
     for item_name in ["b1", "b2", "a1"]:

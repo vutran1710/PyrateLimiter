@@ -104,6 +104,53 @@ class AbstractBucket(ABC):
         return _calc_waiting(bound_item)
 
 
+class Leaker(Thread):
+    daemon = True
+    name = "PyrateLimiter's Leaker"
+    buckets = None
+    clocks = None
+    leak_interval: int = 10_000
+
+    def __init__(self, leak_interval: int):
+        self.buckets = defaultdict()
+        self.clocks = defaultdict()
+        self.leak_interval = leak_interval
+        super().__init__()
+
+    def register(self, bucket: AbstractBucket, clock: AbstractClock):
+        assert self.buckets is not None
+        assert self.clocks is not None
+        self.buckets[id(bucket)] = bucket
+        self.clocks[id(bucket)] = clock
+
+    def run(self) -> None:
+        async def _background_leak():
+            assert self.clocks
+            assert self.buckets
+            while True:
+                for bucket_id, bucket in list(self.buckets.items()):
+                    clock = self.clocks[bucket_id]
+                    now = clock.now()
+
+                    while isawaitable(now):
+                        now = await now
+
+                    assert isinstance(now, int)
+                    leak = bucket.leak(now)
+
+                    while isawaitable(leak):
+                        leak = await leak
+
+                    assert isinstance(leak, int)
+
+                    if leak > 0:
+                        logger.debug("(async)leaking bucket: %s, %s items", bucket, leak)
+
+                await asyncio.sleep(self.leak_interval / 1000)
+
+        asyncio.run(_background_leak())
+
+
 class BucketFactory(ABC):
     """Asbtract BucketFactory class.
     It is reserved for user to implement/override this class with
@@ -113,7 +160,7 @@ class BucketFactory(ABC):
     leak_interval: int = 10_000
     _buckets: Optional[Dict[int, AbstractBucket]] = None
     _clocks: Optional[Dict[int, AbstractClock]] = None
-    _t: Optional[Thread] = None
+    _leaker: Optional[Leaker] = None
 
     @abstractmethod
     def wrap_item(
@@ -146,46 +193,15 @@ class BucketFactory(ABC):
         """Schedule all the buckets' leak, reset bucket's failing rate"""
         assert new_bucket.rates
 
-        if self._buckets is None:
-            self._buckets = defaultdict()
+        if not self._leaker:
+            self._leaker = Leaker(self.leak_interval)
 
-        if self._clocks is None:
-            self._clocks = defaultdict()
+        self._leaker.register(new_bucket, associated_clock)
 
-        bucket_id = id(new_bucket)
-        self._buckets[bucket_id] = new_bucket
-        self._clocks[bucket_id] = associated_clock
-
-        if self._t:
+        if self._leaker.is_alive():
             return
 
-        async def _background_leak():
-            while True:
-                for bucket_id, bucket in list(self._buckets.items()):
-                    clock = self._clocks[bucket_id]
-                    now = clock.now()
-
-                    while isawaitable(now):
-                        now = await now
-
-                    assert isinstance(now, int)
-                    leak = bucket.leak(now)
-
-                    while isawaitable(leak):
-                        leak = await leak
-
-                    assert isinstance(leak, int)
-
-                    if leak > 0:
-                        logger.debug("(async)leaking bucket: %s, %s items", bucket, leak)
-
-                await asyncio.sleep(self.leak_interval / 1000)
-
-        def wrap():
-            asyncio.run(_background_leak())
-
-        self._t = Thread(target=wrap, daemon=True, name="PyrateLimiter Background Leaks")
-        self._t.start()
+        self._leaker.start()
 
 
 class BucketAsyncWrapper(AbstractBucket):
