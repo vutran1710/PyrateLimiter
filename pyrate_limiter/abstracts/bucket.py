@@ -153,7 +153,7 @@ class Leaker(Thread):
                 assert isinstance(leak, int)
 
                 if leak > 0:
-                    logger.warning("(%s) leaking bucket: %s, %s items", "sync" if sync else "async",bucket, leak)
+                    logger.debug("(%s) leaking bucket: %s, %s items", "sync" if sync else "async",bucket, leak)
 
             await asyncio.sleep(self.leak_interval / 1000)
 
