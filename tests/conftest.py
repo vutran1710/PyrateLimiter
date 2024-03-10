@@ -166,10 +166,10 @@ class DemoBucketFactory(BucketFactory):
         async def wrap_async():
             return RateItem(name, await now, weight=weight)
 
-        def wrap_sycn():
+        def wrap_sync():
             return RateItem(name, now, weight=weight)
 
-        return wrap_async() if isawaitable(now) else wrap_sycn()
+        return wrap_async() if isawaitable(now) else wrap_sync()
 
     def get(self, item: RateItem) -> AbstractBucket:
         assert self.buckets is not None
