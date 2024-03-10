@@ -1,20 +1,18 @@
 """Complete Limiter test suite
 """
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from inspect import isawaitable
-from time import sleep
-from time import time
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
 
 import pytest
 
+from .conftest import async_acquire
+from .conftest import concurrent_acquire
+from .conftest import DEFAULT_RATES
+from .conftest import DemoBucketFactory
+from .conftest import flushing_bucket
+from .conftest import inspect_bucket_items
 from .conftest import logger
+from .conftest import prefilling_bucket
 from pyrate_limiter import AbstractBucket
-from pyrate_limiter import AbstractClock
 from pyrate_limiter import BucketAsyncWrapper
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import BucketFullException
@@ -22,232 +20,7 @@ from pyrate_limiter import Duration
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import LimiterDelayException
-from pyrate_limiter import Rate
-from pyrate_limiter import RateItem
 from pyrate_limiter import TimeClock
-from pyrate_limiter import validate_rate_list
-
-
-DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
-validate_rate_list(DEFAULT_RATES)
-
-
-class DemoBucketFactory(BucketFactory):
-    """Multi-bucket factory used for testing schedule-leaks"""
-
-    buckets: Optional[Dict[str, AbstractBucket]] = None
-    clock: AbstractClock
-    auto_leak: bool
-    leak_interval = 300
-
-    def __init__(self, bucket_clock: AbstractClock, auto_leak=False, **buckets: AbstractBucket):
-        self.auto_leak = auto_leak
-        self.clock = bucket_clock
-        self.buckets = {}
-
-        for item_name_pattern, bucket in buckets.items():
-            assert isinstance(bucket, AbstractBucket)
-            self.schedule_leak(bucket, bucket_clock)
-            self.buckets[item_name_pattern] = bucket
-
-    def wrap_item(self, name: str, weight: int = 1):
-        now = self.clock.now()
-
-        async def wrap_async():
-            return RateItem(name, await now, weight=weight)
-
-        def wrap_sycn():
-            return RateItem(name, now, weight=weight)
-
-        return wrap_async() if isawaitable(now) else wrap_sycn()
-
-    def get(self, item: RateItem) -> AbstractBucket:
-        assert self.buckets is not None
-
-        if item.name in self.buckets:
-            bucket = self.buckets[item.name]
-            assert isinstance(bucket, AbstractBucket)
-            return bucket
-
-        bucket = self.create(self.clock, InMemoryBucket, DEFAULT_RATES)
-        self.buckets[item.name] = bucket
-        return bucket
-
-    def schedule_leak(self, *args):
-        if self.auto_leak:
-            super().schedule_leak(*args)
-
-
-@pytest.fixture(params=[True, False])
-def limiter_should_raise(request):
-    return request.param
-
-
-@pytest.fixture(params=[None, 500, Duration.SECOND * 2, Duration.MINUTE])
-def limiter_delay(request):
-    return request.param
-
-
-async def inspect_bucket_items(bucket: AbstractBucket, expected_item_count: int):
-    """Inspect items in the bucket
-    - Assert number of item == expected-item-count
-    - Assert that items are ordered by timestamps, from latest to earliest
-    """
-    collected_items = []
-
-    for idx in range(expected_item_count):
-        item = bucket.peek(idx)
-
-        if isawaitable(item):
-            item = await item
-
-        assert isinstance(item, RateItem)
-        collected_items.append(item)
-
-    item_names = [item.name for item in collected_items]
-
-    for i in range(1, expected_item_count):
-        item = collected_items[i]
-        prev_item = collected_items[i - 1]
-        assert item.timestamp <= prev_item.timestamp
-
-    return item_names
-
-
-async def concurrent_acquire(limiter: Limiter, items: List[str]):
-    with ThreadPoolExecutor() as executor:
-        result = list(executor.map(limiter.try_acquire, items))
-        for idx, coro in enumerate(result):
-            while isawaitable(coro):
-                coro = await coro
-                result[idx] = coro
-
-        return result
-
-
-async def async_acquire(limiter: Limiter, item: str, weight: int = 1) -> Tuple[bool, int]:
-    start = time()
-    acquire = limiter.try_acquire(item, weight=weight)
-
-    if isawaitable(acquire):
-        acquire = await acquire
-
-    time_cost_in_ms = int((time() - start) * 1000)
-    assert isinstance(acquire, bool)
-    return acquire, time_cost_in_ms
-
-
-async def async_count(bucket: AbstractBucket) -> int:
-    count = bucket.count()
-
-    if isawaitable(count):
-        count = await count
-
-    assert isinstance(count, int)
-    return count
-
-
-async def prefilling_bucket(limiter: Limiter, sleep_interval: float, item: str):
-    """Pre-filling bucket to the limit before testing
-    the time cost might vary depending on the bucket's backend
-    - For in-memory bucket, this should be less than a 1ms
-    - For external bucket's source ie Redis, this mostly depends on the network latency
-    """
-    acquire_ok, cost = await async_acquire(limiter, item)
-    logger.info("cost = %s", cost)
-    assert cost <= 50
-    assert acquire_ok
-    sleep(sleep_interval)
-
-    acquire_ok, cost = await async_acquire(limiter, item)
-    logger.info("cost = %s", cost)
-    assert cost <= 50
-    assert acquire_ok
-    sleep(sleep_interval)
-
-    acquire_ok, cost = await async_acquire(limiter, item)
-    logger.info("cost = %s", cost)
-    assert cost <= 50
-    assert acquire_ok
-
-
-async def flushing_bucket(bucket: AbstractBucket):
-    flush = bucket.flush()
-
-    if isawaitable(flush):
-        await flush
-
-
-@pytest.mark.asyncio
-async def test_factory_01(clock, create_bucket):
-    factory = DemoBucketFactory(
-        clock,
-        hello=await create_bucket(DEFAULT_RATES),
-    )
-
-    item = factory.wrap_item("hello", 1)
-
-    if isawaitable(item):
-        item = await item
-
-    assert isinstance(item, RateItem)
-    assert item.weight == 1
-
-    bucket = factory.get(item)
-
-    assert isinstance(bucket, AbstractBucket)
-
-
-@pytest.mark.asyncio
-async def test_factory_leak(clock, create_bucket):
-    bucket1 = await create_bucket(DEFAULT_RATES)
-    bucket2 = await create_bucket(DEFAULT_RATES)
-    assert id(bucket1) != id(bucket2)
-
-    factory = DemoBucketFactory(clock, auto_leak=True, b1=bucket1, b2=bucket2)
-    assert len(factory.buckets) == 2
-    assert len(factory._leaker.buckets) == 2
-    assert len(factory._leaker.clocks) == 2
-    logger.info("Factory initiated with %s buckets", len(factory.buckets))
-
-    for item_name in ["b1", "b2", "a1"]:
-        for _ in range(3):
-            is_async = False
-            item = factory.wrap_item(item_name)
-
-            if isawaitable(item):
-                is_async = True
-                item = await item
-
-            bucket = factory.get(item)
-            put_ok = bucket.put(item)
-
-            if isawaitable(put_ok):
-                is_async = True
-                put_ok = await put_ok
-
-            assert put_ok
-            sleep(0.1)
-
-        if item_name == "b1":
-            assert await async_count(bucket1) == 3
-
-        if item_name == "b2":
-            assert await async_count(bucket2) == 3
-
-        if item_name == "a1":
-            assert await async_count(factory.buckets[item_name]) == 3
-
-        if is_async:
-            await asyncio.sleep(6)
-        else:
-            sleep(6)
-
-        assert await async_count(bucket1) == 0
-        assert await async_count(bucket2) == 0
-        assert await async_count(factory.buckets[item_name]) == 0
-
-    assert len(factory.buckets) == 3
 
 
 @pytest.mark.asyncio

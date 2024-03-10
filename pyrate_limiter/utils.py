@@ -23,22 +23,20 @@ def binary_search(items: List[RateItem], value: int) -> int:
     if value <= items[0].timestamp:
         return 0
 
-    l, r = 0, len(items) - 1
+    left_pointer, right_pointer, mid = 0, len(items) - 1, -2
 
-    mid = -2
-
-    while l <= r:
-        mid = (l + r) // 2
+    while left_pointer <= right_pointer:
+        mid = (left_pointer + right_pointer) // 2
         left, right = items[mid - 1].timestamp, items[mid].timestamp
 
         if left < value <= right:
             break
 
         if left >= value:
-            r = mid
+            right_pointer = mid
 
         if right < value:
-            l = mid+1
+            left_pointer = mid + 1
 
     return mid
 
