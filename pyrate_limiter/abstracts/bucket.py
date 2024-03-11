@@ -7,6 +7,7 @@ from abc import ABC
 from abc import abstractmethod
 from collections import defaultdict
 from inspect import isawaitable
+from inspect import iscoroutine
 from threading import Thread
 from typing import Awaitable
 from typing import Dict
@@ -130,7 +131,10 @@ class Leaker(Thread):
         assert self.clocks is not None
         assert self.async_buckets is not None
 
-        if isawaitable(bucket.leak(0)):
+        try_leak = bucket.leak(0)
+
+        if iscoroutine(try_leak):
+            try_leak.close()
             self.async_buckets[id(bucket)] = bucket
         else:
             self.sync_buckets[id(bucket)] = bucket
