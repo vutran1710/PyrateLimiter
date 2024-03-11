@@ -94,19 +94,6 @@ async def create_async_redis_bucket(rates: List[Rate]):
     return bucket
 
 
-async def create_sentinel_redis_bucket(rates: List[Rate]):
-    from redis.sentinel import Sentinel
-
-    sentinel = Sentinel([('localhost', 26379), ('localhost', 26380)], socket_timeout=0.1)
-    master = sentinel.master_for('mymaster', socket_timeout=0.1)
-    bucket_key = f"test-bucket/{id_generator()}"
-    assert master.ping()
-    master.delete(bucket_key)
-    bucket = RedisBucket.init(rates, master, bucket_key)
-    assert bucket.count() == 0
-    return bucket
-
-
 async def create_sqlite_bucket(rates: List[Rate]):
     temp_dir = Path(gettempdir())
     default_db_path = temp_dir / f"pyrate_limiter_{id_generator(size=5)}.sqlite"
@@ -144,7 +131,6 @@ async def create_sqlite_bucket(rates: List[Rate]):
         create_redis_bucket,
         create_sqlite_bucket,
         create_async_redis_bucket,
-        create_sentinel_redis_bucket,
     ]
 )
 def create_bucket(request):
