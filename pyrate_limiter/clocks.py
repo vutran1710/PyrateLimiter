@@ -1,6 +1,5 @@
 """Clock implementation using different backend
 """
-
 import sqlite3
 from time import monotonic
 from time import time

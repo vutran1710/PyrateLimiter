@@ -1,6 +1,5 @@
 """Limiter class implementation
 """
-
 import asyncio
 import logging
 from functools import wraps

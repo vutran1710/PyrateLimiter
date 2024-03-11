@@ -1,6 +1,5 @@
 """Naive bucket implementation using built-in list
 """
-
 from typing import List
 from typing import Optional
 

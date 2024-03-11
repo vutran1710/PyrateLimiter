@@ -1,6 +1,5 @@
 """Complete Limiter test suite
 """
-
 from inspect import isawaitable
 
 import pytest

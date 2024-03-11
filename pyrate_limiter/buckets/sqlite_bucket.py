@@ -1,6 +1,5 @@
 """Bucket implementation using SQLite
 """
-
 import sqlite3
 from threading import RLock
 from typing import List
