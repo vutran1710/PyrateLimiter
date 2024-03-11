@@ -1,6 +1,7 @@
 """ Implement this class to create
 a workable bucket for Limiter to use
 """
+
 import asyncio
 import logging
 from abc import ABC

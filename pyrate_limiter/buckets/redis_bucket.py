@@ -1,5 +1,6 @@
 """Bucket implementation using Redis
 """
+
 from __future__ import annotations
 
 from inspect import isawaitable
