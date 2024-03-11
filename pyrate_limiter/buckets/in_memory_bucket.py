@@ -26,7 +26,16 @@ class InMemoryBucket(AbstractBucket):
         self.items = []
 
     def put(self, item: RateItem) -> bool:
+        if item.weight == 0:
+            return True
+
+        current_length = len(self.items)
+        after_length = item.weight + current_length
+
         for rate in self.rates:
+            if after_length < rate.limit:
+                break
+
             lower_bound_value = item.timestamp - rate.interval
             lower_bound_idx = binary_search(self.items, lower_bound_value)
 
@@ -41,7 +50,12 @@ class InMemoryBucket(AbstractBucket):
                 return False
 
         self.failing_rate = None
-        self.items.extend(item.weight * [item])
+
+        if item.weight > 1:
+            self.items.extend([item for _ in range(item.weight)])
+        else:
+            self.items.append(item)
+
         return True
 
     def leak(self, current_timestamp: Optional[int] = None) -> int:
