@@ -4,7 +4,7 @@ from nox_poetry import session
 # Reuse virtualenv created by poetry instead of creating new ones
 nox.options.reuse_existing_virtualenvs = True
 
-PYTEST_ARGS = ["--verbose", "-s", "--full-trace", "--maxfail=1", "--numprocesses=auto"]
+PYTEST_ARGS = ["--verbose", "-s", "--full-trace", "--maxfail=1", "--numprocesses=auto", "tests/test_bucket_factory.py"]
 COVERAGE_ARGS = ["--cov", "--cov-report=term", "--cov-report=xml", "--cov-report=html"]
 
 
