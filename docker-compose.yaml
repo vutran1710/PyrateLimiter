@@ -1,0 +1,29 @@
+version: "3.7"
+
+services:
+  redis-master:
+    image: bitnami/redis:latest
+    ports:
+      - "6379:6379"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_REPLICA_PASSWORD=""
+    networks:
+      - redis-sentinel
+
+  redis-slave:
+    image: bitnami/redis:latest
+    ports:
+      - "6380:6379"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_MASTER_PASSWORD=""
+    networks:
+      - redis-sentinel
+
+networks:
+  redis-sentinel:
+    driver: bridge
