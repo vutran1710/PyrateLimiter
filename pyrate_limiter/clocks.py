@@ -72,6 +72,7 @@ class PostgresClock(AbstractClock):
                     raise PyrateClockException(self, detail=f"invalid result from query current-timestamp: {result}")
 
                 value = int(result[0])
+
             self.pool._putconn(conn)
 
         return value

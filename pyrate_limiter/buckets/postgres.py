@@ -72,6 +72,7 @@ class PostgresBucket(AbstractBucket):
 
             if autocommit:
                 conn.commit()
+
             self.pool._putconn(conn)
 
     def _create_table(self):
