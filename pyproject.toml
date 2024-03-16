@@ -37,6 +37,7 @@ sphinx = {optional=true, version="^4.3.0"}
 sphinx-autodoc-typehints = {optional=true, version="^1.17"}
 sphinx-copybutton = {optional=true, version=">=0.5"}
 sphinxcontrib-apidoc = {optional=true, version="^0.3"}
+psycopg2 = {version = "^2.9.9", optional = true}
 
 [tool.poetry.extras]
 all = ["filelock", "redis"]
