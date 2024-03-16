@@ -1414,10 +1414,10 @@ docs = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.link
 testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ignore-flaky", "pytest-mypy", "pytest-ruff (>=0.2.1)"]
 
 [extras]
-all = ["filelock", "redis"]
+all = ["filelock", "redis", "psycopg2"]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints", "sphinx-copybutton", "sphinxcontrib-apidoc"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "a1c0820d8e60d96e171b3f623745703894fc672848de980437358be6a2f147f5"
+content-hash = "3332ed9ac8f743ce94bda482c985168f6b9498ac382263cff977ae629b7434d7"
