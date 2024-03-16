@@ -438,9 +438,10 @@ for _ in range(4):
 
 A few different bucket backends are available:
 
-- InMemoryBucket using python built-in list as bucket
-- RedisBucket, using err... redis, with both async/sync support
-- SQLite, using sqlite3
+- **InMemoryBucket**: using python built-in list as bucket
+- **RedisBucket**, using err... redis, with both async/sync support
+- **PostgresBucket**, using `psycopg2`
+- **SQLiteBucket**, using sqlite3
 
 #### InMemoryBucket
 
@@ -507,12 +508,13 @@ bucket = SQLiteBucket(rates, conn, table)
 
 #### PostgresBucket
 
-Postgres is also supported, but you have to install `psycopg2` or `asyncpg` either as an extra or as a separate package.
+Postgres is supported, but you have to install `psycopg2` or `asyncpg` either as an extra or as a separate package.
 
 You can use Postgres's built-in **CURRENT_TIMESTAMP** as the time source with `PostgresClock`, or use an external custom time source.
 
 ```python
 from pyrate_limiter import PostgresBucket, Rate, PostgresClock
+from psycopg2.pool import ThreadedConnectionPool
 
 connection_pool = ThreadedConnectionPool(5, 10, 'postgresql://postgres:postgres@localhost:5432')
 
