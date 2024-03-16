@@ -33,3 +33,9 @@ class LimiterDelayException(Exception):
             "actual_delay": actual_delay,
         }
         super().__init__(error)
+
+
+class PyrateClockException(Exception):
+    def __init__(self, clock: object, detail=None):
+        error = f"Clock({repr(clock)}) is failing: {detail}"
+        super().__init__(error)

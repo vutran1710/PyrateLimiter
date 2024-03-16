@@ -1,3 +1,9 @@
+import logging
+from inspect import isawaitable
+from time import time
+
+import pytest
+
 from pyrate_limiter import binary_search
 from pyrate_limiter import Duration
 from pyrate_limiter import Rate
@@ -105,3 +111,21 @@ def test_rate_validator():
 
     rates = [Rate(2, 1), Rate(3, 2), Rate(4, 3)]
     assert validate_rate_list(rates) is True
+
+
+@pytest.mark.asyncio
+async def test_clock(clock):
+    """Testing clock backends
+    """
+    now = clock.now()
+
+    while isawaitable(now):
+        now = await now
+
+    logging.info("Testing clock: %s -> %d", clock, now)
+    assert now > 0
+
+    if now > 1000:
+        # NOTE: if not MonotonicClock, the time values should be almost equal
+        use_time = time() * 1000
+        assert int(now) - round(use_time) < 2

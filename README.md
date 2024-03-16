@@ -35,6 +35,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
       - [InMemoryBucket](#inmemorybucket)
       - [SQLiteBucket](#sqlitebucket)
       - [RedisBucket](#redisbucket)
+      - [PostgresBucket](#postgresbucket)
     - [Decorator](#decorator)
   - [Advanced Usage](#advanced-usage)
     - [Component-level Diagram](#component-level-diagram)
@@ -437,9 +438,10 @@ for _ in range(4):
 
 A few different bucket backends are available:
 
-- InMemoryBucket using python built-in list as bucket
-- RedisBucket, using err... redis, with both async/sync support
-- SQLite, using sqlite3
+- **InMemoryBucket**: using python built-in list as bucket
+- **RedisBucket**, using err... redis, with both async/sync support
+- **PostgresBucket**, using `psycopg2`
+- **SQLiteBucket**, using sqlite3
 
 #### InMemoryBucket
 
@@ -502,6 +504,23 @@ conn = sqlite3.connect(
 )
 table = "my-bucket-table"
 bucket = SQLiteBucket(rates, conn, table)
+```
+
+#### PostgresBucket
+
+Postgres is supported, but you have to install `psycopg2` or `asyncpg` either as an extra or as a separate package.
+
+You can use Postgres's built-in **CURRENT_TIMESTAMP** as the time source with `PostgresClock`, or use an external custom time source.
+
+```python
+from pyrate_limiter import PostgresBucket, Rate, PostgresClock
+from psycopg2.pool import ThreadedConnectionPool
+
+connection_pool = ThreadedConnectionPool(5, 10, 'postgresql://postgres:postgres@localhost:5432')
+
+clock = PostgresClock(connection_pool)
+rates = [Rate(3, 1000), Rate(4, 1500)]
+bucket = PostgresBucket(connection_pool, "my-bucket-table", rates)
 ```
 
 ### Decorator

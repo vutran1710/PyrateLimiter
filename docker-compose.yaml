@@ -1,0 +1,38 @@
+version: "3.7"
+
+services:
+  redis-master:
+    image: bitnami/redis:latest
+    ports:
+      - "6379:6379"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_REPLICA_PASSWORD=""
+    networks:
+      - pyrate-bay
+
+  redis-slave:
+    image: bitnami/redis:latest
+    ports:
+      - "6380:6379"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_MASTER_HOST=redis-master
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_MASTER_PASSWORD=""
+    networks:
+      - pyrate-bay
+
+  postgres:
+    image: bitnami/postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRESQL_PASSWORD=postgres
+    networks:
+      - pyrate-bay
+
+networks:
+  pyrate-bay:
+    driver: bridge
