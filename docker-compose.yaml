@@ -25,11 +25,11 @@ services:
       - pyrate-bay
 
   postgres:
-    image: bitnami/postgres
+    image: bitnami/postgresql
     ports:
       - "5432:5432"
     environment:
-      - ALLOW_EMPTY_PASSWORD=yes
+      - POSTGRESQL_PASSWORD=postgres
     networks:
       - pyrate-bay
 
