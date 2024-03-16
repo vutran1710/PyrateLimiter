@@ -781,7 +781,7 @@ name = "psycopg2"
 version = "2.9.9"
 description = "psycopg2 - Python-PostgreSQL Database Adapter"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 files = [
     {file = "psycopg2-2.9.9-cp310-cp310-win32.whl", hash = "sha256:38a8dcc6856f569068b47de286b472b7c473ac7977243593a288ebce0dc89516"},
@@ -1406,4 +1406,4 @@ docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints", "sphinx-cop
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "0ae943f4572902935859aab15ffd013200843343bda63283da027c89e5c3355c"
+content-hash = "a1c0820d8e60d96e171b3f623745703894fc672848de980437358be6a2f147f5"

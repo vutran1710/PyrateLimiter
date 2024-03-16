@@ -1,11 +1,18 @@
 """Clock implementation using different backend
 """
+from __future__ import annotations
+
 import sqlite3
 from time import monotonic
 from time import time
+from typing import TYPE_CHECKING
 
 from .abstracts import AbstractClock
+from .exceptions import PyrateClockException
 from .utils import dedicated_sqlite_clock_connection
+
+if TYPE_CHECKING:
+    from psycopg2.pool import AbstractConnectionPool
 
 
 class MonotonicClock(AbstractClock):
@@ -45,3 +52,25 @@ class SQLiteClock(AbstractClock):
     def now(self) -> int:
         now = self.conn.execute(self.time_query).fetchone()[0]
         return int(now)
+
+
+class PostgresClock(AbstractClock):
+    """Get timestamp using Postgres as remote clock backend"""
+
+    def __init__(self, pool: 'AbstractConnectionPool'):
+        self.pool = pool
+
+    def now(self) -> int:
+        value = 0
+
+        with self.pool._getconn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT EXTRACT(epoch FROM current_timestamp) * 1000")
+                result = cur.fetchone()
+
+                if not result:
+                    raise PyrateClockException(self, detail=f"invalid result from query current-timestamp: {result}")
+
+                value = result[0]
+
+        return value
