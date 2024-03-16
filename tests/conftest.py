@@ -17,7 +17,7 @@ from typing import Tuple
 from typing import Union
 
 import pytest
-from psycopg2.pool import ThreadedConnectionPool
+from psycopg2.pool import SimpleConnectionPool
 
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import AbstractClock
@@ -27,6 +27,7 @@ from pyrate_limiter import id_generator
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import MonotonicClock
+from pyrate_limiter import PostgresBucket
 from pyrate_limiter import PostgresClock
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
@@ -50,7 +51,7 @@ clocks = [
     TimeClock(),
     SQLiteClock.default(),
     TimeAsyncClock(),
-    PostgresClock(ThreadedConnectionPool(1, 1, 'postgresql://postgres:postgres@localhost:5432'))
+    PostgresClock(SimpleConnectionPool(1, 1, 'postgresql://postgres:postgres@localhost:5432'))
 ]
 
 ClockSet = Union[
@@ -130,7 +131,11 @@ async def create_sqlite_bucket(rates: List[Rate]):
 
 
 async def create_postgres_bucket(rates: List[Rate]):
-    pass
+    pool = SimpleConnectionPool(2, 4, 'postgresql://postgres:postgres@localhost:5432/postgres')
+    table = f"test_bucket_{id_generator()}"
+    bucket = PostgresBucket(pool, table, rates)
+    assert bucket.count() == 0
+    return bucket
 
 
 @pytest.fixture(
@@ -139,6 +144,7 @@ async def create_postgres_bucket(rates: List[Rate]):
         create_redis_bucket,
         create_sqlite_bucket,
         create_async_redis_bucket,
+        create_postgres_bucket,
     ]
 )
 def create_bucket(request):
