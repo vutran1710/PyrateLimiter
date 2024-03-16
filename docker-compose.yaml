@@ -10,7 +10,7 @@ services:
       - REDIS_REPLICATION_MODE=master
       - REDIS_REPLICA_PASSWORD=""
     networks:
-      - redis-sentinel
+      - pyrate-bay
 
   redis-slave:
     image: bitnami/redis:latest
@@ -22,8 +22,17 @@ services:
       - REDIS_REPLICATION_MODE=slave
       - REDIS_MASTER_PASSWORD=""
     networks:
-      - redis-sentinel
+      - pyrate-bay
+
+  postgres:
+    image: bitnami/postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    networks:
+      - pyrate-bay
 
 networks:
-  redis-sentinel:
+  pyrate-bay:
     driver: bridge
