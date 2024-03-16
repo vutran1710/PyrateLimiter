@@ -46,7 +46,7 @@ basicConfig(level="INFO")
 logger = getLogger("pyrate_limiter")
 logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 
-pg_pool = ThreadedConnectionPool(10, 20, 'postgresql://postgres:postgres@localhost:5432')
+pg_pool = ThreadedConnectionPool(5, 10, 'postgresql://postgres:postgres@localhost:5432')
 
 clocks = [
     MonotonicClock(),
