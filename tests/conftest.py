@@ -28,7 +28,6 @@ from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import MonotonicClock
 from pyrate_limiter import PostgresBucket
-from pyrate_limiter import PostgresClock
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
 from pyrate_limiter import RedisBucket
@@ -46,14 +45,13 @@ basicConfig(level="INFO")
 logger = getLogger("pyrate_limiter")
 logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 
-pg_pool = PgConnectionPool('postgresql://postgres:postgres@localhost:5432')
+PG_POOL = None
 
 clocks = [
     MonotonicClock(),
     TimeClock(),
     SQLiteClock.default(),
     TimeAsyncClock(),
-    PostgresClock(pg_pool)
 ]
 
 ClockSet = Union[
@@ -61,11 +59,10 @@ ClockSet = Union[
     TimeClock,
     SQLiteClock,
     TimeAsyncClock,
-    PostgresClock
 ]
 
 
-@pytest.fixture(params=clocks)
+@pytest.fixture(params=clocks, scope="function")
 def clock(request):
     """Parametrization for different clock."""
     return request.param
@@ -133,10 +130,10 @@ async def create_sqlite_bucket(rates: List[Rate]):
 
 
 async def create_postgres_bucket(rates: List[Rate]):
-    global pg_pool
-
+    global PG_POOL
+    PG_POOL = PgConnectionPool('postgresql://postgres:postgres@localhost:5432')
     table = f"test_bucket_{id_generator()}"
-    bucket = PostgresBucket(pg_pool, table, rates)
+    bucket = PostgresBucket(PG_POOL, table, rates)
     assert bucket.count() == 0
     return bucket
 
@@ -148,11 +145,16 @@ async def create_postgres_bucket(rates: List[Rate]):
         create_sqlite_bucket,
         create_async_redis_bucket,
         create_postgres_bucket,
-    ]
+    ],
+    scope="function"
 )
 def create_bucket(request):
     """Parametrization for different bucket."""
-    return request.param
+    global PG_POOL
+    yield request.param
+
+    if PG_POOL:
+        PG_POOL.close()
 
 
 DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
