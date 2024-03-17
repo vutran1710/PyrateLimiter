@@ -14,7 +14,7 @@ from ..abstracts import Rate
 from ..abstracts import RateItem
 
 if TYPE_CHECKING:
-    from psycopg2.pool import AbstractConnectionPool
+    from psycopg_pool import ConnectionPool
 
 
 class Queries:
@@ -54,9 +54,9 @@ class Queries:
 
 class PostgresBucket(AbstractBucket):
     table: str
-    pool: AbstractConnectionPool
+    pool: ConnectionPool
 
-    def __init__(self, pool: AbstractConnectionPool, table: str, rates: List[Rate]):
+    def __init__(self, pool: ConnectionPool, table: str, rates: List[Rate]):
         self.table = table.lower()
         self.pool = pool
         assert rates
@@ -66,20 +66,14 @@ class PostgresBucket(AbstractBucket):
 
     @contextmanager
     def _get_conn(self, autocommit=False):
-        with self.pool._getconn() as conn:
-            with conn.cursor() as cur:
-                yield cur
-
-            if autocommit:
-                conn.commit()
-
-            self.pool._putconn(conn)
+        with self.pool.connection() as conn:
+            yield conn
 
     def _create_table(self):
-        with self._get_conn(autocommit=True) as cur:
-            cur.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
+        with self._get_conn(autocommit=True) as conn:
+            conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
             index_name = f'timestampIndex_{self.table}'
-            cur.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
+            conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
 
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Put an item (typically the current time) in the bucket
@@ -88,12 +82,12 @@ class PostgresBucket(AbstractBucket):
         if item.weight == 0:
             return True
 
-        with self._get_conn(autocommit=True) as cur:
+        with self._get_conn(autocommit=True) as conn:
             for rate in self.rates:
                 bound = f"SELECT TO_TIMESTAMP({item.timestamp / 1000}) - INTERVAL '{rate.interval} milliseconds'"
                 query = f'SELECT COUNT(*) FROM {self._full_tbl} WHERE item_timestamp >= ({bound})'
-                cur.execute(query)
-                count = int(cur.fetchone()[0])
+                conn = conn.execute(query)
+                count = int(conn.fetchone()[0])
 
                 if rate.limit - count < item.weight:
                     self.failing_rate = rate
@@ -103,7 +97,7 @@ class PostgresBucket(AbstractBucket):
 
             query = Queries.PUT.format(table=self._full_tbl)
             arguments = [(item.name, item.weight, item.timestamp / 1000)] * item.weight
-            cur.executemany(query, tuple(arguments))
+            conn.executemany(query, tuple(arguments))
 
         return True
 
@@ -120,12 +114,12 @@ class PostgresBucket(AbstractBucket):
 
         count = 0
 
-        with self._get_conn(autocommit=True) as cur:
-            cur.execute(Queries.LEAK_COUNT.format(table=self._full_tbl, timestamp=lower_bound / 1000))
-            result = cur.fetchone()
+        with self._get_conn(autocommit=True) as conn:
+            conn = conn.execute(Queries.LEAK_COUNT.format(table=self._full_tbl, timestamp=lower_bound / 1000))
+            result = conn.fetchone()
 
             if result:
-                cur.execute(Queries.LEAK.format(table=self._full_tbl, timestamp=lower_bound / 1000))
+                conn.execute(Queries.LEAK.format(table=self._full_tbl, timestamp=lower_bound / 1000))
                 count = int(result[0])
 
         return count
@@ -134,8 +128,8 @@ class PostgresBucket(AbstractBucket):
         """Flush the whole bucket
         - Must remove `failing-rate` after flushing
         """
-        with self._get_conn(autocommit=True) as cur:
-            cur.execute(Queries.FLUSH.format(table=self._full_tbl))
+        with self._get_conn(autocommit=True) as conn:
+            conn.execute(Queries.FLUSH.format(table=self._full_tbl))
             self.failing_rate = None
 
         return None
@@ -143,9 +137,9 @@ class PostgresBucket(AbstractBucket):
     def count(self) -> Union[int, Awaitable[int]]:
         """Count number of items in the bucket"""
         count = 0
-        with self._get_conn() as cur:
-            cur.execute(Queries.COUNT.format(table=self._full_tbl))
-            result = cur.fetchone()
+        with self._get_conn() as conn:
+            conn = conn.execute(Queries.COUNT.format(table=self._full_tbl))
+            result = conn.fetchone()
             assert result
             count = int(result[0])
 
@@ -158,9 +152,9 @@ class PostgresBucket(AbstractBucket):
         """
         item = None
 
-        with self._get_conn() as cur:
-            cur.execute(Queries.PEEK.format(table=self._full_tbl, offset=index))
-            result = cur.fetchone()
+        with self._get_conn() as conn:
+            conn = conn.execute(Queries.PEEK.format(table=self._full_tbl, offset=index))
+            result = conn.fetchone()
             if result:
                 name, weight, timestamp = result[0], int(result[1]), int(result[2])
                 item = RateItem(name=name, weight=weight, timestamp=timestamp)

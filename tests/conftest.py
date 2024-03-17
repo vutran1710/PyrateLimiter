@@ -17,7 +17,7 @@ from typing import Tuple
 from typing import Union
 
 import pytest
-from psycopg2.pool import ThreadedConnectionPool
+from psycopg_pool import ConnectionPool as PgConnectionPool
 
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import AbstractClock
@@ -28,6 +28,7 @@ from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import MonotonicClock
 from pyrate_limiter import PostgresBucket
+from pyrate_limiter import PostgresClock
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
 from pyrate_limiter import RedisBucket
@@ -37,7 +38,6 @@ from pyrate_limiter import SQLiteQueries as Queries
 from pyrate_limiter import TimeAsyncClock
 from pyrate_limiter import TimeClock
 from pyrate_limiter import validate_rate_list
-# from pyrate_limiter import PostgresClock
 
 
 # Make log messages visible on test failure (or with pytest -s)
@@ -46,14 +46,14 @@ basicConfig(level="INFO")
 logger = getLogger("pyrate_limiter")
 logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 
-pg_pool = ThreadedConnectionPool(3, 5, 'postgresql://postgres:postgres@localhost:5432')
+pg_pool = PgConnectionPool('postgresql://postgres:postgres@localhost:5432')
 
 clocks = [
     MonotonicClock(),
     TimeClock(),
     SQLiteClock.default(),
     TimeAsyncClock(),
-    # PostgresClock(pg_pool)
+    PostgresClock(pg_pool)
 ]
 
 ClockSet = Union[
@@ -61,7 +61,7 @@ ClockSet = Union[
     TimeClock,
     SQLiteClock,
     TimeAsyncClock,
-    # PostgresClock
+    PostgresClock
 ]
 
 

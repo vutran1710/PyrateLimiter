@@ -508,15 +508,15 @@ bucket = SQLiteBucket(rates, conn, table)
 
 #### PostgresBucket
 
-Postgres is supported, but you have to install `psycopg2` or `asyncpg` either as an extra or as a separate package.
+Postgres is supported, but you have to install `psycopg[pool]` either as an extra or as a separate package.
 
 You can use Postgres's built-in **CURRENT_TIMESTAMP** as the time source with `PostgresClock`, or use an external custom time source.
 
 ```python
 from pyrate_limiter import PostgresBucket, Rate, PostgresClock
-from psycopg2.pool import ThreadedConnectionPool
+from psycopg_pool import ConnectionPool
 
-connection_pool = ThreadedConnectionPool(5, 10, 'postgresql://postgres:postgres@localhost:5432')
+connection_pool = ConnectionPool('postgresql://postgres:postgres@localhost:5432')
 
 clock = PostgresClock(connection_pool)
 rates = [Rate(3, 1000), Rate(4, 1500)]
