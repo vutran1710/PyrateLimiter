@@ -65,12 +65,12 @@ class PostgresBucket(AbstractBucket):
         self._create_table()
 
     @contextmanager
-    def _get_conn(self, autocommit=False):
+    def _get_conn(self):
         with self.pool.connection() as conn:
             yield conn
 
     def _create_table(self):
-        with self._get_conn(autocommit=True) as conn:
+        with self._get_conn() as conn:
             conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
             index_name = f'timestampIndex_{self.table}'
             conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
@@ -82,7 +82,7 @@ class PostgresBucket(AbstractBucket):
         if item.weight == 0:
             return True
 
-        with self._get_conn(autocommit=True) as conn:
+        with self._get_conn() as conn:
             for rate in self.rates:
                 bound = f"SELECT TO_TIMESTAMP({item.timestamp / 1000}) - INTERVAL '{rate.interval} milliseconds'"
                 query = f'SELECT COUNT(*) FROM {self._full_tbl} WHERE item_timestamp >= ({bound})'
@@ -114,7 +114,7 @@ class PostgresBucket(AbstractBucket):
 
         count = 0
 
-        with self._get_conn(autocommit=True) as conn:
+        with self._get_conn() as conn:
             conn = conn.execute(Queries.LEAK_COUNT.format(table=self._full_tbl, timestamp=lower_bound / 1000))
             result = conn.fetchone()
 
@@ -128,7 +128,7 @@ class PostgresBucket(AbstractBucket):
         """Flush the whole bucket
         - Must remove `failing-rate` after flushing
         """
-        with self._get_conn(autocommit=True) as conn:
+        with self._get_conn() as conn:
             conn.execute(Queries.FLUSH.format(table=self._full_tbl))
             self.failing_rate = None
 
