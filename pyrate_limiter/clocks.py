@@ -8,7 +8,6 @@ from time import time
 from typing import TYPE_CHECKING
 
 from .abstracts import AbstractClock
-from .exceptions import PyrateClockException
 from .utils import dedicated_sqlite_clock_connection
 
 if TYPE_CHECKING:
@@ -67,10 +66,7 @@ class PostgresClock(AbstractClock):
             with conn.cursor() as cur:
                 cur.execute("SELECT EXTRACT(epoch FROM current_timestamp) * 1000")
                 result = cur.fetchone()
-
-                if not result:
-                    raise PyrateClockException(self, detail=f"invalid result from query current-timestamp: {result}")
-
+                assert result, "unable to get current-timestamp from postgres"
                 value = int(result[0])
 
         return value
