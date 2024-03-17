@@ -123,7 +123,7 @@ class Leaker(Thread):
         self.async_buckets = defaultdict()
         self.clocks = defaultdict()
         self.leak_interval = leak_interval
-        self.task = None
+        self._task = None
         super().__init__()
 
     def register(self, bucket: AbstractBucket, clock: AbstractClock):
@@ -172,7 +172,7 @@ class Leaker(Thread):
     def leak_async(self):
         if self.async_buckets and not self.is_async_leak_started:
             self.is_async_leak_started = True
-            self.task = asyncio.create_task(self._leak(sync=False))
+            self._task = asyncio.create_task(self._leak(sync=False))
 
     def run(self) -> None:
         assert self.sync_buckets
@@ -181,6 +181,10 @@ class Leaker(Thread):
     def start(self) -> None:
         if self.sync_buckets and not self.is_alive():
             super().start()
+
+    def cancel(self) -> None:
+        if self._task:
+            self._task.cancel()
 
 
 class BucketFactory(ABC):
