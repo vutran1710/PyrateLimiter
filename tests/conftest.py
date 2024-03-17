@@ -62,7 +62,7 @@ ClockSet = Union[
 ]
 
 
-@pytest.fixture(params=clocks, scope="function")
+@pytest.fixture(params=clocks)
 def clock(request):
     """Parametrization for different clock."""
     return request.param
@@ -146,7 +146,6 @@ async def create_postgres_bucket(rates: List[Rate]):
         create_async_redis_bucket,
         create_postgres_bucket,
     ],
-    scope="function"
 )
 def create_bucket(request):
     """Parametrization for different bucket."""
