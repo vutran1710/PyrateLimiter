@@ -10,7 +10,6 @@ from typing import List
 from typing import Union
 
 import pytest
-from psycopg_pool import ConnectionPool as PgConnectionPool
 
 from pyrate_limiter import Duration
 from pyrate_limiter import id_generator
@@ -117,6 +116,8 @@ async def create_sqlite_bucket(rates: List[Rate]):
 
 
 async def create_postgres_bucket(rates: List[Rate]):
+    from psycopg_pool import ConnectionPool as PgConnectionPool
+
     pool = PgConnectionPool('postgresql://postgres:postgres@localhost:5432')
     table = f"test_bucket_{id_generator()}"
     bucket = PostgresBucket(pool, table, rates)
@@ -130,9 +131,8 @@ async def create_postgres_bucket(rates: List[Rate]):
         create_redis_bucket,
         create_sqlite_bucket,
         create_async_redis_bucket,
-        # create_postgres_bucket,
-    ],
-    scope="session"
+        create_postgres_bucket,
+    ]
 )
 def create_bucket(request):
     """Parametrization for different bucket."""

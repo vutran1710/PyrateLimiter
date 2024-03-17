@@ -20,6 +20,7 @@ from pyrate_limiter import Duration
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import LimiterDelayException
+from pyrate_limiter import SingleBucketFactory
 from pyrate_limiter import TimeClock
 
 
@@ -40,7 +41,6 @@ async def test_limiter_constructor_01(clock):
 
 @pytest.mark.asyncio
 async def test_limiter_constructor_02(
-    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
@@ -48,20 +48,19 @@ async def test_limiter_constructor_02(
     bucket = await create_bucket(DEFAULT_RATES)
 
     limiter = Limiter(bucket)
-    assert isinstance(limiter.bucket_factory, BucketFactory)
+    assert isinstance(limiter.bucket_factory, SingleBucketFactory)
     assert isinstance(limiter.bucket_factory.clock, TimeClock)
     assert limiter.max_delay is None
     assert limiter.raise_when_fail is True
 
     limiter = Limiter(
         bucket,
-        clock=clock,
+        clock=TimeClock(),
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
     )
 
     assert isinstance(limiter.bucket_factory, BucketFactory)
-    assert limiter.bucket_factory.clock is clock
     assert limiter.raise_when_fail == limiter_should_raise
     assert limiter.max_delay == limiter_delay
 
@@ -72,27 +71,25 @@ async def test_limiter_constructor_02(
 
     assert acquire_ok
 
-    factory = DemoBucketFactory(clock, demo=bucket)
+    factory = DemoBucketFactory(TimeClock(), demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
     )
     assert limiter.bucket_factory is factory
-    assert limiter.bucket_factory.clock is clock
     assert limiter.raise_when_fail == limiter_should_raise
     assert limiter.max_delay == limiter_delay
 
 
 @pytest.mark.asyncio
 async def test_limiter_01(
-    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(clock, demo=bucket)
+    factory = DemoBucketFactory(TimeClock(), demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -170,13 +167,12 @@ async def test_limiter_01(
 
 @pytest.mark.asyncio
 async def test_limiter_concurrency(
-    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
     bucket: AbstractBucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(clock, demo=bucket)
+    factory = DemoBucketFactory(TimeClock(), demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -218,13 +214,12 @@ async def test_limiter_concurrency(
 
 @pytest.mark.asyncio
 async def test_limiter_decorator(
-    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(clock, demo=bucket)
+    factory = DemoBucketFactory(TimeClock(), demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
