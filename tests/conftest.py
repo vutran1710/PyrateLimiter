@@ -45,8 +45,6 @@ basicConfig(level="INFO")
 logger = getLogger("pyrate_limiter")
 logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 
-PG_POOL = None
-
 clocks = [
     MonotonicClock(),
     TimeClock(),
@@ -130,10 +128,9 @@ async def create_sqlite_bucket(rates: List[Rate]):
 
 
 async def create_postgres_bucket(rates: List[Rate]):
-    global PG_POOL
-    PG_POOL = PgConnectionPool('postgresql://postgres:postgres@localhost:5432')
+    pool = PgConnectionPool('postgresql://postgres:postgres@localhost:5432')
     table = f"test_bucket_{id_generator()}"
-    bucket = PostgresBucket(PG_POOL, table, rates)
+    bucket = PostgresBucket(pool, table, rates)
     assert bucket.count() == 0
     return bucket
 
@@ -149,11 +146,7 @@ async def create_postgres_bucket(rates: List[Rate]):
 )
 def create_bucket(request):
     """Parametrization for different bucket."""
-    global PG_POOL
-    yield request.param
-
-    if PG_POOL:
-        PG_POOL.close()
+    return request.param
 
 
 DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
