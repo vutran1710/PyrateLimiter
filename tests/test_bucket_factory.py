@@ -6,10 +6,10 @@ from time import sleep
 
 import pytest
 
-from .conftest import async_count
 from .conftest import DEFAULT_RATES
-from .conftest import DemoBucketFactory
 from .conftest import logger
+from .demo_bucket_factory import DemoBucketFactory
+from .helpers import async_count
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import RateItem
 
