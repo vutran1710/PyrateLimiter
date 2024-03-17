@@ -82,4 +82,3 @@ async def test_factory_leak(clock, create_bucket):
         assert await async_count(factory.buckets[item_name]) == 0
 
     assert len(factory.buckets) == 3
-    factory._leaker.cancel()
