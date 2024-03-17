@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyrate-limiter"
-version = "3.5.1"
+version = "3.6.0"
 description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = ["vutr <me@vutr.io>"]
 license = "MIT"
@@ -40,7 +40,7 @@ sphinx-copybutton = {optional=true, version=">=0.5"}
 sphinxcontrib-apidoc = {optional=true, version="^0.3"}
 
 [tool.poetry.extras]
-all = ["filelock", "redis", "psycopg2"]
+all = ["filelock", "redis", "psycopg"]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints",
         "sphinx-copybutton", "sphinxcontrib-apidoc"]
 
