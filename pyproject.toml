@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyrate-limiter"
-version = "3.5.1"
+version = "3.6.0"
 description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = ["vutr <me@vutr.io>"]
 license = "MIT"
@@ -29,7 +29,7 @@ python = "^3.8"
 # Optional backend dependencies
 filelock = {optional=true, version=">=3.0"}
 redis = {optional=true, version="^5.0.0"}
-psycopg2 = {version = "^2.9.9", optional = true}
+psycopg = {extras = ["pool"], version = "^3.1.18", optional = true}
 
 # Documentation dependencies needed for Readthedocs builds
 furo = {optional=true, version="^2022.3.4"}
@@ -40,7 +40,7 @@ sphinx-copybutton = {optional=true, version=">=0.5"}
 sphinxcontrib-apidoc = {optional=true, version="^0.3"}
 
 [tool.poetry.extras]
-all = ["filelock", "redis", "psycopg2"]
+all = ["filelock", "redis", "psycopg"]
 docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints",
         "sphinx-copybutton", "sphinxcontrib-apidoc"]
 
@@ -58,7 +58,7 @@ coverage = "6"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.1.1"
 pytest-asyncio = "^0.23.5.post1"
-psycopg2 = "^2.9.9"
+psycopg = {extras = ["pool"], version = "^3.1.18"}
 
 [tool.black]
 line-length = 120

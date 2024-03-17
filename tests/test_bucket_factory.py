@@ -6,10 +6,10 @@ from time import sleep
 
 import pytest
 
-from .conftest import async_count
 from .conftest import DEFAULT_RATES
-from .conftest import DemoBucketFactory
 from .conftest import logger
+from .demo_bucket_factory import DemoBucketFactory
+from .helpers import async_count
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import RateItem
 
@@ -32,6 +32,8 @@ async def test_factory_01(clock, create_bucket):
     bucket = factory.get(item)
 
     assert isinstance(bucket, AbstractBucket)
+    if factory._leaker:
+        factory._leaker.cancel()
 
 
 @pytest.mark.asyncio
@@ -82,3 +84,4 @@ async def test_factory_leak(clock, create_bucket):
         assert await async_count(factory.buckets[item_name]) == 0
 
     assert len(factory.buckets) == 3
+    factory._leaker.cancel()
