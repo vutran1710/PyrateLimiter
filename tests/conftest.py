@@ -19,7 +19,6 @@ from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import RedisBucket
 from pyrate_limiter import SQLiteBucket
-from pyrate_limiter import SQLiteClock
 from pyrate_limiter import SQLiteQueries as Queries
 from pyrate_limiter import TimeAsyncClock
 from pyrate_limiter import TimeClock
@@ -36,14 +35,12 @@ DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
 clocks = [
     MonotonicClock(),
     TimeClock(),
-    SQLiteClock.default(),
     TimeAsyncClock(),
 ]
 
 ClockSet = Union[
     MonotonicClock,
     TimeClock,
-    SQLiteClock,
     TimeAsyncClock,
 ]
 
