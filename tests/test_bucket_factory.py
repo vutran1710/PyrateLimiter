@@ -32,8 +32,6 @@ async def test_factory_01(clock, create_bucket):
     bucket = factory.get(item)
 
     assert isinstance(bucket, AbstractBucket)
-    if factory._leaker:
-        factory._leaker.cancel()
 
 
 @pytest.mark.asyncio
@@ -84,4 +82,3 @@ async def test_factory_leak(clock, create_bucket):
         assert await async_count(factory.buckets[item_name]) == 0
 
     assert len(factory.buckets) == 3
-    factory._leaker.cancel()
