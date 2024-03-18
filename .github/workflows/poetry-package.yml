@@ -33,6 +33,7 @@ jobs:
         env:
           ALLOW_EMPTY_PASSWORD: yes
           POSTGRESQL_PASSWORD: postgres
+          POSTGRESQL_MAX_CONNECTIONS: 1000
         ports:
           - 5432:5432
     strategy:
