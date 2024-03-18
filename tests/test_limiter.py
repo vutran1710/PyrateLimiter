@@ -41,6 +41,7 @@ async def test_limiter_constructor_01(clock):
 
 @pytest.mark.asyncio
 async def test_limiter_constructor_02(
+    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
@@ -55,7 +56,7 @@ async def test_limiter_constructor_02(
 
     limiter = Limiter(
         bucket,
-        clock=TimeClock(),
+        clock=clock,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
     )
@@ -71,7 +72,7 @@ async def test_limiter_constructor_02(
 
     assert acquire_ok
 
-    factory = DemoBucketFactory(TimeClock(), demo=bucket)
+    factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -84,12 +85,13 @@ async def test_limiter_constructor_02(
 
 @pytest.mark.asyncio
 async def test_limiter_01(
+    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(TimeClock(), demo=bucket)
+    factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -167,12 +169,13 @@ async def test_limiter_01(
 
 @pytest.mark.asyncio
 async def test_limiter_concurrency(
+    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
     bucket: AbstractBucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(TimeClock(), demo=bucket)
+    factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -214,12 +217,13 @@ async def test_limiter_concurrency(
 
 @pytest.mark.asyncio
 async def test_limiter_decorator(
+    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(TimeClock(), demo=bucket)
+    factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
