@@ -30,6 +30,7 @@ services:
       - "5432:5432"
     environment:
       - POSTGRESQL_PASSWORD=postgres
+      - POSTGRESQL_MAX_CONNECTIONS=1000
     networks:
       - pyrate-bay
 
