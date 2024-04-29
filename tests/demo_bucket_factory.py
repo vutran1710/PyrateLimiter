@@ -1,6 +1,10 @@
 from inspect import isawaitable
+from os import getenv
 from typing import Dict
 from typing import Optional
+
+from redis.asyncio import ConnectionPool as AsyncConnectionPool
+from redis.asyncio import Redis as AsyncRedis
 
 from .conftest import DEFAULT_RATES
 from pyrate_limiter import AbstractBucket
@@ -8,6 +12,7 @@ from pyrate_limiter import AbstractClock
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import RateItem
+from pyrate_limiter import RedisBucket
 
 
 class DemoBucketFactory(BucketFactory):
@@ -54,3 +59,43 @@ class DemoBucketFactory(BucketFactory):
     def schedule_leak(self, *args):
         if self.auto_leak:
             super().schedule_leak(*args)
+
+
+class DemoAsyncGetBucketFactory(BucketFactory):
+    """Async multi-bucket factory used for testing schedule-leaks"""
+
+    def __init__(self, bucket_clock: AbstractClock, **buckets: AbstractBucket):
+        self.clock = bucket_clock
+        self.buckets = {}
+        self.thread_pool = None
+
+        for item_name_pattern, bucket in buckets.items():
+            assert isinstance(bucket, AbstractBucket)
+            self.schedule_leak(bucket, bucket_clock)
+            self.buckets[item_name_pattern] = bucket
+
+    def wrap_item(self, name: str, weight: int = 1):
+        now = self.clock.now()
+
+        async def wrap_async():
+            return RateItem(name, await now, weight=weight)
+
+        def wrap_sync():
+            return RateItem(name, now, weight=weight)
+
+        return wrap_async() if isawaitable(now) else wrap_sync()
+
+    async def get(self, item: RateItem) -> AbstractBucket:
+        assert self.buckets is not None
+
+        if item.name in self.buckets:
+            bucket = self.buckets[item.name]
+            assert isinstance(bucket, AbstractBucket)
+            return bucket
+
+        pool: AsyncConnectionPool = AsyncConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
+        redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)
+        bucket = await RedisBucket.init(DEFAULT_RATES, redis_db, f"test_bucket:{item.name}")
+        self.schedule_leak(bucket, self.clock)
+        self.buckets.update({item.name: bucket})
+        return bucket

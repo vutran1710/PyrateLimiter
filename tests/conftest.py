@@ -23,7 +23,6 @@ from pyrate_limiter import SQLiteQueries as Queries
 from pyrate_limiter import TimeAsyncClock
 from pyrate_limiter import TimeClock
 
-
 # Make log messages visible on test failure (or with pytest -s)
 basicConfig(level="INFO")
 # Uncomment for more verbose output:
@@ -72,7 +71,7 @@ async def create_async_redis_bucket(rates: List[Rate]):
     from redis.asyncio import ConnectionPool as AsyncConnectionPool
     from redis.asyncio import Redis as AsyncRedis
 
-    pool = AsyncConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
+    pool: AsyncConnectionPool = AsyncConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
     redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)
     bucket_key = f"test-bucket/{id_generator()}"
     await redis_db.delete(bucket_key)
