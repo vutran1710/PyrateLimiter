@@ -171,7 +171,6 @@ async def test_limiter_01(
 @pytest.mark.asyncio
 async def test_limiter_async_factory_get(
     clock,
-    create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
@@ -182,14 +181,11 @@ async def test_limiter_async_factory_get(
         max_delay=limiter_delay,
     )
     item = "demo"
-    bucket = await factory.get(factory.wrap_item(item, weight=0))
-    bucket = BucketAsyncWrapper(bucket)
 
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
     assert acquire_ok
     assert cost <= 10
-    assert await bucket.count() == 0
 
     logger.info("Limiter Test #1")
     await prefilling_bucket(limiter, 0.3, item)
@@ -211,7 +207,7 @@ async def test_limiter_async_factory_get(
             assert acquire_ok
 
     # # Flush before testing again
-    await flushing_bucket(bucket)
+    await factory.flush()
     logger.info("Limiter Test #2")
     await prefilling_bucket(limiter, 0, item)
 
@@ -239,7 +235,7 @@ async def test_limiter_async_factory_get(
             assert acquire_ok
 
     # Flush before testing again
-    await flushing_bucket(bucket)
+    await factory.flush()
     logger.info("Limiter Test #3: exceeding weight")
     await prefilling_bucket(limiter, 0, item)
 

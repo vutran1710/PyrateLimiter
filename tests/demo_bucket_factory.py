@@ -7,6 +7,7 @@ from redis.asyncio import ConnectionPool as AsyncConnectionPool
 from redis.asyncio import Redis as AsyncRedis
 
 from .conftest import DEFAULT_RATES
+from .helpers import flushing_bucket
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import AbstractClock
 from pyrate_limiter import BucketFactory
@@ -99,3 +100,7 @@ class DemoAsyncGetBucketFactory(BucketFactory):
         self.schedule_leak(bucket, self.clock)
         self.buckets.update({item.name: bucket})
         return bucket
+
+    async def flush(self):
+        for bucket in self.buckets.values():
+            await flushing_bucket(bucket)
