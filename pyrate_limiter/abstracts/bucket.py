@@ -217,7 +217,7 @@ class BucketFactory(ABC):
         """
 
     @abstractmethod
-    def get(self, item: RateItem) -> AbstractBucket:
+    def get(self, item: RateItem) -> Union[AbstractBucket, Awaitable[AbstractBucket]]:
         """Get the corresponding bucket to this item"""
 
     def create(

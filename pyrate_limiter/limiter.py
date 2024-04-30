@@ -48,10 +48,10 @@ class SingleBucketFactory(BucketFactory):
         async def wrap_async():
             return RateItem(name, await now, weight=weight)
 
-        def wrap_sycn():
+        def wrap_sync():
             return RateItem(name, now, weight=weight)
 
-        return wrap_async() if isawaitable(now) else wrap_sycn()
+        return wrap_async() if isawaitable(now) else wrap_sync()
 
     def get(self, _: RateItem) -> AbstractBucket:
         return self.bucket
@@ -252,7 +252,7 @@ class Limiter:
         return _handle_result(acquire)  # type: ignore
 
     def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
-        """Try accquiring an item with name & weight
+        """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
         with self.lock:
@@ -260,7 +260,7 @@ class Limiter:
 
             if weight == 0:
                 # NOTE: if item is weightless, just let it go through
-                # NOTE: this might change in the futre
+                # NOTE: this might change in the future
                 return True
 
             item = self.bucket_factory.wrap_item(name, weight)
@@ -271,6 +271,8 @@ class Limiter:
                     nonlocal item
                     item = await item
                     bucket = self.bucket_factory.get(item)
+                    if isawaitable(bucket):
+                        bucket = await bucket
                     assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
                     result = self.handle_bucket_put(bucket, item)
 
@@ -283,6 +285,21 @@ class Limiter:
 
             assert isinstance(item, RateItem)  # NOTE: this is to silence mypy warning
             bucket = self.bucket_factory.get(item)
+            if isawaitable(bucket):
+
+                async def _handle_async_bucket():
+                    nonlocal bucket
+                    bucket = await bucket
+                    assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
+                    result = self.handle_bucket_put(bucket, item)
+
+                    while isawaitable(result):
+                        result = await result
+
+                    return result
+
+                return _handle_async_bucket()
+
             assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
             result = self.handle_bucket_put(bucket, item)
 
