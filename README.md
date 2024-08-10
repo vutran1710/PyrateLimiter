@@ -37,6 +37,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
       - [RedisBucket](#redisbucket)
       - [PostgresBucket](#postgresbucket)
     - [Decorator](#decorator)
+    - [Async or Sync?](#async-or-sync?)
   - [Advanced Usage](#advanced-usage)
     - [Component-level Diagram](#component-level-diagram)
     - [Time sources](#time-sources)
@@ -488,7 +489,7 @@ The API are the same, regardless of sync/async. If AsyncRedis is being used, cal
 
 #### SQLiteBucket
 
-If you need to persist the bucket state, a SQLite backend is available.
+If you need to persist the bucket state, a SQLite backend is available. The SQLite bucket works in sync manner.
 
 Manully create a connection to Sqlite and pass it along with the table name to the bucket class:
 
@@ -519,7 +520,7 @@ If the `db_path` is not provided, it will create a temporary database in memory 
 
 #### PostgresBucket
 
-Postgres is supported, but you have to install `psycopg[pool]` either as an extra or as a separate package.
+Postgres is supported, but you have to install `psycopg[pool]` either as an extra or as a separate package. The PostgresBucket currently does not support async.
 
 You can use Postgres's built-in **CURRENT_TIMESTAMP** as the time source with `PostgresClock`, or use an external custom time source.
 
@@ -554,6 +555,16 @@ def handle_something(*args, **kwargs):
 async def handle_something_async(*args, **kwargs):
     """function logic"""
 ```
+
+### Async or Sync?
+
+The Limiter is basically made of a Clock backend and a Bucket backend. Depends on how each of these component works in term of async-or-sync-wise, PyrateLimiter will change its methods' signatures to sync or async.
+
+Here is a simple rule how to know which mode the Limiter is operating on:
+
+> If either of the backends is async-based component, the Limiter will be async.
+
+
 
 ## Advanced Usage
 
