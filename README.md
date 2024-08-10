@@ -37,7 +37,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
       - [RedisBucket](#redisbucket)
       - [PostgresBucket](#postgresbucket)
     - [Decorator](#decorator)
-    - [Async or Sync?](#async-or-sync?)
+    - [Async or Sync?](#async-or-sync)
   - [Advanced Usage](#advanced-usage)
     - [Component-level Diagram](#component-level-diagram)
     - [Time sources](#time-sources)
