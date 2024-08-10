@@ -497,14 +497,25 @@ from pyrate_limiter import SQLiteBucket, Rate, Duration
 import sqlite3
 
 rates = [Rate(5, Duration.MINUTE * 2)]
-conn = sqlite3.connect(
-    "/var/mydb.sqlite",
-    isolation_level="EXCLUSIVE",
-    check_same_thread=False,
-)
-table = "my-bucket-table"
-bucket = SQLiteBucket(rates, conn, table)
+bucket = SQLiteBucket.init_from_file(rates)
 ```
+
+You can also pass custom arguments to the `init_from_file` following its signature:
+
+```python
+class SQLiteBucket(AbstractBucket):
+    @classmethod
+    def init_from_file(
+        cls,
+        rates: List[Rate],
+        table: str = "rate_bucket",
+        db_path: Optional[str] = None,
+        create_new_table = True
+    ) -> "SQLiteBucket":
+        ...
+```
+
+If the `db_path` is not provided, it will create a temporary database in memory as `tempdir / "pyrate-limiter.sqlite"`
 
 #### PostgresBucket
 
