@@ -1,6 +1,8 @@
 """Bucket implementation using SQLite
 """
 import sqlite3
+from pathlib import Path
+from tempfile import gettempdir
 from threading import RLock
 from typing import List
 from typing import Optional
@@ -140,15 +142,36 @@ class SQLiteBucket(AbstractBucket):
             return RateItem(item[0], item[1])
 
     @classmethod
-    def init_from_file(cls, rates: List[Rate], table: str, create_new_table=True) -> "SQLiteBucket":
+    def init_from_file(
+        cls,
+        rates: List[Rate],
+        table: str = "rate_bucket",
+        db_path: Optional[str] = None,
+        create_new_table: bool = True
+    ) -> "SQLiteBucket":
+        if db_path is None:
+            temp_dir = Path(gettempdir())
+            db_path = str(temp_dir / "pyrate_limiter.sqlite")
+
+        assert db_path is not None
+        assert db_path.endswith(".sqlite"), "Please provide a valid sqlite file path"
+
         sqlite_connection = sqlite3.connect(
-            "./mydb.sqlite",
+            db_path,
             isolation_level="EXCLUSIVE",
             check_same_thread=False,
         )
+
         if create_new_table:
-            cursor = sqlite_connection.cursor()
-            cursor.execute(Queries.CREATE_BUCKET_TABLE.format(table=table))
+            sqlite_connection.execute(Queries.CREATE_BUCKET_TABLE.format(table=table))
+
+        create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
+            index_name="idx_rate_item_timestamp",
+            table_name=table,
+        )
+
+        sqlite_connection.execute(create_idx_query)
+        sqlite_connection.commit()
 
         return cls(
             rates,

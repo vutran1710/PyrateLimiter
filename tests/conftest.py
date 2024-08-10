@@ -94,21 +94,14 @@ async def create_sqlite_bucket(rates: List[Rate]):
     )
     drop_table_query = Queries.DROP_TABLE.format(table=table_name)
     drop_index_query = Queries.DROP_INDEX.format(index=index_name)
-    create_table_query = Queries.CREATE_BUCKET_TABLE.format(table=table_name)
 
     conn.execute(drop_table_query)
     conn.execute(drop_index_query)
-    conn.execute(create_table_query)
-
-    create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
-        index_name=index_name,
-        table_name=table_name,
-    )
-
-    conn.execute(create_idx_query)
-
     conn.commit()
-    return SQLiteBucket(rates, conn, table_name)
+
+    bucket = SQLiteBucket.init_from_file(rates, table_name, db_path=str(default_db_path))
+
+    return bucket
 
 
 async def create_postgres_bucket(rates: List[Rate]):
