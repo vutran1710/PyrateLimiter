@@ -558,7 +558,7 @@ async def handle_something_async(*args, **kwargs):
 
 ### Async or Sync?
 
-The Limiter is basically made of a Clock backend and a Bucket backend. Depends on how each of these component works in term of async-or-sync-wise, PyrateLimiter will change its methods' signatures to sync or async.
+The Limiter is basically made of a Clock backend and a Bucket backend. Depends on how each of these component works async-or-sync wise, PyrateLimiter will change its methods' signatures to sync or async accordingly.
 
 Here is a simple rule how to know which mode the Limiter is operating on:
 
