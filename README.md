@@ -26,6 +26,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
     - [Defining rate limits & buckets](#defining-rate-limits-and-buckets)
     - [Defining clock & routing logic](#defining-clock--routing-logic-with-bucketfactory)
     - [Wrapping all up with Limiter](#wrapping-all-up-with-limiter)
+      - [API](#api)
     - [Weight](#weight)
     - [Handling exceeded limits](#handling-exceeded-limits)
       - [Bucket analogy](#bucket-analogy)
@@ -316,6 +317,34 @@ def request_function(some_number: int):
 async def async_request_function(some_number: int):
     requests.get('https://example.com')
 ```
+
+#### API
+
+##### `bucket()`: get list of all active buckets
+Return list of all active buckets with `limiter.buckets()`
+
+##### `dispose(bucket: int | BucketObject)`: dispose/remove/delete the given bucket
+
+Method signature:
+```python
+def dispose(self, bucket: Union[int, AbstractBucket]) -> bool:
+    """Dispose/Remove a specific bucket,
+    using bucket-id or bucket object as param
+    """
+```
+
+Example of usage:
+```python
+active_buckets = limiter.buckets()
+assert len(active_buckets) > 0
+
+bucket_to_remove = active_buckets[0]
+assert limiter.dispose(bucket_to_remove)
+```
+
+If a bucket is found and get deleted, calling this method will return **True**, otherwise **False**.
+If there is no more buckets in the limiter's bucket-factory, all the leaking tasks will be stopped.
+
 
 ### Weight
 
