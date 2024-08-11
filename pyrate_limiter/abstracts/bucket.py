@@ -272,13 +272,16 @@ class BucketFactory(ABC):
     def get_buckets(self) -> List[AbstractBucket]:
         """Iterator over all buckets in the factory
         """
+        if not self._leaker:
+            return []
+
         buckets = []
 
-        if self._leaker and self._leaker.sync_buckets:
+        if self._leaker.sync_buckets:
             for _, bucket in self._leaker.sync_buckets.items():
                 buckets.append(bucket)
 
-        if self._leaker and self._leaker.async_buckets:
+        if self._leaker.async_buckets:
             for _, bucket in self._leaker.async_buckets.items():
                 buckets.append(bucket)
 
@@ -292,72 +295,3 @@ class BucketFactory(ABC):
         assert isinstance(bucket, int), "no valid id for bucket found"
         assert self._leaker, "Leaker task is not started yet"
         return self._leaker.deregister(bucket)
-
-
-class BucketAsyncWrapper(AbstractBucket):
-    """BucketAsyncWrapper is a wrapping over any bucket
-    that turns a async/synchronous bucket into an async one
-    """
-
-    def __init__(self, bucket: AbstractBucket):
-        assert isinstance(bucket, AbstractBucket)
-        self.bucket = bucket
-
-    async def put(self, item: RateItem):
-        result = self.bucket.put(item)
-
-        while isawaitable(result):
-            result = await result
-
-        return result
-
-    async def count(self):
-        result = self.bucket.count()
-
-        while isawaitable(result):
-            result = await result
-
-        return result
-
-    async def leak(self, current_timestamp: Optional[int] = None) -> int:
-        result = self.bucket.leak(current_timestamp)
-
-        while isawaitable(result):
-            result = await result
-
-        assert isinstance(result, int)
-        return result
-
-    async def flush(self) -> None:
-        result = self.bucket.flush()
-
-        while isawaitable(result):
-            result = await result
-
-        return None
-
-    async def peek(self, index: int) -> Optional[RateItem]:
-        item = self.bucket.peek(index)
-
-        while isawaitable(item):
-            item = await item
-
-        assert item is None or isinstance(item, RateItem)
-        return item
-
-    async def waiting(self, item: RateItem) -> int:
-        wait = super().waiting(item)
-
-        if isawaitable(wait):
-            wait = await wait
-
-        assert isinstance(wait, int)
-        return wait
-
-    @property
-    def failing_rate(self):
-        return self.bucket.failing_rate
-
-    @property
-    def rates(self):
-        return self.bucket.rates
