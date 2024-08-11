@@ -116,7 +116,7 @@ class Leaker(Thread):
     async_buckets: Optional[Dict[int, AbstractBucket]] = None
     clocks: Optional[Dict[int, AbstractClock]] = None
     leak_interval: int = 10_000
-    is_async_leak_started = False
+    aio_leak_task: Optional[asyncio.Task] = None
 
     def __init__(self, leak_interval: int):
         self.sync_buckets = defaultdict()
@@ -132,22 +132,41 @@ class Leaker(Thread):
         assert self.async_buckets is not None
 
         try_leak = bucket.leak(0)
+        bucket_id = id(bucket)
 
         if iscoroutine(try_leak):
             try_leak.close()
-            self.async_buckets[id(bucket)] = bucket
+            self.async_buckets[bucket_id] = bucket
         else:
-            self.sync_buckets[id(bucket)] = bucket
+            self.sync_buckets[bucket_id] = bucket
 
-        self.clocks[id(bucket)] = clock
+        self.clocks[bucket_id] = clock
 
-    async def _leak(self, sync=True) -> None:
+    def deregister(self, bucket_id: int) -> bool:
+        """Deregister a bucket"""
+        if self.sync_buckets and bucket_id in self.sync_buckets:
+            del self.sync_buckets[bucket_id]
+            assert self.clocks
+            del self.clocks[bucket_id]
+            return True
+
+        if self.async_buckets and bucket_id in self.async_buckets:
+            del self.async_buckets[bucket_id]
+            assert self.clocks
+            del self.clocks[bucket_id]
+
+            if not self.async_buckets and self.aio_leak_task:
+                self.aio_leak_task.cancel()
+                self.aio_leak_task = None
+
+            return True
+
+        return False
+
+    async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
         assert self.clocks
 
-        while True:
-            buckets = self.sync_buckets if sync else self.async_buckets
-            assert buckets
-
+        while buckets:
             for bucket_id, bucket in list(buckets.items()):
                 clock = self.clocks[bucket_id]
                 now = clock.now()
@@ -163,21 +182,23 @@ class Leaker(Thread):
 
                 assert isinstance(leak, int)
 
-                bucket_type = "sync" if sync else "async"
-                logger.debug("> Leaking (%s) bucket: %s, %s items", bucket_type, bucket, leak)
-
             await asyncio.sleep(self.leak_interval / 1000)
 
     def leak_async(self):
-        if self.async_buckets and not self.is_async_leak_started:
-            self.is_async_leak_started = True
-            asyncio.create_task(self._leak(sync=False))
+        if self.async_buckets and not self.aio_leak_task:
+            self.aio_leak_task = asyncio.create_task(self._leak(self.async_buckets))
 
     def run(self) -> None:
+        """ Override the original method of Thread
+        Not meant to be called directly
+        """
         assert self.sync_buckets
-        asyncio.run(self._leak(sync=True))
+        asyncio.run(self._leak(self.sync_buckets))
 
     def start(self) -> None:
+        """ Override the original method of Thread
+        Call to run leaking sync buckets
+        """
         if self.sync_buckets and not self.is_alive():
             super().start()
 
@@ -234,7 +255,7 @@ class BucketFactory(ABC):
 
     def schedule_leak(self, new_bucket: AbstractBucket, associated_clock: AbstractClock) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
-        assert new_bucket.rates
+        assert new_bucket.rates, "Bucket rates are not set"
 
         if not self._leaker:
             self._leaker = Leaker(self.leak_interval)
@@ -243,71 +264,32 @@ class BucketFactory(ABC):
         self._leaker.start()
         self._leaker.leak_async()
 
+    def get_buckets(self) -> List[AbstractBucket]:
+        """Iterator over all buckets in the factory
+        """
+        if not self._leaker:
+            return []
 
-class BucketAsyncWrapper(AbstractBucket):
-    """BucketAsyncWrapper is a wrapping over any bucket
-    that turns a async/synchronous bucket into an async one
-    """
+        buckets = []
 
-    def __init__(self, bucket: AbstractBucket):
-        assert isinstance(bucket, AbstractBucket)
-        self.bucket = bucket
+        if self._leaker.sync_buckets:
+            for _, bucket in self._leaker.sync_buckets.items():
+                buckets.append(bucket)
 
-    async def put(self, item: RateItem):
-        result = self.bucket.put(item)
+        if self._leaker.async_buckets:
+            for _, bucket in self._leaker.async_buckets.items():
+                buckets.append(bucket)
 
-        while isawaitable(result):
-            result = await result
+        return buckets
 
-        return result
+    def dispose(self, bucket: Union[int, AbstractBucket]) -> bool:
+        """Delete a bucket from the factory"""
+        if isinstance(bucket, AbstractBucket):
+            bucket = id(bucket)
 
-    async def count(self):
-        result = self.bucket.count()
+        assert isinstance(bucket, int), "not valid bucket id"
 
-        while isawaitable(result):
-            result = await result
+        if not self._leaker:
+            return False
 
-        return result
-
-    async def leak(self, current_timestamp: Optional[int] = None) -> int:
-        result = self.bucket.leak(current_timestamp)
-
-        while isawaitable(result):
-            result = await result
-
-        assert isinstance(result, int)
-        return result
-
-    async def flush(self) -> None:
-        result = self.bucket.flush()
-
-        while isawaitable(result):
-            result = await result
-
-        return None
-
-    async def peek(self, index: int) -> Optional[RateItem]:
-        item = self.bucket.peek(index)
-
-        while isawaitable(item):
-            item = await item
-
-        assert item is None or isinstance(item, RateItem)
-        return item
-
-    async def waiting(self, item: RateItem) -> int:
-        wait = super().waiting(item)
-
-        if isawaitable(wait):
-            wait = await wait
-
-        assert isinstance(wait, int)
-        return wait
-
-    @property
-    def failing_rate(self):
-        return self.bucket.failing_rate
-
-    @property
-    def rates(self):
-        return self.bucket.rates
+        return self._leaker.deregister(bucket)

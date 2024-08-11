@@ -89,6 +89,17 @@ class Limiter:
         self.max_delay = max_delay
         self.lock = RLock()
 
+    def buckets(self) -> List[AbstractBucket]:
+        """Get list of active buckets
+        """
+        return self.bucket_factory.get_buckets()
+
+    def dispose(self, bucket: Union[int, AbstractBucket]) -> bool:
+        """Dispose/Remove a specific bucket,
+        using bucket-id or bucket object as param
+        """
+        return self.bucket_factory.dispose(bucket)
+
     def _init_bucket_factory(
         self,
         argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
