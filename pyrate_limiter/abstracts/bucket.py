@@ -141,10 +141,32 @@ class Leaker(Thread):
 
         self.clocks[id(bucket)] = clock
 
+    def deregister(self, bucket_id: int):
+        """Deregister a bucket"""
+        assert self.sync_buckets is not None
+        assert self.clocks is not None
+        assert self.async_buckets is not None
+
+        if bucket_id in self.sync_buckets:
+            del self.sync_buckets[bucket_id]
+        elif bucket_id in self.async_buckets:
+            del self.async_buckets[bucket_id]
+
+        del self.clocks[bucket_id]
+
     async def _leak(self, sync=True) -> None:
         assert self.clocks
 
         while True:
+            if sync and not self.sync_buckets:
+                # Stop the thread since there is no sync-bucket
+                return
+
+            if not sync and not self.async_buckets:
+                # Exit the coroutine since there is no async-bucket
+                self.is_async_leak_started = False
+                return
+
             buckets = self.sync_buckets if sync else self.async_buckets
             assert buckets
 
@@ -174,10 +196,16 @@ class Leaker(Thread):
             asyncio.create_task(self._leak(sync=False))
 
     def run(self) -> None:
+        """ Override the original method of Thread
+        Not meant to be called directly
+        """
         assert self.sync_buckets
         asyncio.run(self._leak(sync=True))
 
     def start(self) -> None:
+        """ Override the original method of Thread
+        Call to run leaking sync buckets
+        """
         if self.sync_buckets and not self.is_alive():
             super().start()
 
@@ -234,7 +262,7 @@ class BucketFactory(ABC):
 
     def schedule_leak(self, new_bucket: AbstractBucket, associated_clock: AbstractClock) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
-        assert new_bucket.rates
+        assert new_bucket.rates, "Bucket rates are not set"
 
         if not self._leaker:
             self._leaker = Leaker(self.leak_interval)
@@ -242,6 +270,11 @@ class BucketFactory(ABC):
         self._leaker.register(new_bucket, associated_clock)
         self._leaker.start()
         self._leaker.leak_async()
+
+    def dispose(self, bucket_id: int) -> None:
+        """Delete a bucket from the factory"""
+        assert self._leaker, "Leaker task is not started yet"
+        self._leaker.deregister(bucket_id)
 
 
 class BucketAsyncWrapper(AbstractBucket):
