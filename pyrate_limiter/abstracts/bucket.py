@@ -287,6 +287,9 @@ class BucketFactory(ABC):
         if isinstance(bucket, AbstractBucket):
             bucket = id(bucket)
 
-        assert isinstance(bucket, int), "no valid id for bucket found"
-        assert self._leaker, "Leaker task is not started yet"
+        assert isinstance(bucket, int), "not valid bucket id"
+
+        if not self._leaker:
+            return False
+
         return self._leaker.deregister(bucket)
