@@ -39,6 +39,8 @@ async def test_limiter_constructor_01(clock):
     assert limiter.bucket_factory.bucket.rates == DEFAULT_RATES
     assert limiter.bucket_factory.clock == clock
 
+    assert len(limiter.buckets()) == 1
+
 
 @pytest.mark.asyncio
 async def test_limiter_constructor_02(

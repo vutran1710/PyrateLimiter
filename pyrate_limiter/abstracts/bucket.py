@@ -269,6 +269,21 @@ class BucketFactory(ABC):
         self._leaker.start()
         self._leaker.leak_async()
 
+    def get_buckets(self) -> List[AbstractBucket]:
+        """Iterator over all buckets in the factory
+        """
+        buckets = []
+
+        if self._leaker and self._leaker.sync_buckets:
+            for _, bucket in self._leaker.sync_buckets.items():
+                buckets.append(bucket)
+
+        if self._leaker and self._leaker.async_buckets:
+            for _, bucket in self._leaker.async_buckets.items():
+                buckets.append(bucket)
+
+        return buckets
+
     def dispose(self, bucket: Union[int, AbstractBucket]) -> bool:
         """Delete a bucket from the factory"""
         if isinstance(bucket, AbstractBucket):

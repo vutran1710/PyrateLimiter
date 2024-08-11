@@ -83,7 +83,7 @@ async def test_factory_leak(clock, create_bucket):
 
     assert len(factory.buckets) == 3
 
-    for _, bucket in factory.buckets.items():
+    for bucket in factory.get_buckets():
         factory.dispose(bucket)
 
     sleep(1)
