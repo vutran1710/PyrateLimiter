@@ -144,29 +144,24 @@ class Leaker(Thread):
 
     def deregister(self, bucket_id: int) -> bool:
         """Deregister a bucket"""
-        assert self.sync_buckets is not None
-        assert self.clocks is not None
-        assert self.async_buckets is not None
-
-        success = False
-
-        if bucket_id in self.sync_buckets:
+        if self.sync_buckets and bucket_id in self.sync_buckets:
             del self.sync_buckets[bucket_id]
-            success = True
+            assert self.clocks
+            del self.clocks[bucket_id]
+            return True
 
-        if bucket_id in self.async_buckets:
+        if self.async_buckets and bucket_id in self.async_buckets:
             del self.async_buckets[bucket_id]
-            success = True
+            assert self.clocks
+            del self.clocks[bucket_id]
 
-            if not self.async_buckets:
-                assert self.aio_leak_task
+            if not self.async_buckets and self.aio_leak_task:
                 self.aio_leak_task.cancel()
                 self.aio_leak_task = None
 
-        if bucket_id in self.clocks:
-            del self.clocks[bucket_id]
+            return True
 
-        return success
+        return False
 
     async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
         assert self.clocks
