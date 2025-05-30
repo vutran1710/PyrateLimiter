@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [3.7.1]
+* Update package metadata and local dev config to support python 3.13
+
 ## [3.2.1] - 2024-02-13
 * Fix Redis CROSSSLOT Keys following issue [#126](https://github.com/vutran1710/PyrateLimiter/issues/126)
 
