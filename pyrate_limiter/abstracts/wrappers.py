@@ -45,7 +45,8 @@ class BucketAsyncWrapper(AbstractBucket):
         result = self.bucket.flush()
 
         while isawaitable(result):
-            result = await result
+            # TODO: AbstractBucket.flush() may not have correct type annotation?
+            result = await result  # type: ignore
 
         return None
 
