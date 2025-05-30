@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [3.7.1]
 * Update package metadata and local dev config to support python 3.13
 
+## [3.7.0]
+* Add method to remove bucket
+
+## [3.6.2]
+* Fix table creation for SQLiteBucket
+
+## [3.6.1]
+* Support creating/getting bucket asynchronously
+
+## [3.6.0]
+* Use psycopg3 for PostgresBucket
+
+## [3.5.1]
+* Fix dependencies for "all" package extra
+
+## [3.5.0]
+* Add PostgresBucket backend
+
+## [3.4.1]
+* Fix: unnecessary warning during async check
+
+## [3.4.0]
+* Improved in-memory-bucket performance
+
+## [3.3.0]
+* Fix background task for leaking
+
 ## [3.2.1] - 2024-02-13
 * Fix Redis CROSSSLOT Keys following issue [#126](https://github.com/vutran1710/PyrateLimiter/issues/126)
 
