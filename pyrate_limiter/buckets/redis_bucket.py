@@ -130,7 +130,6 @@ class RedisBucket(AbstractBucket):
         if isawaitable(failing_rate):
 
             async def _handle_async():
-                nonlocal failing_rate
                 self.failing_rate = await failing_rate
                 return not bool(self.failing_rate)
 

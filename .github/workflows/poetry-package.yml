@@ -9,7 +9,7 @@ on:
       - master
 
 env:
-  LATEST_PY_VERSION: '3.10'
+  LATEST_PY_VERSION: '3.13'
   REDIS: 'redis://localhost:6379'
 
 jobs:
@@ -39,17 +39,18 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.8", "3.12"]
+        python-version: ["3.8", "3.13"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - uses: snok/install-poetry@v1.3
+    - uses: snok/install-poetry@v1.4.1
       with:
         virtualenvs-in-project: true
+        version: 1.8.5
 
     # Cache packages per python version, and reuse until lockfile changes
     # TODO: For some strange reason, virtualenvs restored from the cache will sometimes be
@@ -65,11 +66,13 @@ jobs:
       # if: steps.cache.outputs.cache-hit != 'true'
       run: poetry install -v -E all
 
-    # Run linting, tests, and coverage
+    # Run linting (latest python version only)
     - name: Lint
+      if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
       run: |
         source $VENV
         nox -e lint
+    # Run tests and coverage report (all python versions)
     - name: Test and Coverage
       run: |
         source $VENV
@@ -88,14 +91,15 @@ jobs:
     if: github.ref == 'refs/heads/master'
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ env.LATEST_PY_VERSION }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.LATEST_PY_VERSION }}
-    - uses: snok/install-poetry@v1.3
+    - uses: snok/install-poetry@v1.4.1
       with:
         virtualenvs-in-project: true
+        version: 1.8.5
     - name: Install dependencies
       run: poetry install -v -E all
     - name: Publish

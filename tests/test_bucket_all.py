@@ -136,7 +136,6 @@ async def test_bucket_waiting(clock: ClockSet, create_bucket):
     bucket = BucketAsyncWrapper(bucket)
 
     async def create_item(weight: int = 1) -> RateItem:
-        nonlocal clock
         now = clock.now()
 
         if isawaitable(now):

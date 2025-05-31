@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyrate-limiter"
-version = "3.7.0"
+version = "3.7.1"
 description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = ["vutr <me@vutr.io>"]
 license = "MIT"
@@ -58,21 +58,19 @@ docs = [
     "sphinxcontrib-apidoc",
 ]
 
-[tool.poetry.dev-dependencies]
-flake8_polyfill = "^1.0.2"
-nox = "^2022.1.7"
-nox-poetry = ">=0.8"
-pre-commit = "^2.17.0"
-pytest-xdist = "^2.5.0"
-pyYAML = "^6.0.1"
-schedule = "^1.1.0"
-pytest-cov = "^4.1.0"
-coverage = "6"
-
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.1.1"
-pytest-asyncio = "^0.23.5.post1"
-psycopg = { extras = ["pool"], version = "^3.1.18" }
+coverage = "6"
+flake8_polyfill = "^1.0.2"
+nox = "^2025.5"
+nox-poetry = ">=1.0"
+pre-commit = "^2.17.0"
+psycopg = {extras = ["pool"], version = "^3.1.18"}
+pytest = ">=8.3"
+pytest-asyncio = ">=0.24"
+pytest-cov = "^4.1.0"
+pytest-xdist = "^2.5.0"
+schedule = "^1.1.0"
+pyyaml = "^6.0.1"
 
 [tool.black]
 line-length = 120

@@ -1,5 +1,3 @@
-version: "3.7"
-
 services:
   redis-master:
     image: bitnami/redis:latest
