@@ -97,11 +97,10 @@ class PostgresBucket(AbstractBucket):
 
             query = Queries.PUT.format(table=self._full_tbl)
 
-            if item.weight == 1:
+            for i in range(item.weight):
+                # as per https://www.psycopg.org/docs/extras.html#fast-exec, executemany isn't faster than execute
+                # execute_batch could also be used here, if weight is expected to typically be > 1
                 conn.execute(query, (item.name, item.weight, item.timestamp / 1000))
-            else:
-                arguments = [(item.name, item.weight, item.timestamp / 1000)] * item.weight
-                conn.executemany(query, tuple(arguments))
 
         return True
 
