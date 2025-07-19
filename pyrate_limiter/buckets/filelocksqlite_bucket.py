@@ -8,11 +8,12 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-from filelock import FileLock # https://pypi.org/project/filelock/
+from filelock import FileLock  # https://pypi.org/project/filelock/
 
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from .sqlite_bucket import Queries, SQLiteBucket
+
 
 class FileLockSQLiteBucket(SQLiteBucket):
     def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str, mp_lock: FileLock):

@@ -104,6 +104,7 @@ async def create_sqlite_bucket(rates: List[Rate]):
 
     return bucket
 
+
 async def create_filelocksqlite_bucket(rates: List[Rate]):
     temp_dir = Path(gettempdir())
     default_db_path = temp_dir / f"pyrate_limiter_{id_generator(size=5)}.sqlite"
