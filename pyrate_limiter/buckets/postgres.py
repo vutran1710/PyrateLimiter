@@ -96,8 +96,12 @@ class PostgresBucket(AbstractBucket):
             self.failing_rate = None
 
             query = Queries.PUT.format(table=self._full_tbl)
-            arguments = [(item.name, item.weight, item.timestamp / 1000)] * item.weight
-            conn.executemany(query, tuple(arguments))
+
+            if item.weight == 1:
+                conn.execute(query, (item.name, item.weight, item.timestamp / 1000))
+            else:
+                arguments = [(item.name, item.weight, item.timestamp / 1000)] * item.weight
+                conn.executemany(query, tuple(arguments))
 
         return True
 
