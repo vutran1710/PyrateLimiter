@@ -552,6 +552,15 @@ rates = [Rate(5, Duration.MINUTE * 2)]
 bucket = SQLiteBucket.init_from_file(rates)
 ```
 
+```py
+from pyrate_limiter import Rate, Limiter, Duration, SQLiteBucket
+
+requests_per_minute = 5
+rate = Rate(requests_per_minute, Duration.MINUTE)
+bucket = SQLiteBucket.init_from_file([rate], use_file_lock=False)  # set use_file_lock to True if using across multiple processes
+limiter = Limiter(bucket, raise_when_fail=False, max_delay=max_delay)
+```
+
 You can also pass custom arguments to the `init_from_file` following its signature:
 
 ```python
@@ -562,12 +571,15 @@ class SQLiteBucket(AbstractBucket):
         rates: List[Rate],
         table: str = "rate_bucket",
         db_path: Optional[str] = None,
-        create_new_table = True
+        create_new_table = True,
+        use_file_lock: bool = False
     ) -> "SQLiteBucket":
         ...
 ```
 
-If the `db_path` is not provided, it will create a temporary database in memory as `tempdir / "pyrate-limiter.sqlite"`
+Options:
+- `db_path`: If not provided, uses `tempdir / "pyrate-limiter.sqlite"`
+- `use_file_lock`: Should be False for single process workloads. For multi process, uses a [filelock](https://pypi.org/project/filelock/) to ensure single access to the SQLite bucket across multiple processes, allowing multi process rate limiting on a single host.
 
 #### PostgresBucket
 
