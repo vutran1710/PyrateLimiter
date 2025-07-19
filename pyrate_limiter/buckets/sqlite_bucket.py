@@ -1,12 +1,15 @@
-"""Bucket implementation using SQLite
-"""
+"""Bucket implementation using SQLite"""
 import sqlite3
+from contextlib import nullcontext
 from pathlib import Path
 from tempfile import gettempdir
 from threading import RLock
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
+
+from filelock import FileLock
 
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
@@ -41,7 +44,9 @@ class Queries:
     DROP_INDEX = "DROP INDEX IF EXISTS '{index}'"
     COUNT_ALL = "SELECT COUNT(*) FROM '{table}'"
     GET_ALL_ITEM = "SELECT * FROM '{table}' ORDER BY item_timestamp ASC"
-    GET_FIRST_ITEM = "SELECT name, item_timestamp FROM '{table}' ORDER BY item_timestamp ASC"
+    GET_FIRST_ITEM = (
+        "SELECT name, item_timestamp FROM '{table}' ORDER BY item_timestamp ASC"
+    )
     GET_LAG = """
     SELECT (strftime ('%s', 'now') || substr(strftime ('%f', 'now'), 4)) - (
     SELECT item_timestamp
@@ -66,11 +71,17 @@ class SQLiteBucket(AbstractBucket):
     full_count_query: str
     lock: RLock
 
-    def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str):
+    def __init__(
+        self, rates: List[Rate], conn: sqlite3.Connection, table: str, lock=None
+    ):
         self.conn = conn
         self.table = table
         self.rates = rates
-        self.lock = RLock()
+
+        if not lock:
+            self.lock = RLock()
+        else:
+            self.lock = lock
 
     def _build_full_count_query(self, current_timestamp: int) -> Tuple[str, dict]:
         full_query: List[str] = []
@@ -82,7 +93,9 @@ class SQLiteBucket(AbstractBucket):
             query = Queries.COUNT_BEFORE_INSERT.format(table=self.table, index=index)
             full_query.append(query)
 
-        join_full_query = " union ".join(full_query) if len(full_query) > 1 else full_query[0]
+        join_full_query = (
+            " union ".join(full_query) if len(full_query) > 1 else full_query[0]
+        )
         return join_full_query, parameters
 
     def put(self, item: RateItem) -> bool:
@@ -100,7 +113,9 @@ class SQLiteBucket(AbstractBucket):
                     self.failing_rate = rate
                     return False
 
-            items = ", ".join([f"('{name}', {item.timestamp})" for name in [item.name] * item.weight])
+            items = ", ".join(
+                [f"('{name}', {item.timestamp})" for name in [item.name] * item.weight]
+            )
             query = (Queries.PUT_ITEM.format(table=self.table)) % items
             self.conn.execute(query)
             self.conn.commit()
@@ -129,7 +144,9 @@ class SQLiteBucket(AbstractBucket):
 
     def count(self) -> int:
         with self.lock:
-            return self.conn.execute(Queries.COUNT_ALL.format(table=self.table)).fetchone()[0]
+            return self.conn.execute(
+                Queries.COUNT_ALL.format(table=self.table)
+            ).fetchone()[0]
 
     def peek(self, index: int) -> Optional[RateItem]:
         with self.lock:
@@ -147,34 +164,43 @@ class SQLiteBucket(AbstractBucket):
         rates: List[Rate],
         table: str = "rate_bucket",
         db_path: Optional[str] = None,
-        create_new_table: bool = True
+        create_new_table: bool = True,
+        use_file_lock: bool = False,
     ) -> "SQLiteBucket":
         if db_path is None:
             temp_dir = Path(gettempdir())
             db_path = str(temp_dir / "pyrate_limiter.sqlite")
 
-        assert db_path is not None
-        assert db_path.endswith(".sqlite"), "Please provide a valid sqlite file path"
-
-        sqlite_connection = sqlite3.connect(
-            db_path,
-            isolation_level="EXCLUSIVE",
-            check_same_thread=False,
+        file_lock: Union[FileLock, nullcontext] = (
+            FileLock(db_path + ".lock") if use_file_lock else nullcontext()
         )
 
-        if create_new_table:
-            sqlite_connection.execute(Queries.CREATE_BUCKET_TABLE.format(table=table))
+        with file_lock:
+            assert db_path is not None
+            assert db_path.endswith(".sqlite"), (
+                "Please provide a valid sqlite file path"
+            )
 
-        create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
-            index_name="idx_rate_item_timestamp",
-            table_name=table,
-        )
+            sqlite_connection = sqlite3.connect(
+                db_path,
+                isolation_level="EXCLUSIVE",
+                check_same_thread=False,
+            )
 
-        sqlite_connection.execute(create_idx_query)
-        sqlite_connection.commit()
+            if use_file_lock:
+                sqlite_connection.execute("PRAGMA journal_mode=WAL;")
 
-        return cls(
-            rates,
-            sqlite_connection,
-            table=table,
-        )
+            if create_new_table:
+                sqlite_connection.execute(
+                    Queries.CREATE_BUCKET_TABLE.format(table=table)
+                )
+
+            create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
+                index_name="idx_rate_item_timestamp",
+                table_name=table,
+            )
+
+            sqlite_connection.execute(create_idx_query)
+            sqlite_connection.commit()
+
+            return cls(rates, sqlite_connection, table=table, lock=file_lock)
