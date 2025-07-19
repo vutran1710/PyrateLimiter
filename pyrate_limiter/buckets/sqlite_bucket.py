@@ -9,8 +9,6 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-from filelock import FileLock
-
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
@@ -171,11 +169,19 @@ class SQLiteBucket(AbstractBucket):
             temp_dir = Path(gettempdir())
             db_path = str(temp_dir / "pyrate_limiter.sqlite")
 
-        file_lock = FileLock(db_path + ".lock") if use_file_lock else None
+        file_lock = None
+        file_lock_ctx = nullcontext()
 
-        file_lock_ctx: Union[FileLock, nullcontext] = (
-            file_lock if file_lock else nullcontext()
-        )
+        if use_file_lock:
+            try:
+                from filelock import FileLock  # type: ignore[import-untyped]
+                file_lock = FileLock(db_path + ".lock")  # type: ignore[no-redefs]
+                file_lock_ctx: Union[nullcontext, FileLock] = file_lock  # type: ignore[no-redef]
+            except ImportError:
+                raise ImportError(
+                    "filelock is required for file locking. "
+                    "Please install it as optional dependency"
+                )
 
         with file_lock_ctx:
             assert db_path is not None

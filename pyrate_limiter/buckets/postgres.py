@@ -14,7 +14,7 @@ from ..abstracts import Rate
 from ..abstracts import RateItem
 
 if TYPE_CHECKING:
-    from psycopg_pool import ConnectionPool
+    from psycopg_pool import ConnectionPool  # type: ignore[import-untyped]
 
 
 class Queries:
