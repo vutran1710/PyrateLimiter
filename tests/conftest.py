@@ -108,7 +108,7 @@ async def create_sqlite_bucket(rates: List[Rate], file_lock: bool = False):
 
 
 async def create_filelocksqlite_bucket(rates: List[Rate]):
-    return create_sqlite_bucket(rates=rates, file_lock=True)
+    return await create_sqlite_bucket(rates=rates, file_lock=True)
 
 
 async def create_postgres_bucket(rates: List[Rate]):
