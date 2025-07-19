@@ -19,6 +19,7 @@ from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import RedisBucket
 from pyrate_limiter import SQLiteBucket
+from pyrate_limiter import FileLockSQLiteBucket
 from pyrate_limiter import SQLiteQueries as Queries
 from pyrate_limiter import TimeAsyncClock
 from pyrate_limiter import TimeClock
@@ -103,6 +104,29 @@ async def create_sqlite_bucket(rates: List[Rate]):
 
     return bucket
 
+async def create_filelocksqlite_bucket(rates: List[Rate]):
+    temp_dir = Path(gettempdir())
+    default_db_path = temp_dir / f"pyrate_limiter_{id_generator(size=5)}.sqlite"
+    logger.info("SQLite db path: %s", default_db_path)
+    table_name = f"pyrate-test-bucket-{id_generator(size=10)}"
+    index_name = table_name + "__timestamp_index"
+
+    conn = sqlite3.connect(
+        default_db_path,
+        isolation_level="EXCLUSIVE",
+        check_same_thread=False,
+    )
+    drop_table_query = Queries.DROP_TABLE.format(table=table_name)
+    drop_index_query = Queries.DROP_INDEX.format(index=index_name)
+
+    conn.execute(drop_table_query)
+    conn.execute(drop_index_query)
+    conn.commit()
+
+    bucket = FileLockSQLiteBucket.init_from_file(rates, table_name, db_path=str(default_db_path))
+
+    return bucket
+
 
 async def create_postgres_bucket(rates: List[Rate]):
     from psycopg_pool import ConnectionPool as PgConnectionPool
@@ -121,6 +145,7 @@ async def create_postgres_bucket(rates: List[Rate]):
         create_sqlite_bucket,
         create_async_redis_bucket,
         create_postgres_bucket,
+        create_filelocksqlite_bucket
     ]
 )
 def create_bucket(request):
