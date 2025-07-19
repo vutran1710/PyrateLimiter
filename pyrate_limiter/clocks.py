@@ -1,17 +1,21 @@
-"""Clock implementation using different backend
-"""
+"""Clock implementation using different backend"""
 from __future__ import annotations
 
 import sqlite3
+from contextlib import nullcontext
 from time import monotonic
 from time import time
+from typing import Optional
 from typing import TYPE_CHECKING
+from typing import Union
 
 from .abstracts import AbstractClock
+from .buckets import SQLiteBucket
 from .utils import dedicated_sqlite_clock_connection
 
 if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool
+    from threading import RLock
 
 
 class MonotonicClock(AbstractClock):
@@ -37,11 +41,22 @@ class TimeAsyncClock(AbstractClock):
 class SQLiteClock(AbstractClock):
     """Get timestamp using SQLite as remote clock backend"""
 
-    conn: sqlite3.Connection
-    time_query = "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
+    time_query = (
+        "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
+    )
 
-    def __init__(self, conn: sqlite3.Connection):
-        self.conn = conn
+    def __init__(self, conn: Union[sqlite3.Connection, SQLiteBucket]):
+        """
+        In multiprocessing cases, use the bucket, so that a shared lock is used.
+        """
+
+        self.lock: Optional[RLock] = None
+
+        if isinstance(conn, SQLiteBucket):
+            self.conn = conn.conn
+            self.lock = conn.lock
+        else:
+            self.conn = conn
 
     @classmethod
     def default(cls):
@@ -49,14 +64,15 @@ class SQLiteClock(AbstractClock):
         return cls(conn)
 
     def now(self) -> int:
-        now = self.conn.execute(self.time_query).fetchone()[0]
-        return int(now)
+        with self.lock if self.lock else nullcontext():
+            now = self.conn.execute(self.time_query).fetchone()[0]
+            return int(now)
 
 
 class PostgresClock(AbstractClock):
     """Get timestamp using Postgres as remote clock backend"""
 
-    def __init__(self, pool: 'ConnectionPool'):
+    def __init__(self, pool: "ConnectionPool"):
         self.pool = pool
 
     def now(self) -> int:
