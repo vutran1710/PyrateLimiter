@@ -104,7 +104,7 @@ class PostgresBucket(AbstractBucket):
             if item.weight == 1:
                 conn.execute(query, arguments)
             else:
-                execute_batch(conn, query, arguments)
+                execute_batch(conn, query, [arguments] * item.weight)
 
         return True
 
