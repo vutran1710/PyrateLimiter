@@ -7,3 +7,4 @@ from .postgres import Queries as PgQueries
 from .redis_bucket import RedisBucket
 from .sqlite_bucket import Queries as SQLiteQueries
 from .sqlite_bucket import SQLiteBucket
+from .filelocksqlite_bucket import FileLockSQLiteBucket
