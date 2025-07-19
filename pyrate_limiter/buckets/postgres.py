@@ -9,6 +9,8 @@ from typing import Optional
 from typing import TYPE_CHECKING
 from typing import Union
 
+from psycopg2.extras import execute_batch
+
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
@@ -97,7 +99,12 @@ class PostgresBucket(AbstractBucket):
 
             query = Queries.PUT.format(table=self._full_tbl)
             arguments = [(item.name, item.weight, item.timestamp / 1000)] * item.weight
-            conn.executemany(query, tuple(arguments))
+
+            # https://www.psycopg.org/docs/extras.html#fast-exec
+            if item.weight == 1:
+                conn.execute(query, arguments)
+            else:
+                execute_batch(conn, query, arguments)
 
         return True
 
