@@ -1,5 +1,5 @@
-"""Pytest config & fixtures
-"""
+"""Pytest config & fixtures"""
+
 import sqlite3
 from logging import basicConfig
 from logging import getLogger
@@ -72,7 +72,9 @@ async def create_async_redis_bucket(rates: List[Rate]):
     from redis.asyncio import ConnectionPool as AsyncConnectionPool
     from redis.asyncio import Redis as AsyncRedis
 
-    pool: AsyncConnectionPool = AsyncConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
+    pool: AsyncConnectionPool = AsyncConnectionPool.from_url(
+        getenv("REDIS", "redis://localhost:6379")
+    )
     redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)
     bucket_key = f"test-bucket/{id_generator()}"
     await redis_db.delete(bucket_key)
@@ -100,7 +102,9 @@ async def create_sqlite_bucket(rates: List[Rate]):
     conn.execute(drop_index_query)
     conn.commit()
 
-    bucket = SQLiteBucket.init_from_file(rates, table_name, db_path=str(default_db_path))
+    bucket = SQLiteBucket.init_from_file(
+        rates, table_name, db_path=str(default_db_path)
+    )
 
     return bucket
 
@@ -124,7 +128,9 @@ async def create_filelocksqlite_bucket(rates: List[Rate]):
     conn.execute(drop_index_query)
     conn.commit()
 
-    bucket = FileLockSQLiteBucket.init_from_file(rates, table_name, db_path=str(default_db_path))
+    bucket = FileLockSQLiteBucket.init_from_file(
+        rates, table_name, db_path=str(default_db_path)
+    )
 
     return bucket
 
@@ -132,7 +138,7 @@ async def create_filelocksqlite_bucket(rates: List[Rate]):
 async def create_postgres_bucket(rates: List[Rate]):
     from psycopg_pool import ConnectionPool as PgConnectionPool
 
-    pool = PgConnectionPool('postgresql://postgres:postgres@localhost:5432')
+    pool = PgConnectionPool("postgresql://postgres:postgres@localhost:5432")
     table = f"test_bucket_{id_generator()}"
     bucket = PostgresBucket(pool, table, rates)
     assert bucket.count() == 0
@@ -146,7 +152,7 @@ async def create_postgres_bucket(rates: List[Rate]):
         create_sqlite_bucket,
         create_async_redis_bucket,
         create_postgres_bucket,
-        create_filelocksqlite_bucket
+        create_filelocksqlite_bucket,
     ]
 )
 def create_bucket(request):

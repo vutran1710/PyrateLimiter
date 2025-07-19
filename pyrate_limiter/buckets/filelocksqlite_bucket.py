@@ -1,5 +1,5 @@
-"""Bucket implementation using SQLite
-"""
+"""Bucket implementation using SQLite"""
+
 import sqlite3
 from pathlib import Path
 from tempfile import gettempdir
@@ -16,7 +16,9 @@ from .sqlite_bucket import Queries, SQLiteBucket
 
 
 class FileLockSQLiteBucket(SQLiteBucket):
-    def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str, mp_lock: FileLock):
+    def __init__(
+        self, rates: List[Rate], conn: sqlite3.Connection, table: str, mp_lock: FileLock
+    ):
         self.conn = conn
         self.table = table
         self.rates = rates
@@ -33,7 +35,9 @@ class FileLockSQLiteBucket(SQLiteBucket):
             query = Queries.COUNT_BEFORE_INSERT.format(table=self.table, index=index)
             full_query.append(query)
 
-        join_full_query = " union ".join(full_query) if len(full_query) > 1 else full_query[0]
+        join_full_query = (
+            " union ".join(full_query) if len(full_query) > 1 else full_query[0]
+        )
         return join_full_query, parameters
 
     def put(self, item: RateItem) -> bool:
@@ -52,7 +56,7 @@ class FileLockSQLiteBucket(SQLiteBucket):
     def count(self) -> int:
         with self.mp_lock:
             return super().count()
-        
+
     def peek(self, index: int) -> Optional[RateItem]:
         with self.mp_lock:
             return super().peek(index)
@@ -73,11 +77,10 @@ class FileLockSQLiteBucket(SQLiteBucket):
 
         assert db_path is not None
         assert db_path.endswith(".sqlite"), "Please provide a valid sqlite file path"
-    
-        mp_lock = FileLock(f"{db_path}.lock")
-        
-        with mp_lock:
 
+        mp_lock = FileLock(f"{db_path}.lock")
+
+        with mp_lock:
             sqlite_connection = sqlite3.connect(
                 db_path,
                 isolation_level="EXCLUSIVE",
@@ -86,7 +89,9 @@ class FileLockSQLiteBucket(SQLiteBucket):
             sqlite_connection.execute("PRAGMA journal_mode=WAL;")
 
             if create_new_table:
-                sqlite_connection.execute(Queries.CREATE_BUCKET_TABLE.format(table=table))
+                sqlite_connection.execute(
+                    Queries.CREATE_BUCKET_TABLE.format(table=table)
+                )
 
             create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
                 index_name="idx_rate_item_timestamp",
@@ -96,9 +101,4 @@ class FileLockSQLiteBucket(SQLiteBucket):
             sqlite_connection.execute(create_idx_query)
             sqlite_connection.commit()
 
-            return cls(
-                rates,
-                sqlite_connection,
-                table=table,
-                mp_lock=mp_lock
-            )
+            return cls(rates, sqlite_connection, table=table, mp_lock=mp_lock)
