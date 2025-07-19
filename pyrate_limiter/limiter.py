@@ -192,26 +192,25 @@ class Limiter:
                 assert isinstance(delay, int), "Delay not integer"
 
                 total_delay = 0
-                delay += 50
 
                 while True:
+                    delay += 50
                     total_delay += delay
 
-                    if self.retry_until_max_delay:
-                        if self.max_delay is not None and total_delay > self.max_delay:
-                            logger.error("Total delay exceeded max_delay: total_delay=%s, max_delay=%s",
-                                         total_delay, self.max_delay)
-                            self._raise_delay_exception_if_necessary(bucket, item, total_delay)
-                            return False
-                    else:
-                        if self.max_delay is not None and delay > self.max_delay:
-                            logger.error(
-                                "Required delay too large: actual=%s, expected=%s",
-                                delay,
-                                self.max_delay,
-                            )
-                            self._raise_delay_exception_if_necessary(bucket, item, delay)
-                            return False
+                    if delay > self.max_delay:
+                        logger.error(
+                            "Required delay too large: actual=%s, expected=%s",
+                            delay,
+                            self.max_delay,
+                        )
+                        self._raise_delay_exception_if_necessary(bucket, item, delay)
+                        return False
+
+                    if total_delay > self.max_delay:
+                        logger.error("Total delay exceeded max_delay: total_delay=%s, max_delay=%s",
+                                     total_delay, self.max_delay)
+                        self._raise_delay_exception_if_necessary(bucket, item, total_delay)
+                        return False
 
                     await asyncio.sleep(delay / 1000)
                     item.timestamp += delay
@@ -242,14 +241,13 @@ class Limiter:
         total_delay = 0
 
         while True:
-            logger.debug("delay=%d, total_delay=%s", delay, total_delay)
+            logger.info(f"{delay=}, {total_delay=}")
             delay = bucket.waiting(item)
             assert isinstance(delay, int)
-
             delay += 50
             total_delay += delay
 
-            if self.max_delay is not None and total_delay > self.max_delay:
+            if total_delay > self.max_delay:
                 logger.error(
                     "Required delay too large: actual=%s, expected=%s",
                     delay,
