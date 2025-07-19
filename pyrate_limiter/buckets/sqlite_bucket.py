@@ -171,11 +171,13 @@ class SQLiteBucket(AbstractBucket):
             temp_dir = Path(gettempdir())
             db_path = str(temp_dir / "pyrate_limiter.sqlite")
 
-        file_lock: Union[FileLock, nullcontext] = (
-            FileLock(db_path + ".lock") if use_file_lock else nullcontext()
+        file_lock = FileLock(db_path + ".lock") if use_file_lock else None
+
+        file_lock_ctx: Union[FileLock, nullcontext] = (
+            file_lock if file_lock else nullcontext()
         )
 
-        with file_lock:
+        with file_lock_ctx:
             assert db_path is not None
             assert db_path.endswith(".sqlite"), (
                 "Please provide a valid sqlite file path"
