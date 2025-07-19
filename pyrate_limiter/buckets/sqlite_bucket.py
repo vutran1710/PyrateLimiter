@@ -175,7 +175,7 @@ class SQLiteBucket(AbstractBucket):
         if use_file_lock:
             try:
                 from filelock import FileLock  # type: ignore[import-untyped]
-                file_lock = FileLock(db_path + ".lock")  # type: ignore[no-redefs]
+                file_lock = FileLock(db_path + ".lock")  # type: ignore[no-redef]
                 file_lock_ctx: Union[nullcontext, FileLock] = file_lock  # type: ignore[no-redef]
             except ImportError:
                 raise ImportError(
