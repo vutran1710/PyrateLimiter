@@ -172,7 +172,7 @@ class SQLiteBucket(AbstractBucket):
         table: str = "rate_bucket",
         db_path: Optional[str] = None,
         create_new_table: bool = True,
-        use_file_lock: bool = False,
+        use_file_lock: bool = False
     ) -> "SQLiteBucket":
         if db_path is None:
             temp_dir = Path(gettempdir())
@@ -200,13 +200,17 @@ class SQLiteBucket(AbstractBucket):
 
             sqlite_connection = sqlite3.connect(
                 db_path,
-                isolation_level="EXCLUSIVE",
+                isolation_level="DEFERRED",
                 check_same_thread=False,
             )
 
             cur = sqlite_connection.cursor()
             if use_file_lock:
+                # https://www.sqlite.org/wal.html
                 cur.execute("PRAGMA journal_mode=WAL;")
+
+                # https://www.sqlite.org/pragma.html#pragma_synchronous
+                cur.execute("PRAGMA synchronous=NORMAL;")
 
             if create_new_table:
                 cur.execute(
