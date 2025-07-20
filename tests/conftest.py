@@ -18,9 +18,11 @@ from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import RedisBucket
 from pyrate_limiter import SQLiteBucket
+from pyrate_limiter import SQLiteClock
 from pyrate_limiter import SQLiteQueries as Queries
 from pyrate_limiter import TimeAsyncClock
 from pyrate_limiter import TimeClock
+
 
 # Make log messages visible on test failure (or with pytest -s)
 basicConfig(level="INFO")
@@ -34,6 +36,7 @@ clocks = [
     MonotonicClock(),
     TimeClock(),
     TimeAsyncClock(),
+    SQLiteClock.default()
 ]
 
 ClockSet = Union[
