@@ -181,9 +181,10 @@ class SQLiteBucket(AbstractBucket):
             temp_dir = Path(gettempdir())
             db_path = str(temp_dir / "pyrate_limiter.sqlite")
 
-        file_lock = None
-        file_lock_ctx = nullcontext()
-
+        # TBD: FileLock switched to a thread-local FileLock in 3.11.0.
+        # Should we set FileLock's thread_local to False, for cases where user is both multiprocessing & threading?
+        # As is, the file lock should be Multi Process - Single Thread and non-filelock is Single Process - Multi Thread
+        # A hybrid lock may be needed to gracefully handle both cases
         if use_file_lock:
             try:
                 from filelock import FileLock  # type: ignore[import-untyped]
