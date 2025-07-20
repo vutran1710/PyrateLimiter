@@ -266,6 +266,9 @@ class Limiter:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
+
+        item = self.bucket_factory.wrap_item(name, weight)
+
         with self.lock:
             assert weight >= 0, "item's weight must be >= 0"
 
@@ -273,8 +276,6 @@ class Limiter:
                 # NOTE: if item is weightless, just let it go through
                 # NOTE: this might change in the future
                 return True
-
-            item = self.bucket_factory.wrap_item(name, weight)
 
             if isawaitable(item):
 
