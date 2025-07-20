@@ -30,12 +30,14 @@ class TestResult:
 
 
 def create_sqlite_limiter(rate: Rate, use_fileLock: bool, max_delay: int):
-    bucket = SQLiteBucket.init_from_file([rate], use_file_lock=False)
+    bucket = SQLiteBucket.init_from_file([rate], db_path="pyrate_limiter.sqlite", use_file_lock=use_fileLock)
 
+    # retry_until_max_delay=True
     if use_fileLock:
         kwargs = dict(clock=SQLiteClock(bucket))
     else:
         kwargs = {}
+
     return Limiter(bucket, raise_when_fail=False, max_delay=max_delay, **kwargs)
 
 
@@ -43,7 +45,7 @@ def create_rate_limiter_factory(
     requests_per_second: int,
     max_delay_seconds: int,
     backend: Literal["default", "sqlite", "sqlite_filelock"],
-) -> Callable:
+) -> Callable[[], Limiter]:
     """Returns a callable, so it can be used with multiprocessing"""
     max_delay = max_delay_seconds * 1000  # should never wait for more than 60 seconds
     rate = Rate(requests_per_second, Duration.SECOND)
@@ -62,30 +64,31 @@ def create_rate_limiter_factory(
         raise ValueError(f"Unexpected backend option: {backend}")
 
 
-SHARED_LIMITER = None
+SHARED_LIMITER: Optional[Limiter] = None
 
 
-def task(call_times):
+def task():
+    assert SHARED_LIMITER is not None, "Limiter not initialized"
+
     try:
-        if SHARED_LIMITER:
-            SHARED_LIMITER.try_acquire("task")
-        call_times.append(perf_counter())
+        acquired = SHARED_LIMITER.try_acquire("task")
+
+        if not acquired:
+            raise ValueError("Failed to acquire")
     except Exception as e:
         logger.exception(e)
 
 
-def limiter_init(limiter_factory: Callable[[], object]):
+def limiter_init(limiter_factory: Callable[[], Limiter]):
     global SHARED_LIMITER
     SHARED_LIMITER = limiter_factory()
 
 
 def test_rate_limiter(
-    limiter_factory: Optional[Callable[[], object]],
+    limiter_factory: Optional[Callable[[], Limiter]],
     num_requests: int,
     use_process_pool: bool,
 ):
-    call_times: list[float] = []
-
     start = perf_counter()
 
     if use_process_pool:
@@ -93,7 +96,7 @@ def test_rate_limiter(
         with ProcessPoolExecutor(
             initializer=partial(limiter_init, limiter_factory) if limiter_factory is not None else None
         ) as executor:
-            futures = [executor.submit(task, call_times) for _ in range(num_requests)]
+            futures = [executor.submit(task) for _ in range(num_requests)]
             wait(futures)
     else:
         with ThreadPoolExecutor() as executor:
@@ -101,7 +104,7 @@ def test_rate_limiter(
             global SHARED_LIMITER
             SHARED_LIMITER = limiter
 
-            futures = [executor.submit(task, call_times) for _ in range(num_requests)]
+            futures = [executor.submit(task) for _ in range(num_requests)]
             wait(futures)
 
     for f in futures:
@@ -149,7 +152,8 @@ if __name__ == "__main__":
     import plotly.express as px
 
     requests_per_second_list = [10, 100, 1000, 2500, 5000, 7500]
-    test_duration_seconds = 5
+
+    test_duration_seconds = 10
 
     test_results = []
 
@@ -158,16 +162,6 @@ if __name__ == "__main__":
         level=logging.INFO,
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-
-    for requests_per_second in requests_per_second_list:
-        logger.info(f"Testing with no rate limiting, {requests_per_second=}")
-        result = run_test_limiter(
-            limiter=None,
-            label="Threads: No Limiter",
-            requests_per_second=requests_per_second,
-            test_duration_seconds=test_duration_seconds,
-        )
-        test_results.append(result)
 
     for backend in ["default", "sqlite", "sqlite_filelock"]:
         backend = cast(Literal["default", "sqlite", "sqlite_filelock"], backend)
@@ -185,20 +179,23 @@ if __name__ == "__main__":
             test_results.append(result)
 
     logger.info("Testing Multiprocessing")
-    for requests_per_second in requests_per_second_list:
-        logger.info(f"Testing with {backend=}, {requests_per_second=}")
+    for backend in ["sqlite_filelock"]:
+        backend = cast(Literal["default", "sqlite", "sqlite_filelock"], backend)
 
-        limiter_factory = create_rate_limiter_factory(
-            requests_per_second, max_delay_seconds=60, backend="sqlite_filelock"
-        )
-        result = run_test_limiter(
-            limiter=limiter_factory,
-            label="Processes: " + backend,
-            requests_per_second=requests_per_second,
-            test_duration_seconds=test_duration_seconds,
-            use_process_pool=True,
-        )
-        test_results.append(result)
+        for requests_per_second in requests_per_second_list:
+            logger.info(f"Testing with {backend=}, {requests_per_second=}")
+
+            limiter_factory = create_rate_limiter_factory(
+                requests_per_second, max_delay_seconds=60, backend=backend
+            )
+            result = run_test_limiter(
+                limiter=limiter_factory,
+                label="Processes: " + backend,
+                requests_per_second=requests_per_second,
+                test_duration_seconds=test_duration_seconds,
+                use_process_pool=True,
+            )
+            test_results.append(result)
 
     results_df = pd.DataFrame(test_results).sort_values(by="requests_per_second")
     results_df["requests_per_second"] = results_df["requests_per_second"].astype(str)
