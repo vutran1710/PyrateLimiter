@@ -96,8 +96,9 @@ async def create_sqlite_bucket(rates: List[Rate], file_lock: bool = False):
     drop_table_query = Queries.DROP_TABLE.format(table=table_name)
     drop_index_query = Queries.DROP_INDEX.format(index=index_name)
 
-    conn.execute(drop_table_query)
-    conn.execute(drop_index_query)
+    cur = conn.execute(drop_table_query)
+    cur.execute(drop_index_query)
+    cur.close()
     conn.commit()
 
     bucket = SQLiteBucket.init_from_file(
