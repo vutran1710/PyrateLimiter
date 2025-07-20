@@ -167,6 +167,9 @@ class SQLiteBucket(AbstractBucket):
         create_new_table: bool = True,
         use_file_lock: bool = False
     ) -> "SQLiteBucket":
+        if db_path is None and use_file_lock:
+            raise ValueError("db_path must be specified when using use_file_lock")
+
         if db_path is None:
             temp_dir = Path(gettempdir())
             db_path = str(temp_dir / "pyrate_limiter.sqlite")
