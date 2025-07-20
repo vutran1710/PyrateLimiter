@@ -1,5 +1,6 @@
 # pylint: disable=C0114,C0115
 from typing import Dict
+from typing import Optional
 from typing import Union
 
 from .abstracts.rate import Rate
@@ -19,7 +20,7 @@ class BucketFullException(Exception):
 
 
 class LimiterDelayException(Exception):
-    def __init__(self, item: RateItem, rate: Rate, actual_delay: int, max_delay: int):
+    def __init__(self, item: RateItem, rate: Rate, actual_delay: int, max_delay: Optional[int]):
         error = f"""
         Actual delay exceeded allowance: actual={actual_delay}, allowed={max_delay}
         Bucket for {item.name} with Rate {rate} is already full
@@ -29,7 +30,9 @@ class LimiterDelayException(Exception):
             "name": item.name,
             "weight": item.weight,
             "rate": str(rate),
-            "max_delay": max_delay,
             "actual_delay": actual_delay,
         }
+        if max_delay:
+            self.meta_info["max_delay"] = max_delay
+
         super().__init__(error)

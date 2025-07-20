@@ -140,7 +140,6 @@ class Limiter:
     ):
         if self.raise_when_fail:
             assert bucket.failing_rate is not None  # NOTE: silence mypy
-            assert isinstance(item.max_delay, int)
             raise LimiterDelayException(
                 item,
                 bucket.failing_rate,
@@ -155,10 +154,6 @@ class Limiter:
     ) -> Union[bool, Awaitable[bool]]:
         """On `try_acquire` failed, handle delay or raise error immediately"""
         assert bucket.failing_rate is not None
-
-        if item.max_delay is None:
-            self._raise_bucket_full_if_necessary(bucket, item)
-            return False
 
         delay = bucket.waiting(item)
 
@@ -182,7 +177,7 @@ class Limiter:
                 assert isinstance(delay, int), "Delay not integer"
                 delay += 50
 
-                if delay > item.max_delay:
+                if item.max_delay is not None and delay > item.max_delay:
                     logger.error(
                         "Required delay too large: actual=%s, expected=%s",
                         delay,
@@ -216,7 +211,7 @@ class Limiter:
 
         delay += 50
 
-        if delay > item.max_delay:
+        if item.max_delay is not None and delay > item.max_delay:
             logger.error(
                 "Required delay too large: actual=%s, expected=%s",
                 delay,
@@ -264,39 +259,46 @@ class Limiter:
         return _handle_result(acquire)  # type: ignore
 
     @contextmanager
-    def _rlock(self, name: str, item_max_delay: Optional[int]):
+    def _rlock(self, name: str, max_lock_wait: Optional[int]):
         """
         Wraps self.lock with a max_delay. max_delay can be overridden with max_lock _wait, otherwise
         max_delay is self.max_delay
         """
 
-        logger.debug("%s: waiting for self.lock", name)
+        logger.debug("%s: waiting for self.lock, for max_lock_wait = %s", name, max_lock_wait)
 
-        if item_max_delay is None:
+        if max_lock_wait is None:
             acquired = self.lock.acquire()
         else:
-            acquired = self.lock.acquire(timeout=item_max_delay // 1000)
+            acquired = self.lock.acquire(timeout=max_lock_wait // 1000)
 
         if not acquired:
-            raise TimeoutError(f"Failed to acquire lock for name='{name}' within {item_max_delay} ms")
+            raise TimeoutError(f"Failed to acquire lock for name='{name}' within {max_lock_wait} ms")
         try:
             logger.debug("%s: acquired self.lock", name)
             yield
         finally:
             self.lock.release()
 
+    #  - sentinel value only to detect if user passed explicit param
+    _sentinel_delay: int = object()  # type: ignore
+
     def try_acquire(self, name: str, weight: int = 1,
-                    max_delay_override_ms: Optional[int] = None) -> Union[bool, Awaitable[bool]]:
+                    max_delay_override_ms: Optional[int] = _sentinel_delay) -> Union[bool, Awaitable[bool]]:
         """Try acquiring an item with name & weight
         Return true on success, false on failure.
 
         max_delay_override_ms: overrides the limiters default max_delay.
         """
 
-        item_max_delay = max_delay_override_ms if max_delay_override_ms is not None else self.max_delay
+        if max_delay_override_ms is self._sentinel_delay:
+            item_max_delay = self.max_delay
+        else:
+            item_max_delay = max_delay_override_ms
+
         item = self.bucket_factory.wrap_item(name=name, weight=weight, max_delay=item_max_delay)
 
-        with self._rlock(name=name, item_max_delay=item_max_delay):
+        with self._rlock(name=name, max_lock_wait=item_max_delay):
             assert weight >= 0, "item's weight must be >= 0"
 
             if weight == 0:
