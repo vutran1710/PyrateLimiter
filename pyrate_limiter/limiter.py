@@ -241,7 +241,7 @@ class Limiter:
         total_delay = 0
 
         while True:
-            logger.info(f"{delay=}, {total_delay=}")
+            logger.debug("delay=%d, total_delay=%s", delay, total_delay)
             delay = bucket.waiting(item)
             assert isinstance(delay, int)
             delay += 50
