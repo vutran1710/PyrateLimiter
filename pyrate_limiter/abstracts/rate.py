@@ -1,6 +1,7 @@
 """Unit classes that deals with rate, item & duration
 """
 from enum import Enum
+from typing import Optional
 from typing import Union
 
 
@@ -58,14 +59,17 @@ class RateItem:
     name: str
     weight: int
     timestamp: int
+    max_delay: Optional[int]
 
-    def __init__(self, name: str, timestamp: int, weight: int = 1):
+    def __init__(self, name: str, timestamp: int, max_delay: Optional[int] = None, weight: int = 1):
         self.name = name
         self.timestamp = timestamp
         self.weight = weight
+        self.max_delay = max_delay
 
     def __str__(self) -> str:
-        return f"RateItem(name={self.name}, weight={self.weight}, timestamp={self.timestamp})"
+        return f"""RateItem(name={self.name}, weight={self.weight},
+            max_delay={self.max_delay}, timestamp={self.timestamp})"""
 
 
 class Rate:
