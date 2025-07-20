@@ -185,6 +185,9 @@ class SQLiteBucket(AbstractBucket):
         # Should we set FileLock's thread_local to False, for cases where user is both multiprocessing & threading?
         # As is, the file lock should be Multi Process - Single Thread and non-filelock is Single Process - Multi Thread
         # A hybrid lock may be needed to gracefully handle both cases
+        file_lock = None
+        file_lock_ctx = nullcontext()
+
         if use_file_lock:
             try:
                 from filelock import FileLock  # type: ignore[import-untyped]
