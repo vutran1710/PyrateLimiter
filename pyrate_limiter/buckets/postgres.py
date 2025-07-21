@@ -14,7 +14,7 @@ from ..abstracts import Rate
 from ..abstracts import RateItem
 
 if TYPE_CHECKING:
-    from psycopg_pool import ConnectionPool
+    from psycopg_pool import ConnectionPool  # type: ignore[import-untyped]
 
 
 class Queries:
@@ -96,8 +96,11 @@ class PostgresBucket(AbstractBucket):
             self.failing_rate = None
 
             query = Queries.PUT.format(table=self._full_tbl)
-            arguments = [(item.name, item.weight, item.timestamp / 1000)] * item.weight
-            conn.executemany(query, tuple(arguments))
+
+            # https://www.psycopg.org/docs/extras.html#fast-exec
+
+            for _ in range(item.weight):
+                conn.execute(query, (item.name, item.weight, item.timestamp / 1000))
 
         return True
 

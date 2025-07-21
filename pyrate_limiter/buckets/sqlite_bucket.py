@@ -9,8 +9,6 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-from filelock import FileLock
-
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
@@ -101,7 +99,9 @@ class SQLiteBucket(AbstractBucket):
     def put(self, item: RateItem) -> bool:
         with self.lock:
             query, parameters = self._build_full_count_query(item.timestamp)
-            rate_limit_counts = self.conn.execute(query, parameters).fetchall()
+            cur = self.conn.execute(query, parameters)
+            rate_limit_counts = cur.fetchall()
+            cur.close()
 
             for idx, result in enumerate(rate_limit_counts):
                 interval, count = result
@@ -117,7 +117,7 @@ class SQLiteBucket(AbstractBucket):
                 [f"('{name}', {item.timestamp})" for name in [item.name] * item.weight]
             )
             query = (Queries.PUT_ITEM.format(table=self.table)) % items
-            self.conn.execute(query)
+            self.conn.execute(query).close()
             self.conn.commit()
             return True
 
@@ -130,28 +130,35 @@ class SQLiteBucket(AbstractBucket):
                 interval=self.rates[-1].interval,
                 current_timestamp=current_timestamp,
             )
-            count = self.conn.execute(query).fetchone()[0]
+            cur = self.conn.execute(query)
+            count = cur.fetchone()[0]
             query = Queries.LEAK.format(table=self.table, count=count)
-            self.conn.execute(query)
+            cur.execute(query)
+            cur.close()
             self.conn.commit()
             return count
 
     def flush(self) -> None:
         with self.lock:
-            self.conn.execute(Queries.FLUSH.format(table=self.table))
+            self.conn.execute(Queries.FLUSH.format(table=self.table)).close()
             self.conn.commit()
             self.failing_rate = None
 
     def count(self) -> int:
         with self.lock:
-            return self.conn.execute(
+            cur = self.conn.execute(
                 Queries.COUNT_ALL.format(table=self.table)
-            ).fetchone()[0]
+            )
+            ret = cur.fetchone()[0]
+            cur.close()
+            return ret
 
     def peek(self, index: int) -> Optional[RateItem]:
         with self.lock:
             query = Queries.PEEK.format(table=self.table, count=index)
-            item = self.conn.execute(query).fetchone()
+            cur = self.conn.execute(query)
+            item = cur.fetchone()
+            cur.close()
 
             if not item:
                 return None
@@ -171,11 +178,19 @@ class SQLiteBucket(AbstractBucket):
             temp_dir = Path(gettempdir())
             db_path = str(temp_dir / "pyrate_limiter.sqlite")
 
-        file_lock = FileLock(db_path + ".lock") if use_file_lock else None
+        file_lock = None
+        file_lock_ctx = nullcontext()
 
-        file_lock_ctx: Union[FileLock, nullcontext] = (
-            file_lock if file_lock else nullcontext()
-        )
+        if use_file_lock:
+            try:
+                from filelock import FileLock  # type: ignore[import-untyped]
+                file_lock = FileLock(db_path + ".lock")  # type: ignore[no-redef]
+                file_lock_ctx: Union[nullcontext, FileLock] = file_lock  # type: ignore[no-redef]
+            except ImportError:
+                raise ImportError(
+                    "filelock is required for file locking. "
+                    "Please install it as optional dependency"
+                )
 
         with file_lock_ctx:
             assert db_path is not None
@@ -189,11 +204,12 @@ class SQLiteBucket(AbstractBucket):
                 check_same_thread=False,
             )
 
+            cur = sqlite_connection.cursor()
             if use_file_lock:
-                sqlite_connection.execute("PRAGMA journal_mode=WAL;")
+                cur.execute("PRAGMA journal_mode=WAL;")
 
             if create_new_table:
-                sqlite_connection.execute(
+                cur.execute(
                     Queries.CREATE_BUCKET_TABLE.format(table=table)
                 )
 
@@ -202,7 +218,8 @@ class SQLiteBucket(AbstractBucket):
                 table_name=table,
             )
 
-            sqlite_connection.execute(create_idx_query)
+            cur.execute(create_idx_query)
+            cur.close()
             sqlite_connection.commit()
 
             return cls(rates, sqlite_connection, table=table, lock=file_lock)

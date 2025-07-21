@@ -49,7 +49,9 @@ class SQLiteClock(AbstractClock):
         return cls(conn)
 
     def now(self) -> int:
-        now = self.conn.execute(self.time_query).fetchone()[0]
+        cur = self.conn.execute(self.time_query)
+        now = cur.fetchone()[0]
+        cur.close()
         return int(now)
 
 
