@@ -86,8 +86,9 @@ class PostgresBucket(AbstractBucket):
             for rate in self.rates:
                 bound = f"SELECT TO_TIMESTAMP({item.timestamp / 1000}) - INTERVAL '{rate.interval} milliseconds'"
                 query = f'SELECT COUNT(*) FROM {self._full_tbl} WHERE item_timestamp >= ({bound})'
-                conn = conn.execute(query)
-                count = int(conn.fetchone()[0])
+                cur = conn.execute(query)
+                count = int(cur.fetchone()[0])
+                cur.close()
 
                 if rate.limit - count < item.weight:
                     self.failing_rate = rate
