@@ -1,5 +1,6 @@
 """Complete Limiter test suite
 """
+import multiprocessing
 import time
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
@@ -71,9 +72,12 @@ def test_mp_bucket():
     bucket = MultiprocessBucket.init([rate])
 
     start = time.monotonic()
+    # future proofing for 3.14
+    is_fork_default = multiprocessing.get_start_method(allow_none=True) == 'fork'
 
     with ProcessPoolExecutor(
-        initializer=partial(init_process_mp, bucket)
+        initializer=partial(init_process_mp, bucket),
+        mp_context=multiprocessing.get_context("forkserver") if is_fork_default else None
     ) as executor:
         futures = [executor.submit(my_task) for _ in range(num_requests)]
         wait(futures)
