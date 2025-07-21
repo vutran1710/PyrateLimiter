@@ -7,6 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import wait
 from functools import partial
 from multiprocessing.synchronize import Lock as LockType
+from typing import Optional
 
 from pyrate_limiter import Duration
 from pyrate_limiter import Limiter
@@ -18,14 +19,14 @@ from pyrate_limiter.buckets.mp_bucket import MultiprocessBucket
 
 MAX_DELAY = Duration.DAY
 
-LIMITER: Limiter | None = None
+LIMITER: Optional[Limiter] = None
 
 
 def init_process_mp(bucket, mp_lock: LockType):
     global LIMITER
 
     LIMITER = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
-                      retry_until_max_delay=True, max_delay=MAX_DELAY)
+                      max_delay=MAX_DELAY)
 
     LIMITER.lock = mp_lock  # type: ignore[assignment]
 
