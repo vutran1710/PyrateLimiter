@@ -241,12 +241,12 @@ class Limiter:
 
         total_delay = 0
 
-        delay += 50
-
         while True:
             logger.debug("delay=%d, total_delay=%s", delay, total_delay)
             delay = bucket.waiting(item)
             assert isinstance(delay, int)
+
+            delay += 50
             total_delay += delay
 
             if total_delay > self.max_delay:
