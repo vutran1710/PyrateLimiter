@@ -77,7 +77,15 @@ class Limiter:
         retry_until_max_delay: bool = False
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
-        / single rate / rate list
+        / single rate / rate list.
+        
+        Parameters:
+            argument (Union[BucketFactory, AbstractBucket, Rate, List[Rate]]): The bucket or rate configuration.
+            clock (AbstractClock, optional): The clock instance to use for rate limiting. Defaults to TimeClock().
+            raise_when_fail (bool, optional): Whether to raise an exception when rate limiting fails. Defaults to True.
+            max_delay (Optional[Union[int, Duration]], optional): The maximum delay allowed for rate limiting. Defaults to None.
+            retry_until_max_delay (bool, optional): If True, retry operations until the maximum delay is reached. 
+                Useful for ensuring operations eventually succeed within the allowed delay window. Defaults to False.
         """
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
