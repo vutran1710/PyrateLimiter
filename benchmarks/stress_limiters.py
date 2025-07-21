@@ -64,14 +64,14 @@ def create_rate_limiter_factory(
         raise ValueError(f"Unexpected backend option: {backend}")
 
 
-SHARED_LIMITER: Optional[Limiter] = None
+LIMITER: Optional[Limiter] = None
 
 
 def task():
-    assert SHARED_LIMITER is not None, "Limiter not initialized"
+    assert LIMITER is not None, "Limiter not initialized"
 
     try:
-        acquired = SHARED_LIMITER.try_acquire("task")
+        acquired = LIMITER.try_acquire("task")
 
         if not acquired:
             raise ValueError("Failed to acquire")
@@ -80,8 +80,8 @@ def task():
 
 
 def limiter_init(limiter_factory: Callable[[], Limiter]):
-    global SHARED_LIMITER
-    SHARED_LIMITER = limiter_factory()
+    global LIMITER
+    LIMITER = limiter_factory()
 
 
 def test_rate_limiter(
@@ -101,8 +101,8 @@ def test_rate_limiter(
     else:
         with ThreadPoolExecutor() as executor:
             limiter = limiter_factory() if limiter_factory is not None else None
-            global SHARED_LIMITER
-            SHARED_LIMITER = limiter
+            global LIMITER
+            LIMITER = limiter
 
             futures = [executor.submit(task) for _ in range(num_requests)]
             wait(futures)
