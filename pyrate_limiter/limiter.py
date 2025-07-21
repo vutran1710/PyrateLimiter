@@ -197,20 +197,21 @@ class Limiter:
                 while True:
                     total_delay += delay
 
-                    if self.max_delay is not None and delay > self.max_delay:
-                        logger.error(
-                            "Required delay too large: actual=%s, expected=%s",
-                            delay,
-                            self.max_delay,
-                        )
-                        self._raise_delay_exception_if_necessary(bucket, item, delay)
-                        return False
-
-                    if self.max_delay is not None and total_delay > self.max_delay:
-                        logger.error("Total delay exceeded max_delay: total_delay=%s, max_delay=%s",
-                                     total_delay, self.max_delay)
-                        self._raise_delay_exception_if_necessary(bucket, item, total_delay)
-                        return False
+                    if self.retry_until_max_delay:
+                        if self.max_delay is not None and total_delay > self.max_delay:
+                            logger.error("Total delay exceeded max_delay: total_delay=%s, max_delay=%s",
+                                         total_delay, self.max_delay)
+                            self._raise_delay_exception_if_necessary(bucket, item, total_delay)
+                            return False
+                    else:
+                        if self.max_delay is not None and delay > self.max_delay:
+                            logger.error(
+                                "Required delay too large: actual=%s, expected=%s",
+                                delay,
+                                self.max_delay,
+                            )
+                            self._raise_delay_exception_if_necessary(bucket, item, delay)
+                            return False
 
                     await asyncio.sleep(delay / 1000)
                     item.timestamp += delay
