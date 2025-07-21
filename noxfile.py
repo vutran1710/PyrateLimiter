@@ -4,7 +4,7 @@ from nox_poetry import session
 # Reuse virtualenv created by poetry instead of creating new ones
 nox.options.reuse_existing_virtualenvs = True
 
-PYTEST_ARGS = ["--verbose", "--maxfail=1", "--numprocesses=auto", "--deselect tests/test_multiprocessing.py"]
+PYTEST_ARGS = ["--verbose", "--maxfail=1", "--numprocesses=auto", "--ignore=tests/test_multiprocessing.py"]
 PYTEST_MP_ARGS = ["--verbose", "--maxfail=1", "tests/test_multiprocessing.py"]
 COVERAGE_ARGS = ["--cov", "--cov-report=term", "--cov-report=xml", "--cov-report=html"]
 
