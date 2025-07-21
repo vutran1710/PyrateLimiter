@@ -23,6 +23,7 @@ from pyrate_limiter import SQLiteQueries as Queries
 from pyrate_limiter import TimeAsyncClock
 from pyrate_limiter import TimeClock
 
+
 # Make log messages visible on test failure (or with pytest -s)
 basicConfig(level="INFO")
 # Uncomment for more verbose output:
