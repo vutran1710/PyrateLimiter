@@ -72,6 +72,10 @@ jobs:
       run: |
         source $VENV
         nox -e lint
+    - name: Test MP
+      run: |
+        source $VENV
+        nox -e test_mp
     # Run tests and coverage report (all python versions)
     - name: Test and Coverage
       run: |
