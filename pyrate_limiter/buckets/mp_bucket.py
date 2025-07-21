@@ -14,7 +14,7 @@ class MultiprocessBucket(InMemoryBucket):
      and a multiprocessing.Lock.
     """
 
-    items: list[RateItem]  # ListProxy
+    items: List[RateItem]  # ListProxy
 
     def __init__(self, rates: List[Rate], items: list[RateItem]):
 
