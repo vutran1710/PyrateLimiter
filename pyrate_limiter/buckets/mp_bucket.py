@@ -16,7 +16,7 @@ class MultiprocessBucket(InMemoryBucket):
 
     items: List[RateItem]  # ListProxy
 
-    def __init__(self, rates: List[Rate], items: list[RateItem]):
+    def __init__(self, rates: List[Rate], items: List[RateItem]):
 
         if not isinstance(items, ListProxy):
             raise ValueError("items must be a ListProxy")
