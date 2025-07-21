@@ -1,12 +1,10 @@
 """Complete Limiter test suite
 """
-import multiprocessing
 import time
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import wait
 from functools import partial
-from multiprocessing.synchronize import Lock as LockType
 from typing import List
 from typing import Optional
 
@@ -23,13 +21,13 @@ MAX_DELAY = Duration.DAY
 LIMITER: Optional[Limiter] = None
 
 
-def init_process_mp(bucket, mp_lock: LockType):
+def init_process_mp(bucket: MultiprocessBucket):
     global LIMITER
 
     LIMITER = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
                       max_delay=MAX_DELAY)
 
-    LIMITER.lock = mp_lock  # type: ignore[assignment]
+    LIMITER.lock = bucket.mp_lock  # type: ignore[assignment]
 
 
 def my_task():
@@ -71,12 +69,11 @@ def test_mp_bucket():
 
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = MultiprocessBucket.init([rate])
-    mp_lock = multiprocessing.Lock()
 
     start = time.monotonic()
 
     with ProcessPoolExecutor(
-        initializer=partial(init_process_mp, bucket, mp_lock)
+        initializer=partial(init_process_mp, bucket)
     ) as executor:
         futures = [executor.submit(my_task) for _ in range(num_requests)]
         wait(futures)

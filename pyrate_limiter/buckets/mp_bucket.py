@@ -1,7 +1,9 @@
 """Naive bucket implementation using built-in list
 """
+from multiprocessing import Lock
 from multiprocessing import Manager
 from multiprocessing.managers import ListProxy
+from multiprocessing.synchronize import Lock as LockType
 from typing import List
 
 from ..abstracts import Rate
@@ -15,14 +17,16 @@ class MultiprocessBucket(InMemoryBucket):
     """
 
     items: List[RateItem]  # ListProxy
+    mp_lock: LockType
 
-    def __init__(self, rates: List[Rate], items: List[RateItem]):
+    def __init__(self, rates: List[Rate], items: List[RateItem], mp_lock: LockType):
 
         if not isinstance(items, ListProxy):
             raise ValueError("items must be a ListProxy")
 
         self.rates = sorted(rates, key=lambda r: r.interval)
         self.items = items
+        self.mp_lock = mp_lock
 
     @classmethod
     def init(
@@ -32,6 +36,8 @@ class MultiprocessBucket(InMemoryBucket):
         """
         Creates a single ListProxy so that this bucket can be shared across multiple processes.
         """
-        shared_items: ListProxy[int] = Manager().list()
+        shared_items: List[RateItem] = Manager().list()  # type: ignore[assignment]
 
-        return cls(rates=rates, items=shared_items)  # type: ignore
+        mp_lock: LockType = Lock()
+
+        return cls(rates=rates, items=shared_items, mp_lock=mp_lock)
