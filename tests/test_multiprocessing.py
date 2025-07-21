@@ -7,6 +7,8 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import wait
 from functools import partial
 from multiprocessing.synchronize import Lock as LockType
+from typing import Dict
+from typing import List
 from typing import Optional
 
 from pyrate_limiter import Duration
@@ -38,7 +40,7 @@ def my_task():
     return result
 
 
-def analyze_times(start: float, requests_per_second: int, time: list[dict]):
+def analyze_times(start: float, requests_per_second: int, time: List[Dict]):
     import pandas as pd
 
     df = pd.DataFrame(time)
