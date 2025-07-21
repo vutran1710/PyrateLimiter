@@ -1,4 +1,5 @@
-"""Naive bucket implementation using built-in list
+"""MultiProcessing In-memory Bucket using a multiprocessing.Manager.ListProxy
+     and a multiprocessing.Lock.
 """
 from multiprocessing import Lock
 from multiprocessing import Manager
@@ -12,9 +13,6 @@ from pyrate_limiter.buckets import InMemoryBucket
 
 
 class MultiprocessBucket(InMemoryBucket):
-    """MultiProcessing In-memory Bucket using a multiprocessing.Manager
-     and a multiprocessing.Lock.
-    """
 
     items: List[RateItem]  # ListProxy
     mp_lock: LockType
