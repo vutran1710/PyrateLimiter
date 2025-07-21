@@ -14,6 +14,7 @@ from pyrate_limiter import Duration
 from pyrate_limiter import id_generator
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import MonotonicClock
+from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import RedisBucket
@@ -82,6 +83,12 @@ async def create_async_redis_bucket(rates: List[Rate]):
     return bucket
 
 
+async def create_mp_bucket(rates: List[Rate]):
+    bucket = MultiprocessBucket.init(rates)
+
+    return bucket
+
+
 async def create_sqlite_bucket(rates: List[Rate], file_lock: bool = False):
     temp_dir = Path(gettempdir())
     default_db_path = temp_dir / f"pyrate_limiter_{id_generator(size=5)}.sqlite"
@@ -131,6 +138,7 @@ async def create_postgres_bucket(rates: List[Rate]):
         create_async_redis_bucket,
         create_postgres_bucket,
         create_filelocksqlite_bucket,
+        create_mp_bucket
     ]
 )
 def create_bucket(request):
