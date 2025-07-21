@@ -50,7 +50,7 @@ def analyze_times(start: float, requests_per_second: int, times: List[float]):
             w.popleft()
         ops_last_sec.append(len(w))
     print(f'{max(ops_last_sec)=},  {requests_per_second=}')
-    assert max(ops_last_sec) <= requests_per_second
+    assert max(ops_last_sec) == requests_per_second
 
 
 def init_process_sqlite(rate):
