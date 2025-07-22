@@ -178,12 +178,10 @@ class Limiter:
 
         def _handle_reacquire(re_acquire: bool) -> bool:
             if not re_acquire:
-                logger.error(
-                    """
-                Re-acquiring with delay expected to be successful,
-                if it failed then either clock or bucket is probably unstable
-                """
-                )
+                logger.error("""Failed to re-acquire after the expected delay. If it failed,
+                either clock or bucket is unstable.
+                If asyncio, use try_acquire_async(). If multiprocessing,
+                use retry_until_max_delay=True.""")
                 self._raise_bucket_full_if_necessary(bucket, item)
 
             return re_acquire
