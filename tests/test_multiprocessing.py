@@ -38,7 +38,7 @@ def my_task():
     while not LIMITER.try_acquire("my_task"):
         time.sleep(0.01)
 
-    result = time.monotonic()
+    result = time.time()
     time.sleep(0.01)
     return result
 
@@ -73,7 +73,7 @@ def test_mp_bucket():
     bucket = MultiprocessBucket.init([rate])
     # init_process_mp(bucket)
 
-    start = time.monotonic()
+    start = time.time()
 
     with ProcessPoolExecutor(
         initializer=partial(init_process_mp, bucket),
@@ -103,7 +103,7 @@ def test_sqlite_filelock_bucket():
     db_path = str(temp_dir / "pyrate_limiter.sqlite")
     init_process_sqlite(requests_per_second, db_path, create_new_table=True)
 
-    start = time.monotonic()
+    start = time.time()
 
     with ProcessPoolExecutor(
         initializer=partial(init_process_sqlite, requests_per_second=requests_per_second, db_path=db_path)
