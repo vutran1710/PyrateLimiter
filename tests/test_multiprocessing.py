@@ -65,7 +65,7 @@ def init_process_sqlite(requests_per_second, db_path, create_new_table: bool = F
 
 def test_mp_bucket():
 
-    requests_per_second = 100
+    requests_per_second = 250
     num_seconds = 5
     num_requests = requests_per_second * num_seconds
 
@@ -94,7 +94,7 @@ def test_mp_bucket():
 
 def test_sqlite_filelock_bucket():
 
-    requests_per_second = 100
+    requests_per_second = 250
     num_seconds = 5
     num_requests = requests_per_second * num_seconds
 
