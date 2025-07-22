@@ -249,7 +249,7 @@ class Limiter:
             delay += 50
             total_delay += delay
 
-            if total_delay > self.max_delay:
+            if self.max_delay is not None and total_delay > self.max_delay:
                 logger.error(
                     "Required delay too large: actual=%s, expected=%s",
                     delay,
