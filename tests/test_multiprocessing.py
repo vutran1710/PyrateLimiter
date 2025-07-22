@@ -55,10 +55,10 @@ def analyze_times(start: float, requests_per_second: int, times: List[float]):
     assert max(ops_last_sec) <= requests_per_second * 1.01  # a small amount of error is observed when multiprocessing
 
 
-def init_process_sqlite(requests_per_second, db_path, create_new_table: bool = False):
+def init_process_sqlite(requests_per_second, db_path):
     global LIMITER
     rate = Rate(requests_per_second, Duration.SECOND)
-    bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, create_new_table=create_new_table, use_file_lock=True)
+    bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, create_new_table=False, use_file_lock=True)
     LIMITER = Limiter(bucket, raise_when_fail=False, max_delay=MAX_DELAY, clock=SQLiteClock(bucket))
     LIMITER.lock = bucket.lock
 
@@ -101,8 +101,14 @@ def test_sqlite_filelock_bucket():
     # Initialize the table
     temp_dir = Path(gettempdir())
     db_path = str(temp_dir / "pyrate_limiter.sqlite")
-    init_process_sqlite(requests_per_second, db_path, create_new_table=True)
+    rate = Rate(requests_per_second, Duration.SECOND)
+    bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, create_new_table=True, use_file_lock=True)
+    limiter = Limiter(bucket, raise_when_fail=False, max_delay=MAX_DELAY, clock=SQLiteClock(bucket.conn))
 
+    # Verify limiter for test purposes
+    limiter.try_acquire("my_task")
+
+    # Start the ProcessPoolExecutor
     start = time.time()
 
     with ProcessPoolExecutor(
