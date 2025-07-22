@@ -4,6 +4,7 @@ import asyncio
 import logging
 from functools import wraps
 from inspect import isawaitable
+from threading import local
 from threading import RLock
 from time import sleep
 from typing import Any
@@ -67,6 +68,9 @@ class Limiter:
     max_delay: Optional[int] = None
     lock: RLock
 
+    # async_lock is thread local, created on first use
+    _thread_local: local
+
     def __init__(
         self,
         argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
@@ -97,6 +101,8 @@ class Limiter:
 
         self.max_delay = max_delay
         self.lock = RLock()
+
+        self._thread_local = local()
 
     def buckets(self) -> List[AbstractBucket]:
         """Get list of active buckets
@@ -270,6 +276,28 @@ class Limiter:
             return _put_async()
 
         return _handle_result(acquire)  # type: ignore
+
+    async def _get_async_lock(self):
+        if not hasattr(self._thread_local, "async_lock"):
+            logger.info("Creating async_lock for thread")
+            self._thread_local.async_lock = asyncio.Lock()
+        return self._thread_local.async_lock
+
+    async def try_acquire_async(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
+        """
+            async version of try_acquire.
+
+            This uses a top level, thread-local async lock to ensure that the async loop doesn't block
+
+            This does not make the entire code async: use an async bucket for that.
+        """
+        async with await self._get_async_lock():
+            acquired = self.try_acquire(name=name, weight=weight)
+
+            if isawaitable(acquired):
+                return await acquired
+            else:
+                return acquired
 
     def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
         """Try acquiring an item with name & weight
