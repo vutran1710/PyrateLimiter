@@ -10,6 +10,7 @@ from typing import cast
 from typing import Literal
 from typing import Optional
 
+from pyrate_limiter import AbstractClock
 from pyrate_limiter import Duration
 from pyrate_limiter import Limiter
 from pyrate_limiter import MonotonicClock
@@ -17,6 +18,7 @@ from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import SQLiteBucket
 from pyrate_limiter import SQLiteClock
+from pyrate_limiter import TimeClock
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +38,11 @@ def create_sqlite_limiter(rate: Rate, use_fileLock: bool, max_delay: int):
 
     # retry_until_max_delay=True
     if use_fileLock:
-        kwargs = dict(clock=SQLiteClock(bucket))
+        clock: AbstractClock = SQLiteClock(bucket)
     else:
-        kwargs = {}
+        clock = TimeClock()
 
-    return Limiter(bucket, raise_when_fail=False, max_delay=max_delay, **kwargs)
+    return Limiter(bucket, raise_when_fail=False, max_delay=max_delay, clock=clock, retry_until_max_delay=True)
 
 
 def create_mp_limiter(max_delay: int, bucket: MultiprocessBucket):
