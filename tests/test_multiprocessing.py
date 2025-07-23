@@ -1,4 +1,4 @@
-"""Complete Limiter test suite
+"""Rate limiter multiprocessing tests
 """
 import time
 from collections import deque
