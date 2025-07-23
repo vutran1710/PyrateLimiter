@@ -5,7 +5,6 @@ __pycache__/
 dist/
 docs/_build/
 docs/modules/
-examples/
 htmlcov/
 env/
 test-reports/
@@ -14,3 +13,7 @@ test-reports/
 .idea/
 .coveralls.yml
 .DS_Store
+
+.venv
+xdg_cache
+*\.sqlite*

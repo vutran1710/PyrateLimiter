@@ -52,10 +52,7 @@ async def concurrent_acquire(limiter: Limiter, items: List[str]):
 
 async def async_acquire(limiter: Limiter, item: str, weight: int = 1) -> Tuple[bool, int]:
     start = time()
-    acquire = limiter.try_acquire(item, weight=weight)
-
-    if isawaitable(acquire):
-        acquire = await acquire
+    acquire = await limiter.try_acquire_async(item, weight=weight)
 
     time_cost_in_ms = int((time() - start) * 1000)
     assert isinstance(acquire, bool)
