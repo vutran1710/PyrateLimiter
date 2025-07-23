@@ -139,3 +139,12 @@ def limiter_should_raise(request):
 @pytest.fixture(params=[None, 500, Duration.SECOND * 2, Duration.MINUTE])
 def limiter_delay(request):
     return request.param
+
+
+def pytest_configure():
+    # fork is not threading friendly, which is why
+    # 3.14 is moving to forkserver as default.
+    import sys
+    import multiprocessing
+    if sys.platform.startswith("linux"):
+        multiprocessing.set_start_method("forkserver")
