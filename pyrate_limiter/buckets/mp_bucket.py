@@ -1,4 +1,4 @@
-"""MultiProcessing In-memory Bucket using a multiprocessing.Manager.ListProxy
+"""multiprocessing In-memory Bucket using a multiprocessing.Manager.ListProxy
      and a multiprocessing.Lock.
 """
 from multiprocessing import Lock
