@@ -245,6 +245,7 @@ class Limiter:
                             self._raise_delay_exception_if_necessary(bucket, item, delay)
                             return False
 
+                    logger.debug("Sleeping for %dms", delay)
                     await asyncio.sleep(delay / 1000)
                     item.timestamp += delay
                     re_acquire = bucket.put(item)
@@ -295,6 +296,7 @@ class Limiter:
 
                 return False
 
+            logger.debug("Sleeping for %dms", delay)
             sleep(delay / 1000)
             item.timestamp += delay
             re_acquire = bucket.put(item)
@@ -375,7 +377,7 @@ class Limiter:
         lock = self._get_async_lock()
 
         if item_max_delay_ms:
-            await asyncio.wait_for(lock.acquire(), item_max_delay_ms // 1000)
+            await asyncio.wait_for(lock.acquire(), item_max_delay_ms / 1000)
         else:
             await lock.acquire()
 
@@ -402,7 +404,7 @@ class Limiter:
 
         item_max_delay_ms = self._get_item_max_delay_ms(max_delay_override_ms)
 
-        with combined_lock(self.locks, item_max_delay_ms):
+        with combined_lock(self.locks, item_max_delay_ms / 1000 if item_max_delay_ms else None):
             item = self.bucket_factory.wrap_item(name=name, weight=weight, max_delay=item_max_delay)
 
             assert weight >= 0, "item's weight must be >= 0"
