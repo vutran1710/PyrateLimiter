@@ -44,6 +44,19 @@ class MultiprocessBucket(InMemoryBucket):
         """Provides a new Lock that combines mp_lock with the RLock
         """
         class CombinedLock:
+            """
+            A context manager that combines multiple locks into a single lock.
+
+            It is used to wrap/replace the Limiter.lock, and is intended to be used only by Limiter.
+
+            Usage:
+                with CombinedLock(lock1, lock2):
+                    # Critical section
+                    pass
+
+            These locks should only be used once at Limiter try_acquire, and always in the same order, to
+            avoid deadlocks.
+            """
             def __init__(self, *locks):
                 self.locks = locks
 
