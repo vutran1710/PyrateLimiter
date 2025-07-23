@@ -1,8 +1,8 @@
 """
 Testing buckets of all implementations
 """
+import asyncio
 from inspect import isawaitable
-from time import sleep
 from time import time
 
 import pytest
@@ -50,10 +50,10 @@ async def test_bucket_01(clock: ClockSet, create_bucket):
 
     assert await bucket.put(RateItem("my-item", await get_now(clock))) is False
 
-    sleep(2)
+    await asyncio.sleep(2)
     assert await bucket.put(RateItem("my-item", await get_now(clock))) is True
 
-    sleep(2)
+    await asyncio.sleep(2)
     assert await bucket.put(RateItem("my-item", await get_now(clock), weight=30)) is False
 
 
@@ -152,7 +152,7 @@ async def test_bucket_waiting(clock: ClockSet, create_bucket):
     for _ in range(3):
         assert await bucket.put(await create_item()) is True
         # NOTE: sleep 100ms between each item
-        sleep(0.1)
+        await asyncio.sleep(0.1)
 
     end = await get_now(clock)
     assert end > 0
@@ -167,9 +167,9 @@ async def test_bucket_waiting(clock: ClockSet, create_bucket):
     assert isinstance(availability, int)
     logger.info("1 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.03)
+    await asyncio.sleep(availability / 1000 - 0.03)
     assert await bucket.put(await create_item()) is False
-    sleep(0.04)
+    await asyncio.sleep(0.04)
     assert await bucket.put(await create_item()) is True
 
     assert await bucket.put(await create_item(2)) is False
@@ -177,9 +177,9 @@ async def test_bucket_waiting(clock: ClockSet, create_bucket):
     assert isinstance(availability, int)
     logger.info("2 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.03)
+    await asyncio.sleep(availability / 1000 - 0.03)
     assert await bucket.put(await create_item(2)) is False
-    sleep(0.04)
+    await asyncio.sleep(0.04)
     assert await bucket.put(await create_item(2)) is True
 
     assert await bucket.put(await create_item(3)) is False
@@ -187,9 +187,9 @@ async def test_bucket_waiting(clock: ClockSet, create_bucket):
     assert isinstance(availability, int)
     logger.info("3 space available in: %s", availability)
 
-    sleep(availability / 1000 - 0.03)
+    await asyncio.sleep(availability / 1000 - 0.03)
     assert await bucket.put(await create_item(3)) is False
-    sleep(0.04)
+    await asyncio.sleep(0.04)
     assert await bucket.put(await create_item(3)) is True
 
 
@@ -206,7 +206,7 @@ async def test_bucket_leak(clock: ClockSet, create_bucket):
     assert await bucket.leak(await get_now(clock)) == 0
     assert await bucket.count() == 100
 
-    sleep(3.01)
+    await asyncio.sleep(3.01)
     assert await bucket.leak(await get_now(clock)) == 100
     assert await bucket.leak(await get_now(clock)) == 0
     assert await bucket.count() == 0
