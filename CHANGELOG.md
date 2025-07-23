@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [TBD]
+* Added Limiter.try_acquire_async()
+* Added MultiprocessBucket
+* Added retry_until_max_delay for multiprocess concurrency
+* Added examples/
+
 ## [3.8.0]
 * Add FileLock option for SQLiteBucket
 
