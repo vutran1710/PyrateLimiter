@@ -1,10 +1,10 @@
 """
-Demonstrates using a SQLite Bucket across multiple processes, using a filelock to enforce synchronization.
+Demonstrates using a MultiprocessBucket using a ProcessPoolExecutor, running a simple task.
 
-This is useful in cases where multiple processes are created, possibly at different times or from different
-applications.
+A MultiprocessBucket is useful when the rate is to be shared among a multiprocessing pool or ProcessPoolExecutor.
 
-The SQLite Bucket uses a .lock file to ensure that only one process is active at a time.
+The mp_bucket stores its items in a multiprocessing ListProxy, and a multiprocessing lock is shared
+across Limiter instances.
 
 """
 import logging
@@ -13,12 +13,13 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import wait
 from functools import partial
+from multiprocessing import Lock
 
 from pyrate_limiter import Duration
 from pyrate_limiter import Limiter
+from pyrate_limiter import MonotonicClock
+from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import Rate
-from pyrate_limiter import SQLiteBucket
-from pyrate_limiter import SQLiteClock
 
 LIMITER: Limiter | None = None
 MAX_DELAY = Duration.DAY
@@ -28,13 +29,13 @@ NUM_REQUESTS = REQUESTS_PER_SECOND * 5  # Run for ~5 seconds
 logger = logging.getLogger(__name__)
 
 
-def init_process():
+def init_process(bucket: MultiprocessBucket):
     global LIMITER
 
-    rate = Rate(REQUESTS_PER_SECOND, Duration.SECOND)
-    bucket = SQLiteBucket.init_from_file([rate], db_path="pyrate_limiter.sqlite", use_file_lock=True)
-    LIMITER = Limiter(bucket, raise_when_fail=False, clock=SQLiteClock(bucket.conn),
+    LIMITER = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
                       max_delay=MAX_DELAY)  # retry_until_max_delay=True,
+
+    LIMITER.lock = bucket.mp_lock  # type: ignore[assignment]
 
 
 def my_task():
@@ -51,10 +52,15 @@ if __name__ == "__main__":
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+    rate = Rate(REQUESTS_PER_SECOND, Duration.SECOND)
+
+    bucket = MultiprocessBucket.init([rate])
+    mp_lock = Lock()
+
     start = time.monotonic()
 
     with ProcessPoolExecutor(
-        initializer=partial(init_process)
+        initializer=partial(init_process, bucket)
     ) as executor:
         futures = [executor.submit(my_task) for _ in range(NUM_REQUESTS)]
         wait(futures)
@@ -67,4 +73,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Task raised: {e}")
 
-    print(times)
+    end = time.monotonic()
+
+    print(f"Completed {NUM_REQUESTS=} in {end - start} seconds, at a rate of {REQUESTS_PER_SECOND=}")
