@@ -59,7 +59,7 @@ def create_sqlite_limiter(
     )
 
     if async_wrapper:
-        bucket = BucketAsyncWrapper(InMemoryBucket(rate_limits))
+        bucket = BucketAsyncWrapper(bucket)
 
     limiter = Limiter(
         bucket, raise_when_fail=False, max_delay=max_delay, retry_until_max_delay=True
