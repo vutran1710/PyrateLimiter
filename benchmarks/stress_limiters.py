@@ -58,7 +58,7 @@ def create_mp_limiter(max_delay: int, bucket: MultiprocessBucket):
 def create_rate_limiter_factory(
     requests_per_second: int,
     max_delay_seconds: int,
-    backend: Literal["default", "sqlite", "sqlite_filelock"],
+    backend: Literal["default", "sqlite", "sqlite_filelock", "mp_limiter"],
 ) -> Callable[[], Limiter]:
     """Returns a callable, so it can be used with multiprocessing"""
     max_delay = max_delay_seconds * 1000  # should never wait for more than 60 seconds
