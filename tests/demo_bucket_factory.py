@@ -35,7 +35,7 @@ class DemoBucketFactory(BucketFactory):
             self.schedule_leak(bucket, bucket_clock)
             self.buckets[item_name_pattern] = bucket
 
-    def wrap_item(self, name: str, weight: int = 1):
+    def wrap_item(self, name: str, weight: int = 1):  # type: ignore[override]
         now = self.clock.now()
 
         async def wrap_async():
@@ -77,7 +77,7 @@ class DemoAsyncGetBucketFactory(BucketFactory):
             self.schedule_leak(bucket, bucket_clock)
             self.buckets[item_name_pattern] = bucket
 
-    def wrap_item(self, name: str, weight: int = 1):
+    def wrap_item(self, name: str, weight: int = 1):   # type: ignore[override]
         now = self.clock.now()
 
         async def wrap_async():
