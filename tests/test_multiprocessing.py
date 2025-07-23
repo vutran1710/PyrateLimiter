@@ -100,7 +100,7 @@ def test_sqlite_filelock_bucket():
 
     # Initialize the table
     temp_dir = Path(gettempdir())
-    db_path = str(temp_dir / "pyrate_limiter.sqlite")
+    db_path = str(temp_dir / f"pyrate_limiter_{time.time()}.sqlite")
     rate = Rate(requests_per_second, Duration.SECOND)
     SQLiteBucket.init_from_file([rate], db_path=db_path, create_new_table=True, use_file_lock=True)
 
