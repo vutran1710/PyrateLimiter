@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 
 from pyrate_limiter import Limiter
-from pyrate_limiter.limiter_factory import get_async_limiter
+from pyrate_limiter.limiter_factory import create_inmemory_limiter
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -23,7 +23,7 @@ async def main():
     print("Note that the TICKs continue while the tasks are waiting")
 
     start = time.time()
-    limiter = get_async_limiter()
+    limiter = create_inmemory_limiter(async_wrapper=True)
 
     async def task_async(name, weight, i, limiter: Limiter):
         await limiter.try_acquire_async(name, weight)
