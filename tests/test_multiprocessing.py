@@ -59,7 +59,7 @@ def analyze_times(start: float, requests_per_second: int, times: List[float]):
 def init_process_sqlite(requests_per_second, db_path):
     global LIMITER
     rate = Rate(requests_per_second, Duration.SECOND)
-    bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, create_new_table=False, use_file_lock=True)
+    bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, use_file_lock=True)
     LIMITER = Limiter(bucket, raise_when_fail=False, max_delay=MAX_DELAY, clock=SQLiteClock(bucket))
     LIMITER.lock = bucket.lock
 
@@ -101,8 +101,6 @@ def test_sqlite_filelock_bucket():
     # Initialize the table
     temp_dir = Path(gettempdir())
     db_path = str(temp_dir / f"pyrate_limiter_{time.time()}.sqlite")
-    rate = Rate(requests_per_second, Duration.SECOND)
-    SQLiteBucket.init_from_file([rate], db_path=db_path, create_new_table=True, use_file_lock=True)
 
     # Start the ProcessPoolExecutor
     start = time.time()
