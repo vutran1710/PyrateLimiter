@@ -72,7 +72,6 @@ def test_mp_bucket():
 
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = MultiprocessBucket.init([rate])
-    # init_process_mp(bucket)
 
     start = time.time()
 
