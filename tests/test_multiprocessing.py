@@ -102,11 +102,7 @@ def test_sqlite_filelock_bucket():
     temp_dir = Path(gettempdir())
     db_path = str(temp_dir / "pyrate_limiter.sqlite")
     rate = Rate(requests_per_second, Duration.SECOND)
-    bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, create_new_table=True, use_file_lock=True)
-    limiter = Limiter(bucket, raise_when_fail=False, max_delay=MAX_DELAY, clock=SQLiteClock(bucket.conn))
-
-    # Verify limiter for test purposes
-    limiter.try_acquire("my_task")
+    SQLiteBucket.init_from_file([rate], db_path=db_path, create_new_table=True, use_file_lock=True)
 
     # Start the ProcessPoolExecutor
     start = time.time()
