@@ -318,7 +318,7 @@ class Limiter:
             self._thread_local.async_lock = lock
             return lock
 
-    async def try_acquire_async(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
+    async def try_acquire_async(self, name: str, weight: int = 1) -> bool:
         """
             async version of try_acquire.
 
