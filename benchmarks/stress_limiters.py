@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
     logger.info("Testing Multiprocessing")
     for backend in ["sqlite_filelock", "mp_limiter"]:
-        backend = cast(Literal["default", "sqlite", "sqlite_filelock"], backend)
+        backend = cast(Literal["default", "sqlite", "sqlite_filelock", "mp_limiter"], backend)
 
         for requests_per_second in requests_per_second_list:
             logger.info(f"Testing with {backend=}, {requests_per_second=}")
