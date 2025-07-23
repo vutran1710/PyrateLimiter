@@ -27,9 +27,9 @@ def init_process_mp(bucket: MultiprocessBucket):
     global LIMITER
 
     LIMITER = Limiter(bucket, raise_when_fail=False, clock=TimeClock(),
-                      max_delay=MAX_DELAY)
+                      max_delay=MAX_DELAY, retry_until_max_delay=True)
 
-    LIMITER.lock = bucket.mp_lock  # type: ignore[assignment]
+    LIMITER.lock = bucket.get_combined_lock(LIMITER.lock)  # type: ignore[assignment]
 
 
 def my_task():
@@ -60,7 +60,11 @@ def init_process_sqlite(requests_per_second, db_path):
     global LIMITER
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, use_file_lock=True)
-    LIMITER = Limiter(bucket, raise_when_fail=False, max_delay=MAX_DELAY, clock=SQLiteClock(bucket))
+    LIMITER = Limiter(bucket,
+                      raise_when_fail=False,
+                      max_delay=MAX_DELAY,
+                      retry_until_max_delay=True,
+                      clock=SQLiteClock(bucket))
     LIMITER.lock = bucket.lock
 
 

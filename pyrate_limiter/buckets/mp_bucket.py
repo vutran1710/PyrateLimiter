@@ -39,3 +39,20 @@ class MultiprocessBucket(InMemoryBucket):
         mp_lock: LockType = Lock()
 
         return cls(rates=rates, items=shared_items, mp_lock=mp_lock)
+
+    def get_combined_lock(self, lock):
+        """Provides a new Lock that combines mp_lock with the RLock
+        """
+        class CombinedLock:
+            def __init__(self, *locks):
+                self.locks = locks
+
+            def __enter__(self):
+                for lock in self.locks:
+                    lock.acquire()
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                for lock in reversed(self.locks):
+                    lock.release()
+
+        return CombinedLock(self.mp_lock, lock)
