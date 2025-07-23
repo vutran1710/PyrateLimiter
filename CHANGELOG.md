@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [TBD]
+* Added Limiter.try_acquire_async()
+* Added MultiprocessBucket
+* Added examples/
+
 ## [3.8.1]
 * Keep Retrying until Max Delay Has Expired
 * Postgres performance turning
