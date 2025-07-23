@@ -33,7 +33,7 @@ def init_process(bucket: MultiprocessBucket):
     global LIMITER
 
     LIMITER = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
-                      max_delay=MAX_DELAY)  # retry_until_max_delay=True,
+                      max_delay=MAX_DELAY, retry_until_max_delay=True)
 
     LIMITER.lock = bucket.mp_lock  # type: ignore[assignment]
 

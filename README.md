@@ -293,11 +293,14 @@ heavy_item = "the-sun"
 limiter.try_acquire(heavy_item, weight=10000)
 ```
 
-If your bucket's backend is `async`, well, we got you covered! Passing `await` to the limiter is enought to make it scream!
+### asyncio: If your tasks are async, use an async bucket with limiter.try_acquire_async
+
 
 ```python
-await limiter.try_acquire(item)
+await limiter.try_acquire_async(item)
 ```
+
+Example: [asyncio_ratelimit.py](examples/asyncio_ratelimit.py)
 
 Alternatively, you can use `Limiter.try_acquire` as a function decorator. But you have to provide a `mapping` function that map the wrapped function's arguments to a proper `limiter.try_acquire` argument - which is a tuple of `(str, int)` or just `str`
 
@@ -316,6 +319,9 @@ def request_function(some_number: int):
 async def async_request_function(some_number: int):
     requests.get('https://example.com')
 ```
+
+Example: [asyncio_decorator.py](examples/asyncio_decorator.py)
+
 
 ### Limiter API
 
@@ -491,9 +497,12 @@ for _ in range(4):
 A few different bucket backends are available:
 
 - **InMemoryBucket**: using python built-in list as bucket
+- **MultiprocessBucket**:  uses a multiprocessing lock for distributed concurrency with a ListProxy as the bucket
 - **RedisBucket**, using err... redis, with both async/sync support
 - **PostgresBucket**, using `psycopg2`
 - **SQLiteBucket**, using sqlite3
+- **BucketAsyncWrapper**: wraps an existing bucket with async interfaces, to avoid blocking the event loop
+
 
 #### InMemoryBucket
 
@@ -507,6 +516,17 @@ bucket = InMemoryBucket(rates)
 ```
 
 This bucket only availabe in `sync` mode. The only constructor argument is `List[Rate]`.
+
+#### MultiprocessBucket
+
+MultiprocessBucket uses a ListProxy to store items within a python multiprocessing pool or ProcessPoolExecutor. Concurrency is enforced via a multiprocessing Lock.
+
+The bucket is shared across instances.
+
+An example is provided in [in_memory_multiprocess](examples/in_memory_multiprocess.py)
+
+Whenever multiprocessing, bucket.waiting calculations will be often wrong because of the concurrency involved. Set Limiter.retry_until_max_delay=True so that the
+item keeps retrying rather than returning False.
 
 #### RedisBucket
 
@@ -581,6 +601,8 @@ Options:
 - `db_path`: If not provided, uses `tempdir / "pyrate-limiter.sqlite"`
 - `use_file_lock`: Should be False for single process workloads. For multi process, uses a [filelock](https://pypi.org/project/filelock/) to ensure single access to the SQLite bucket across multiple processes, allowing multi process rate limiting on a single host.
 
+Example: [limiter_factory.py::create_sqlite_limiter()](pyrate_limiter/limiter_factory.py)
+
 #### PostgresBucket
 
 Postgres is supported, but you have to install `psycopg[pool]` either as an extra or as a separate package. The PostgresBucket currently does not support async.
@@ -598,14 +620,24 @@ rates = [Rate(3, 1000), Rate(4, 1500)]
 bucket = PostgresBucket(connection_pool, "my-bucket-table", rates)
 ```
 
-### Async or Sync?
+#### BucketAsyncWrapper
+The BucketAsyncWrapper wraps a sync bucket to ensure all its methods return awaitables. This allows the Limiter to detect
+asynchronous behavior and use asyncio.sleep() instead of time.sleep() during delay handling,
+preventing blocking of the asyncio event loop.
 
-The Limiter is basically made of a Clock backend and a Bucket backend. Depends on how each of these component works async-or-sync wise, PyrateLimiter will change its methods' signatures to sync or async accordingly.
+Example: [limiter_factory.py::create_inmemory_limiter()](pyrate_limiter/limiter_factory.py)
 
-Here is a simple rule how to know which mode the Limiter is operating on:
+### Async or Sync or Multiprocessing
 
-> If either of the backends is async-based component, the Limiter will be async.
+The Limiter is basically made of a Clock backend and a Bucket backend. The backends may be async or sync, which determines the Limiters internal behavior, regardless of whether the caller enters via a sync or async function.
 
+try_acquire_async: When calling from an async context, use try_acquire_async. This uses a thread-local asyncio lock to ensure only one asyncio task is acquiring, followed by a global RLock so that only one thread is acquiring.
+
+try_acquire: When called directly, the global RLock enforces only one thread at a time.
+
+Multiprocessing: If using MultiprocessBucket, the RLock must be replaced with the shared multiprocessing.Lock (MultiprocessBucket.mp_lock) to enforce process-level exclusivity.
+  * Asyncio + multiprocessing works as expected.
+  * Multiprocessing + multithreading is not supported unless you add an extra inter-process/thread locking layer.
 
 
 ## Advanced Usage
