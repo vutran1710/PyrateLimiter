@@ -65,6 +65,7 @@ class Limiter:
 
     bucket_factory: BucketFactory
     raise_when_fail: bool
+    retry_until_max_delay: bool
     max_delay: Optional[int] = None
     lock: RLock
 
@@ -74,13 +75,23 @@ class Limiter:
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
+        retry_until_max_delay: bool = False
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
-        / single rate / rate list
+        / single rate / rate list.
+
+        Parameters:
+            argument (Union[BucketFactory, AbstractBucket, Rate, List[Rate]]): The bucket or rate configuration.
+            clock (AbstractClock, optional): The clock instance to use for rate limiting. Defaults to TimeClock().
+            raise_when_fail (bool, optional): Whether to raise an exception when rate limiting fails. Defaults to True.
+            max_delay (Optional[Union[int, Duration]], optional): The maximum delay allowed for rate limiting.
+            Defaults to None.
+            retry_until_max_delay (bool, optional): If True, retry operations until the maximum delay is reached.
+                Useful for ensuring operations eventually succeed within the allowed delay window. Defaults to False.
         """
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
-
+        self.retry_until_max_delay = retry_until_max_delay
         if max_delay is not None:
             if isinstance(max_delay, Duration):
                 max_delay = int(max_delay)
@@ -175,25 +186,40 @@ class Limiter:
                 nonlocal delay
                 delay = await delay
                 assert isinstance(delay, int), "Delay not integer"
+
+                total_delay = 0
                 delay += 50
 
-                if item.max_delay is not None and delay > item.max_delay:
-                    logger.error(
-                        "Required delay too large: actual=%s, expected=%s",
-                        delay,
-                        item.max_delay,
-                    )
-                    self._raise_delay_exception_if_necessary(bucket, item, delay)
-                    return False
+                while True:
+                    total_delay += delay
 
-                await asyncio.sleep(delay / 1000)
-                item.timestamp += delay
-                re_acquire = bucket.put(item)
+                    if self.retry_until_max_delay:
+                        if self.max_delay is not None and total_delay > self.max_delay:
+                            logger.error("Total delay exceeded max_delay: total_delay=%s, max_delay=%s",
+                                         total_delay, self.max_delay)
+                            self._raise_delay_exception_if_necessary(bucket, item, total_delay)
+                            return False
+                    else:
+                        if self.max_delay is not None and delay > self.max_delay:
+                            logger.error(
+                                "Required delay too large: actual=%s, expected=%s",
+                                delay,
+                                self.max_delay,
+                            )
+                            self._raise_delay_exception_if_necessary(bucket, item, delay)
+                            return False
 
-                if isawaitable(re_acquire):
-                    re_acquire = await re_acquire
+                    await asyncio.sleep(delay / 1000)
+                    item.timestamp += delay
+                    re_acquire = bucket.put(item)
 
-                return _handle_reacquire(re_acquire)
+                    if isawaitable(re_acquire):
+                        re_acquire = await re_acquire
+
+                    if not self.retry_until_max_delay:
+                        return _handle_reacquire(re_acquire)
+                    elif re_acquire:
+                        return True
 
             return _handle_async()
 
@@ -209,23 +235,40 @@ class Limiter:
             self._raise_bucket_full_if_necessary(bucket, item)
             return False
 
-        delay += 50
+        total_delay = 0
 
-        if item.max_delay is not None and delay > item.max_delay:
-            logger.error(
-                "Required delay too large: actual=%s, expected=%s",
-                delay,
-                item.max_delay,
-            )
-            self._raise_delay_exception_if_necessary(bucket, item, delay)
-            return False
+        while True:
+            logger.debug("delay=%d, total_delay=%s", delay, total_delay)
+            delay = bucket.waiting(item)
+            assert isinstance(delay, int)
 
-        sleep(delay / 1000)
-        item.timestamp += delay
-        re_acquire = bucket.put(item)
-        # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
-        assert isinstance(re_acquire, bool)
-        return _handle_reacquire(re_acquire)
+            delay += 50
+            total_delay += delay
+
+            if self.max_delay is not None and total_delay > self.max_delay:
+                logger.error(
+                    "Required delay too large: actual=%s, expected=%s",
+                    delay,
+                    self.max_delay,
+                )
+
+                if self.retry_until_max_delay:
+                    self._raise_delay_exception_if_necessary(bucket, item, total_delay)
+                else:
+                    self._raise_delay_exception_if_necessary(bucket, item, delay)
+
+                return False
+
+            sleep(delay / 1000)
+            item.timestamp += delay
+            re_acquire = bucket.put(item)
+            # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
+            assert isinstance(re_acquire, bool)
+
+            if not self.retry_until_max_delay:
+                return _handle_reacquire(re_acquire)
+            elif re_acquire:
+                return True
 
     def handle_bucket_put(
         self,

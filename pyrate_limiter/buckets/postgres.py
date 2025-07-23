@@ -14,7 +14,7 @@ from ..abstracts import Rate
 from ..abstracts import RateItem
 
 if TYPE_CHECKING:
-    from psycopg_pool import ConnectionPool
+    from psycopg_pool import ConnectionPool  # type: ignore[import-untyped]
 
 
 class Queries:
@@ -86,8 +86,9 @@ class PostgresBucket(AbstractBucket):
             for rate in self.rates:
                 bound = f"SELECT TO_TIMESTAMP({item.timestamp / 1000}) - INTERVAL '{rate.interval} milliseconds'"
                 query = f'SELECT COUNT(*) FROM {self._full_tbl} WHERE item_timestamp >= ({bound})'
-                conn = conn.execute(query)
-                count = int(conn.fetchone()[0])
+                cur = conn.execute(query)
+                count = int(cur.fetchone()[0])
+                cur.close()
 
                 if rate.limit - count < item.weight:
                     self.failing_rate = rate
@@ -96,8 +97,11 @@ class PostgresBucket(AbstractBucket):
             self.failing_rate = None
 
             query = Queries.PUT.format(table=self._full_tbl)
-            arguments = [(item.name, item.weight, item.timestamp / 1000)] * item.weight
-            conn.executemany(query, tuple(arguments))
+
+            # https://www.psycopg.org/docs/extras.html#fast-exec
+
+            for _ in range(item.weight):
+                conn.execute(query, (item.name, item.weight, item.timestamp / 1000))
 
         return True
 
