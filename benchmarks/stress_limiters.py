@@ -50,7 +50,7 @@ def create_mp_limiter(max_delay: int, bucket: MultiprocessBucket):
     limiter = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
                       max_delay=max_delay)
 
-    limiter.lock = bucket.get_combined_lock(limiter.lock)  # type: ignore[assignment]
+    limiter.locks = (bucket.mp_lock, *limiter.locks)
 
     return limiter
 

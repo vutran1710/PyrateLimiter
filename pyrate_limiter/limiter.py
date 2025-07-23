@@ -5,6 +5,7 @@ import logging
 from contextlib import contextmanager
 from functools import wraps
 from inspect import isawaitable
+from threading import local
 from threading import RLock
 from time import sleep
 from typing import Any
@@ -58,6 +59,24 @@ class SingleBucketFactory(BucketFactory):
         return self.bucket
 
 
+@contextmanager
+def combined_lock(locks, timeout_sec: Optional[float]):
+    acquired = []
+    try:
+        for lock in locks:
+            if timeout_sec is not None:
+                if not lock.acquire(timeout=timeout_sec):
+                    raise TimeoutError("Timeout while acquiring combined lock.")
+            else:
+                lock.acquire()
+            acquired.append(lock)
+        yield
+    finally:
+
+        for lock in reversed(acquired):
+            lock.release()
+
+
 class Limiter:
     """This class responsibility is to sum up all underlying logic
     and make working with async/sync functions easily
@@ -67,7 +86,11 @@ class Limiter:
     raise_when_fail: bool
     retry_until_max_delay: bool
     max_delay: Optional[int] = None
-    lock: RLock
+
+    locks: Tuple  # Locks: (RLock,) when just threading, (MPLock, RLock) when multiprocessing
+
+    # async_lock is thread local, created on first use
+    _thread_local: local
 
     def __init__(
         self,
@@ -75,7 +98,7 @@ class Limiter:
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
-        retry_until_max_delay: bool = False
+        retry_until_max_delay: bool = False,
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list.
@@ -99,7 +122,22 @@ class Limiter:
             assert max_delay >= 0, "Max-delay must not be negative"
 
         self.max_delay = max_delay
-        self.lock = RLock()
+
+        if isinstance(argument, AbstractBucket):
+
+            limiter_lock = argument.limiter_lock()
+        else:
+            logger.info("not using")
+            limiter_lock = None
+
+        if limiter_lock is not None:
+            # Top level lock is for multiprocessing
+            # Second lock is for Threading
+            self.locks = (limiter_lock, RLock())
+        else:
+            self.locks = (RLock(),)
+
+        self._thread_local = local()
 
     def buckets(self) -> List[AbstractBucket]:
         """Get list of active buckets
@@ -170,12 +208,10 @@ class Limiter:
 
         def _handle_reacquire(re_acquire: bool) -> bool:
             if not re_acquire:
-                logger.error(
-                    """
-                Re-acquiring with delay expected to be successful,
-                if it failed then either clock or bucket is probably unstable
-                """
-                )
+                logger.error("""Failed to re-acquire after the expected delay. If it failed,
+                either clock or bucket is unstable.
+                If asyncio, use try_acquire_async(). If multiprocessing,
+                use retry_until_max_delay=True.""")
                 self._raise_bucket_full_if_necessary(bucket, item)
 
             return re_acquire
@@ -301,30 +337,58 @@ class Limiter:
 
         return _handle_result(acquire)  # type: ignore
 
-    @contextmanager
-    def _rlock(self, name: str, max_lock_wait: Optional[int]):
-        """
-        Wraps self.lock with a max_delay. max_delay can be overridden with max_lock _wait, otherwise
-        max_delay is self.max_delay
-        """
-
-        logger.debug("%s: waiting for self.lock, for max_lock_wait = %s", name, max_lock_wait)
-
-        if max_lock_wait is None:
-            acquired = self.lock.acquire()
-        else:
-            acquired = self.lock.acquire(timeout=max_lock_wait // 1000)
-
-        if not acquired:
-            raise TimeoutError(f"Failed to acquire lock for name='{name}' within {max_lock_wait} ms")
+    def _get_async_lock(self):
+        """Must be called before first try_acquire_async for each thread"""
         try:
-            logger.debug("%s: acquired self.lock", name)
-            yield
-        finally:
-            self.lock.release()
+            return self._thread_local.async_lock
+        except AttributeError:
+            lock = asyncio.Lock()
+            self._thread_local.async_lock = lock
+            return lock
 
-    #  - sentinel value only to detect if user passed explicit param
+    def _get_item_max_delay_ms(self, max_delay_override_ms: Optional[int]):
+        """Uses max_delay_override_ms if specified, else self.max_delay.
+        Returns the delay in seconds.
+        """
+        if max_delay_override_ms is self._sentinel_delay:
+            item_max_delay = self.max_delay
+        else:
+            item_max_delay = max_delay_override_ms
+
+        return item_max_delay if item_max_delay else None
+
+    # sentinel value to detect if user passed explicit param
+    # The purpose is to distinguish "None" from not passed since None means; no delay
     _sentinel_delay: int = object()  # type: ignore
+
+    async def try_acquire_async(self, name: str, weight: int = 1,
+                                max_delay_override_ms: Optional[int] = _sentinel_delay) -> bool:
+        """
+            async version of try_acquire.
+
+            This uses a top level, thread-local async lock to ensure that the async loop doesn't block
+
+            This does not make the entire code async: use an async bucket for that.
+        """
+        item_max_delay_ms = self._get_item_max_delay_ms(max_delay_override_ms)
+
+        lock = self._get_async_lock()
+
+        if item_max_delay_ms:
+            await asyncio.wait_for(lock.acquire(), item_max_delay_ms // 1000)
+        else:
+            await lock.acquire()
+
+        try:
+            acquired = self.try_acquire(name=name, weight=weight, max_delay_override_ms=max_delay_override_ms)
+
+            if isawaitable(acquired):
+                return await acquired
+            else:
+                logger.warning("async call made without an async bucket.")
+                return acquired
+        finally:
+            lock.release()
 
     def try_acquire(self, name: str, weight: int = 1,
                     max_delay_override_ms: Optional[int] = _sentinel_delay) -> Union[bool, Awaitable[bool]]:
@@ -334,14 +398,13 @@ class Limiter:
         max_delay_override_ms: overrides the limiters default max_delay.
         """
 
-        if max_delay_override_ms is self._sentinel_delay:
-            item_max_delay = self.max_delay
-        else:
-            item_max_delay = max_delay_override_ms
+        item_max_delay = self._get_item_max_delay_ms(max_delay_override_ms)
 
-        item = self.bucket_factory.wrap_item(name=name, weight=weight, max_delay=item_max_delay)
+        item_max_delay_ms = self._get_item_max_delay_ms(max_delay_override_ms)
 
-        with self._rlock(name=name, max_lock_wait=item_max_delay):
+        with combined_lock(self.locks, item_max_delay_ms):
+            item = self.bucket_factory.wrap_item(name=name, weight=weight, max_delay=item_max_delay)
+
             assert weight >= 0, "item's weight must be >= 0"
 
             if weight == 0:
@@ -404,34 +467,50 @@ class Limiter:
         """Use limiter decorator
         Use with both sync & async function
         """
-
         def with_mapping_func(mapping: ItemMapping) -> DecoratorWrapper:
             def decorator_wrapper(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
-                """Actual function warpper"""
+                """Actual function wrapper"""
 
-                @wraps(func)
-                def wrapper(*args, **kwargs):
-                    (name, weight) = mapping(*args, **kwargs)
-                    assert isinstance(name, str), "Mapping name is expected but not found"
-                    assert isinstance(weight, int), "Mapping weight is expected but not found"
-                    accquire_ok = self.try_acquire(name, weight)
+                if asyncio.iscoroutinefunction(func):
 
-                    if not isawaitable(accquire_ok):
-                        return func(*args, **kwargs)
+                    @wraps(func)
+                    async def wrapper_async(*args, **kwargs):
+                        (name, weight) = mapping(*args, **kwargs)
+                        assert isinstance(name, str), "Mapping name is expected but not found"
+                        assert isinstance(weight, int), "Mapping weight is expected but not found"
+                        accquire_ok = self.try_acquire_async(name, weight)
 
-                    async def _handle_accquire_async():
-                        nonlocal accquire_ok
-                        accquire_ok = await accquire_ok
-                        result = func(*args, **kwargs)
+                        if isawaitable(accquire_ok):
+                            await accquire_ok
 
-                        if isawaitable(result):
-                            return await result
+                        return await func(*args, **kwargs)
 
-                        return result
+                    return wrapper_async
+                else:
+                    @wraps(func)
+                    def wrapper(*args, **kwargs):
+                        (name, weight) = mapping(*args, **kwargs)
+                        assert isinstance(name, str), "Mapping name is expected but not found"
+                        assert isinstance(weight, int), "Mapping weight is expected but not found"
+                        accquire_ok = self.try_acquire(name, weight)
 
-                    return _handle_accquire_async()
+                        if not isawaitable(accquire_ok):
+                            return func(*args, **kwargs)
 
-                return wrapper
+                        async def _handle_accquire_async():
+                            nonlocal accquire_ok
+                            accquire_ok = await accquire_ok
+
+                            result = func(*args, **kwargs)
+
+                            if isawaitable(result):
+                                return await result
+
+                            return result
+
+                        return _handle_accquire_async()
+
+                    return wrapper
 
             return decorator_wrapper
 

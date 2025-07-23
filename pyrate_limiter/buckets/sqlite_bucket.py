@@ -1,4 +1,5 @@
 """Bucket implementation using SQLite"""
+import logging
 import sqlite3
 from contextlib import nullcontext
 from pathlib import Path
@@ -13,6 +14,8 @@ from typing import Union
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
+
+logger = logging.getLogger(__name__)
 
 
 class Queries:
@@ -69,6 +72,7 @@ class SQLiteBucket(AbstractBucket):
     table: str
     full_count_query: str
     lock: RLock
+    use_limiter_lock: bool
 
     def __init__(
         self, rates: List[Rate], conn: sqlite3.Connection, table: str, lock=None
@@ -78,9 +82,15 @@ class SQLiteBucket(AbstractBucket):
         self.rates = rates
 
         if not lock:
+            self.use_limiter_lock = False
             self.lock = RLock()
         else:
+            self.use_limiter_lock = True
             self.lock = lock
+
+    def limiter_lock(self):
+        if self.use_limiter_lock:
+            return self.lock
 
     def _build_full_count_query(self, current_timestamp: int) -> Tuple[str, dict]:
         full_query: List[str] = []
@@ -175,6 +185,7 @@ class SQLiteBucket(AbstractBucket):
         create_new_table: bool = True,
         use_file_lock: bool = False
     ) -> "SQLiteBucket":
+
         if db_path is None and use_file_lock:
             raise ValueError("db_path must be specified when using use_file_lock")
 
@@ -226,7 +237,7 @@ class SQLiteBucket(AbstractBucket):
                 )
 
             create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
-                index_name="idx_rate_item_timestamp",
+                index_name=f"idx_{table}_rate_item_timestamp",
                 table_name=table,
             )
 

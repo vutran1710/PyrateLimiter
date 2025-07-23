@@ -1,7 +1,7 @@
 """multiprocessing In-memory Bucket using a multiprocessing.Manager.ListProxy
      and a multiprocessing.Lock.
 """
-from multiprocessing import Lock
+import logging
 from multiprocessing import Manager
 from multiprocessing.managers import ListProxy
 from multiprocessing.synchronize import Lock as LockType
@@ -10,6 +10,8 @@ from typing import List
 from ..abstracts import Rate
 from ..abstracts import RateItem
 from pyrate_limiter.buckets import InMemoryBucket
+
+logger = logging.getLogger(__name__)
 
 
 class MultiprocessBucket(InMemoryBucket):
@@ -26,6 +28,9 @@ class MultiprocessBucket(InMemoryBucket):
         self.items = items
         self.mp_lock = mp_lock
 
+    def limiter_lock(self):
+        return self.mp_lock
+
     @classmethod
     def init(
         cls,
@@ -34,38 +39,12 @@ class MultiprocessBucket(InMemoryBucket):
         """
         Creates a single ListProxy so that this bucket can be shared across multiple processes.
         """
-        shared_items: List[RateItem] = Manager().list()  # type: ignore[assignment]
 
-        mp_lock: LockType = Lock()
+        logger.debug("Initializing manager. This should occur once for a pool")
+        manager = Manager()
+
+        shared_items: List[RateItem] = manager.list()  # type: ignore[assignment]
+
+        mp_lock: LockType = manager.RLock()  # type: ignore [assignment]
 
         return cls(rates=rates, items=shared_items, mp_lock=mp_lock)
-
-    def get_combined_lock(self, lock):
-        """Provides a new Lock that combines mp_lock with the RLock
-        """
-        class CombinedLock:
-            """
-            A context manager that combines multiple locks into a single lock.
-
-            It is used to wrap/replace the Limiter.lock, and is intended to be used only by Limiter.
-
-            Usage:
-                with CombinedLock(lock1, lock2):
-                    # Critical section
-                    pass
-
-            These locks should only be used once at Limiter try_acquire, and always in the same order, to
-            avoid deadlocks.
-            """
-            def __init__(self, *locks):
-                self.locks = locks
-
-            def __enter__(self):
-                for lock in self.locks:
-                    lock.acquire()
-
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                for lock in reversed(self.locks):
-                    lock.release()
-
-        return CombinedLock(self.mp_lock, lock)
