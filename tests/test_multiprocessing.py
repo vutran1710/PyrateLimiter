@@ -45,7 +45,8 @@ def my_task():
 
 def analyze_times(start: float, requests_per_second: int, times: List[float]):
     elapsed = sorted(t - start for t in times)
-    w, ops_last_sec = deque(), []  # type: ignore[var-annotated]
+    w: deque[float] = deque()
+    ops_last_sec: List[int] = []
     for t in elapsed:
         w.append(t)
         while w and w[0] <= t - 1:
