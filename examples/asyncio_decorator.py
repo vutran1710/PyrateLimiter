@@ -22,7 +22,7 @@ async def main():
     print("Note that the TICKs continue while the tasks are waiting")
 
     start = time.time()
-    limiter = await get_async_limiter()
+    limiter = get_async_limiter()
 
     @limiter.as_decorator()(lambda name, weight: (name, weight))  # type: ignore[arg-type]
     async def task_async(name: str, weight: int):

@@ -17,22 +17,20 @@ def get_inmemory_limiter(rate_per_duration: int = 3,
     limiter = Limiter(bucket,
                       raise_when_fail=False,
                       max_delay=max_delay,
-                      init_async_lock=False,
                       retry_until_max_delay=True)
 
     return limiter
 
 
-async def get_async_limiter(rate_per_duration: int = 3,
-                            duration: Duration = Duration.SECOND,
-                            max_delay: Duration = Duration.DAY) -> Limiter:
+def get_async_limiter(rate_per_duration: int = 3,
+                      duration: Duration = Duration.SECOND,
+                      max_delay: Duration = Duration.DAY) -> Limiter:
     rate = Rate(rate_per_duration, duration)
     rate_limits = [rate]
     bucket = BucketAsyncWrapper(InMemoryBucket(rate_limits))
     limiter = Limiter(bucket,
                       raise_when_fail=False,
                       max_delay=max_delay,
-                      init_async_lock=True,
                       retry_until_max_delay=True)
 
     return limiter

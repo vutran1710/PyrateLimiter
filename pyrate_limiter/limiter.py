@@ -79,7 +79,6 @@ class Limiter:
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
         retry_until_max_delay: bool = False,
-        init_async_lock: bool = False
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list.
@@ -92,7 +91,6 @@ class Limiter:
             Defaults to None.
             retry_until_max_delay (bool, optional): If True, retry operations until the maximum delay is reached.
                 Useful for ensuring operations eventually succeed within the allowed delay window. Defaults to False.
-            init_async_lock (bool): If True, initializes the thread local asyncio lock to be used by try_acquire_async.
         """
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
@@ -107,11 +105,6 @@ class Limiter:
         self.lock = RLock()
 
         self._thread_local = local()
-
-        if not init_async_lock:
-            self._thread_local.pyrate_limiter_async_lock = None
-        else:
-            self.create_async_lock()
 
     def buckets(self) -> List[AbstractBucket]:
         """Get list of active buckets
@@ -316,9 +309,14 @@ class Limiter:
 
         return _handle_result(acquire)  # type: ignore
 
-    def create_async_lock(self):
+    def _get_async_lock(self):
         """Must be called before first try_acquire_async for each thread"""
-        self._thread_local.pyrate_limiter_async_lock = asyncio.Lock()
+        try:
+            return self._thread_local.async_lock
+        except AttributeError:
+            lock = asyncio.Lock()
+            self._thread_local.async_lock = lock
+            return lock
 
     async def try_acquire_async(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
         """
@@ -328,10 +326,7 @@ class Limiter:
 
             This does not make the entire code async: use an async bucket for that.
         """
-        if self._thread_local.pyrate_limiter_async_lock is None:
-            raise RuntimeError("Must call create_async_lock before using try_acquire_async")
-
-        async with self._thread_local.pyrate_limiter_async_lock:
+        async with self._get_async_lock():
             acquired = self.try_acquire(name=name, weight=weight)
 
             if isawaitable(acquired):
