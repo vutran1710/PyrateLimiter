@@ -9,7 +9,7 @@ on:
       - master
 
 env:
-  LATEST_PY_VERSION: '3.14'
+  LATEST_PY_VERSION: '3.13'
   REDIS: 'redis://localhost:6379'
 
 jobs:
@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.8", "3.14"]
+        python-version: ["3.8", "3.13", "3.14"]
     steps:
     - name: Check out code
       uses: actions/checkout@v4

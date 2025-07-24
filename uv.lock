@@ -1,10 +1,6 @@
 version = 1
 revision = 1
-requires-python = ">=3.8, <4"
-resolution-markers = [
-    "python_full_version >= '3.9'",
-    "python_full_version < '3.9'",
-]
+requires-python = ">=3.8"
 
 [[package]]
 name = "alabaster"
@@ -723,7 +719,6 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
-    { name = "pyyaml" },
     { name = "schedule" },
 ]
 
@@ -753,7 +748,6 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "pytest-cov", specifier = ">=4.1.0,<5" },
     { name = "pytest-xdist", specifier = ">=2.5.0,<3" },
-    { name = "pyyaml", specifier = ">=6.0.1,<7" },
     { name = "schedule", specifier = ">=1.1.0,<2" },
 ]
 
