@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from tempfile import gettempdir
 from threading import RLock
+from time import time
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -183,7 +184,7 @@ class SQLiteBucket(AbstractBucket):
 
         if db_path is None:
             temp_dir = Path(gettempdir())
-            db_path = str(temp_dir / "pyrate_limiter.sqlite")
+            db_path = str(temp_dir / f"pyrate_limiter_{time()}.sqlite")
 
         # TBD: FileLock switched to a thread-local FileLock in 3.11.0.
         # Should we set FileLock's thread_local to False, for cases where user is both multiprocessing & threading?
