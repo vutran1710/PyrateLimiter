@@ -61,13 +61,11 @@ jobs:
     - name: Lint
       if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
       run: |
-        source $VENV
-        nox -e lint
+        uv run nox -e lint
     # Run tests and coverage report (all python versions)
     - name: Test and Coverage
       run: |
-        source $VENV
-        nox -e cover
+        uv run nox -e cover
 
     # Latest python version: send coverage report to codecov
     - name: "Upload coverage report to Codecov"
