@@ -57,14 +57,16 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: uv sync --all-groups --all-extras
-    - name: Build package
-      run: |
-        uv build
     # Run linting (latest python version only)
     - name: Lint
       if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
       run: |
         uv run nox -e lint
+    - name: Build and install package, if this is latest
+      if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
+      run: |
+        uv build
+        uv pip install dist/*.whl
     # Run tests and coverage report (all python versions)
     - name: Test and Coverage
       run: |
@@ -73,7 +75,8 @@ jobs:
     - name: "Upload coverage report to Codecov"
       if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
       uses: codecov/codecov-action@v2
-    - name: Upload dist
+
+    - name: Upload dist, if this is latest
       if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
       uses: actions/upload-artifact@v4
       with:
