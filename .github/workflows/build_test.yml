@@ -42,29 +42,20 @@ jobs:
         python-version: ["3.8", "3.13"]
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - uses: snok/install-poetry@v1.4.1
-      with:
-        virtualenvs-in-project: true
-        version: 1.8.5
-
-    # Cache packages per python version, and reuse until lockfile changes
-    # TODO: For some strange reason, virtualenvs restored from the cache will sometimes be
-    #   missing a python interpreter. Just disabling the cache for now.
-    # - name: Cache python packages
-    #   id: cache
-    #   uses: actions/cache@v3
-    #   with:
-    #     path: .venv
-    #     key: venv-${{ matrix.python-version }}-latest-${{ hashFiles('poetry.lock') }}
-
     - name: Install dependencies
-      # if: steps.cache.outputs.cache-hit != 'true'
-      run: poetry install -v -E all
+      run: uv sync --all-groups
 
     # Run linting (latest python version only)
     - name: Lint
