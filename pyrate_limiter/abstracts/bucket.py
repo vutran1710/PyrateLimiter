@@ -103,6 +103,12 @@ class AbstractBucket(ABC):
         assert isinstance(bound_item, RateItem)
         return _calc_waiting(bound_item)
 
+    def limiter_lock(self) -> Optional[object]:  # type: ignore
+        """An additional lock to be used by Limiter in-front of the thread lock.
+        Intended for multiprocessing environments where a thread lock is insufficient.
+        """
+        return None
+
 
 class Leaker(Thread):
     """Responsible for scheduling buckets' leaking at the background either
