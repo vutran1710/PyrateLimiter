@@ -1,6 +1,6 @@
 [project]
 name = "pyrate-limiter"
-version = "3.8.1"
+dynamic = ["version"]
 description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = [{ name = "vutr", email = "me@vutr.io" }]
 requires-python = ">=3.9"
