@@ -14,7 +14,7 @@ from pyrate_limiter import validate_rate_list
 
 def test_version():
     from pyrate_limiter import _version
-    assert re.match(r'^\d+\.\d+\.\d+$', _version.__version__), f"""{_version.__version__=}
+    assert re.match(r'^\d+\.\d+\.\d+(\..*)?', _version.__version__), f"""{_version.__version__=}
     doesn't match a version pattern (x.y.z)"""
 
 

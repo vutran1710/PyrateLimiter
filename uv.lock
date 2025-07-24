@@ -643,7 +643,6 @@ wheels = [
 
 [[package]]
 name = "pyrate-limiter"
-version = "3.8.1"
 source = { editable = "." }
 
 [package.optional-dependencies]
