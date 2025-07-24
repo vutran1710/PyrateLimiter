@@ -86,7 +86,7 @@ build-backend = "hatchling.build"
 source = "uv-dynamic-versioning"
 
 [tool.hatch.build.hooks.version]
-path = "_version.py"
+path = "pyrate_limiter/_version.py"
 template = '''
 __version__ = "{version}"
 '''
