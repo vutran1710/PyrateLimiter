@@ -3,7 +3,7 @@ name = "pyrate-limiter"
 version = "3.8.1"
 description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = [{ name = "vutr", email = "me@vutr.io" }]
-requires-python = "~=3.10"
+requires-python = "~=3.8"
 readme = "README.md"
 license = "MIT"
 keywords = [
