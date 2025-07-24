@@ -8,6 +8,7 @@ from pyrate_limiter import binary_search
 from pyrate_limiter import Duration
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
+from pyrate_limiter import SQLiteClock
 from pyrate_limiter import validate_rate_list
 
 
@@ -129,3 +130,17 @@ async def test_clock(clock):
         # NOTE: if not MonotonicClock, the time values should be almost equal
         use_time = time() * 1000
         assert int(now) - round(use_time) < 2
+
+
+@pytest.mark.asyncio
+async def test_sqlite_clock():
+    """Testing clock backends
+    """
+    await test_clock(SQLiteClock.default())
+
+    from .conftest import create_sqlite_bucket
+
+    bucket = await create_sqlite_bucket([Rate(1, Duration.SECOND)])
+    await test_clock(SQLiteClock(bucket.conn))
+
+    await test_clock(SQLiteClock(bucket))
