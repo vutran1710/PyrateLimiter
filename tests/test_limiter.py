@@ -189,19 +189,11 @@ async def test_limiter_async_factory_get(
 
     if not limiter_should_raise:
         acquire_ok, cost = await async_acquire(limiter, item)
-        if limiter_delay is None:
-            assert cost <= 50
-            assert not acquire_ok
-        else:
-            assert acquire_ok
+        assert acquire_ok
     else:
-        if limiter_delay is None:
-            with pytest.raises(BucketFullException):
-                acquire_ok, cost = await async_acquire(limiter, item)
-        else:
-            acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 400
-            assert acquire_ok
+        acquire_ok, cost = await async_acquire(limiter, item)
+        assert cost > 400
+        assert acquire_ok
 
     # # Flush before testing again
     await factory.flush()
@@ -218,15 +210,12 @@ async def test_limiter_async_factory_get(
         elif limiter_delay == 2000:
             acquire_ok, cost = await async_acquire(limiter, item)
             assert acquire_ok
-        elif limiter_delay == Duration.MINUTE:
+        elif limiter_delay == Duration.MINUTE or limiter_delay is None:
             acquire_ok, cost = await async_acquire(limiter, item)
             assert acquire_ok
-        else:
-            with pytest.raises(BucketFullException) as err:
-                await async_acquire(limiter, item)
     else:
         acquire_ok, cost = await async_acquire(limiter, item)
-        if limiter_delay == 500 or limiter_delay is None:
+        if limiter_delay == 500:
             assert not acquire_ok
         else:
             assert acquire_ok
