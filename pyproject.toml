@@ -59,17 +59,6 @@ dev = [
     "pyyaml>=6.0.1,<7",
 ]
 
-[tool.hatch.build.targets.sdist]
-include = [
-    "LICENSE",
-    "CHANGELOG.md",
-    "docs",
-    "tests",
-]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
 
 [tool.black]
 line-length = 120
@@ -88,3 +77,33 @@ output = 'test-reports/coverage.xml'
 
 [tool.ipdb]
 context = 7
+
+
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.hatch.build.hooks.version]
+path = "_version.py"
+template = '''
+__version__ = "{version}"
+'''
+
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "LICENSE",
+    "CHANGELOG.md",
+    "examples",
+    "pyrate_limiter",
+    "tests",
+]
+
+[tool.hatch.build.targets.wheel]
+include = ["pyrate_limiter"]
+
+[tool.hatch.build.targets.wheel.sources]
+"./pyrate_limiter" = "pyrate_limiter"
