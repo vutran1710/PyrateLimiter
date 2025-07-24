@@ -189,8 +189,8 @@ class Leaker(Thread):
                     assert isinstance(leak, int)
 
                 await asyncio.sleep(self.leak_interval / 1000)
-            except (RuntimeError):
-                logger.debug("Leak task stopped due to event loop shutdown.")
+            except RuntimeError as e:
+                logger.debug("Leak task stopped due to event loop shutdown. %s", e)
                 return
 
     def leak_async(self):
