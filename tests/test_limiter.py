@@ -1,5 +1,6 @@
 """Complete Limiter test suite
 """
+import time
 from inspect import isawaitable
 
 import pytest
@@ -21,6 +22,7 @@ from pyrate_limiter import Duration
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import LimiterDelayException
+from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
 from pyrate_limiter import TimeClock
 
@@ -338,3 +340,33 @@ async def test_limiter_decorator(
 
     await async_inc_counter(1)
     assert counter == 2
+
+
+def test_wait_too_long():
+
+    requests_per_second = 10
+
+    rate = Rate(requests_per_second, Duration.SECOND)
+    bucket = InMemoryBucket([rate])
+    limiter = Limiter(bucket, raise_when_fail=False, clock=TimeClock(),
+                      max_delay=Duration.SECOND, retry_until_max_delay=True)
+
+    # raise_when_fail = False
+    for i in range(500):
+        success = limiter.try_acquire("mytest", 1)
+        if not success:
+            break
+
+    assert not success  # retried and then failed
+
+    time.sleep(1)
+
+    # raise_when_fail = True
+    limiter = Limiter(bucket, raise_when_fail=True, clock=TimeClock(),
+                      max_delay=Duration.SECOND, retry_until_max_delay=True)
+
+    with pytest.raises(LimiterDelayException):
+        for i in range(500):
+            success = limiter.try_acquire("mytest", 1)
+            if not success:
+                break
