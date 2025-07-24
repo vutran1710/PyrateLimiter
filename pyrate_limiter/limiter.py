@@ -4,6 +4,7 @@ import asyncio
 import logging
 from functools import wraps
 from inspect import isawaitable
+from threading import local
 from threading import RLock
 from time import sleep
 from typing import Any
@@ -68,13 +69,16 @@ class Limiter:
     max_delay: Optional[int] = None
     lock: RLock
 
+    # async_lock is thread local, created on first use
+    _thread_local: local
+
     def __init__(
         self,
         argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
         clock: AbstractClock = TimeClock(),
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
-        retry_until_max_delay: bool = False
+        retry_until_max_delay: bool = False,
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list.
@@ -99,6 +103,8 @@ class Limiter:
 
         self.max_delay = max_delay
         self.lock = RLock()
+
+        self._thread_local = local()
 
     def buckets(self) -> List[AbstractBucket]:
         """Get list of active buckets
@@ -174,12 +180,10 @@ class Limiter:
 
         def _handle_reacquire(re_acquire: bool) -> bool:
             if not re_acquire:
-                logger.error(
-                    """
-                Re-acquiring with delay expected to be successful,
-                if it failed then either clock or bucket is probably unstable
-                """
-                )
+                logger.error("""Failed to re-acquire after the expected delay. If it failed,
+                either clock or bucket is unstable.
+                If asyncio, use try_acquire_async(). If multiprocessing,
+                use retry_until_max_delay=True.""")
                 self._raise_bucket_full_if_necessary(bucket, item)
 
             return re_acquire
@@ -305,6 +309,32 @@ class Limiter:
 
         return _handle_result(acquire)  # type: ignore
 
+    def _get_async_lock(self):
+        """Must be called before first try_acquire_async for each thread"""
+        try:
+            return self._thread_local.async_lock
+        except AttributeError:
+            lock = asyncio.Lock()
+            self._thread_local.async_lock = lock
+            return lock
+
+    async def try_acquire_async(self, name: str, weight: int = 1) -> bool:
+        """
+            async version of try_acquire.
+
+            This uses a top level, thread-local async lock to ensure that the async loop doesn't block
+
+            This does not make the entire code async: use an async bucket for that.
+        """
+        async with self._get_async_lock():
+            acquired = self.try_acquire(name=name, weight=weight)
+
+            if isawaitable(acquired):
+                return await acquired
+            else:
+                logger.warning("async call made without an async bucket.")
+                return acquired
+
     def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
@@ -374,34 +404,50 @@ class Limiter:
         """Use limiter decorator
         Use with both sync & async function
         """
-
         def with_mapping_func(mapping: ItemMapping) -> DecoratorWrapper:
             def decorator_wrapper(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
-                """Actual function warpper"""
+                """Actual function wrapper"""
 
-                @wraps(func)
-                def wrapper(*args, **kwargs):
-                    (name, weight) = mapping(*args, **kwargs)
-                    assert isinstance(name, str), "Mapping name is expected but not found"
-                    assert isinstance(weight, int), "Mapping weight is expected but not found"
-                    accquire_ok = self.try_acquire(name, weight)
+                if asyncio.iscoroutinefunction(func):
 
-                    if not isawaitable(accquire_ok):
-                        return func(*args, **kwargs)
+                    @wraps(func)
+                    async def wrapper_async(*args, **kwargs):
+                        (name, weight) = mapping(*args, **kwargs)
+                        assert isinstance(name, str), "Mapping name is expected but not found"
+                        assert isinstance(weight, int), "Mapping weight is expected but not found"
+                        accquire_ok = self.try_acquire_async(name, weight)
 
-                    async def _handle_accquire_async():
-                        nonlocal accquire_ok
-                        accquire_ok = await accquire_ok
-                        result = func(*args, **kwargs)
+                        if isawaitable(accquire_ok):
+                            await accquire_ok
 
-                        if isawaitable(result):
-                            return await result
+                        return await func(*args, **kwargs)
 
-                        return result
+                    return wrapper_async
+                else:
+                    @wraps(func)
+                    def wrapper(*args, **kwargs):
+                        (name, weight) = mapping(*args, **kwargs)
+                        assert isinstance(name, str), "Mapping name is expected but not found"
+                        assert isinstance(weight, int), "Mapping weight is expected but not found"
+                        accquire_ok = self.try_acquire(name, weight)
 
-                    return _handle_accquire_async()
+                        if not isawaitable(accquire_ok):
+                            return func(*args, **kwargs)
 
-                return wrapper
+                        async def _handle_accquire_async():
+                            nonlocal accquire_ok
+                            accquire_ok = await accquire_ok
+
+                            result = func(*args, **kwargs)
+
+                            if isawaitable(result):
+                                return await result
+
+                            return result
+
+                        return _handle_accquire_async()
+
+                    return wrapper
 
             return decorator_wrapper
 

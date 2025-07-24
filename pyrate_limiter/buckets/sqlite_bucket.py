@@ -1,4 +1,5 @@
 """Bucket implementation using SQLite"""
+import logging
 import sqlite3
 from contextlib import nullcontext
 from pathlib import Path
@@ -12,6 +13,8 @@ from typing import Union
 from ..abstracts import AbstractBucket
 from ..abstracts import Rate
 from ..abstracts import RateItem
+
+logger = logging.getLogger(__name__)
 
 
 class Queries:
@@ -174,6 +177,7 @@ class SQLiteBucket(AbstractBucket):
         create_new_table: bool = True,
         use_file_lock: bool = False
     ) -> "SQLiteBucket":
+
         if db_path is None and use_file_lock:
             raise ValueError("db_path must be specified when using use_file_lock")
 
@@ -225,7 +229,7 @@ class SQLiteBucket(AbstractBucket):
                 )
 
             create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
-                index_name="idx_rate_item_timestamp",
+                index_name=f"idx_{table}_rate_item_timestamp",
                 table_name=table,
             )
 
