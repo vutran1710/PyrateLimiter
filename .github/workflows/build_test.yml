@@ -56,7 +56,7 @@ jobs:
         enable-cache: true
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      run: uv sync --all-groups --extras all
+      run: uv sync --all-groups --all-extras
     - name: Build package
       run: |
         uv build
