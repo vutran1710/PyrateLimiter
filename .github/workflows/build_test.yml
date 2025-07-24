@@ -9,7 +9,7 @@ on:
       - master
 
 env:
-  LATEST_PY_VERSION: '3.13'
+  LATEST_PY_VERSION: '3.14'
   REDIS: 'redis://localhost:6379'
 
 jobs:
@@ -39,8 +39,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.8", "3.13"]
-
+        python-version: ["3.8", "3.14"]
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -54,9 +53,12 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+        allow-prereleases: true
+    - name: Build package
+      run: |
+        uv build
     - name: Install dependencies
-      run: uv sync --all-groups
-
+      run: uv sync --all-groups --extras all
     # Run linting (latest python version only)
     - name: Lint
       if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
@@ -66,33 +68,25 @@ jobs:
     - name: Test and Coverage
       run: |
         uv run nox -e cover
-
     # Latest python version: send coverage report to codecov
     - name: "Upload coverage report to Codecov"
       if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
       uses: codecov/codecov-action@v2
-
-
+    - name: Upload dist
+      if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist
   publish:
-
     needs: check
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-
+    if: startsWith(github.ref, 'refs/tags/v') && github.ref == 'refs/heads/master'
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ env.LATEST_PY_VERSION }}
-      uses: actions/setup-python@v5
+    - name: Download dist
+      uses: actions/download-artifact@v4
       with:
-        python-version: ${{ env.LATEST_PY_VERSION }}
-    - uses: snok/install-poetry@v1.4.1
-      with:
-        virtualenvs-in-project: true
-        version: 1.8.5
-    - name: Install dependencies
-      run: poetry install -v -E all
-    - name: Publish
-      run: |
-        poetry config http-basic.pypi ${{ secrets.PYPI_USERNAME }} ${{ secrets.PYPI_PASSWORD }}
-        poetry build
-        poetry publish
+        name: dist
+        path: dist
+    - name: Upload package to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
