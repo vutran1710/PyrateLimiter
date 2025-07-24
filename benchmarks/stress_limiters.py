@@ -46,11 +46,9 @@ def create_sqlite_limiter(rate: Rate, use_fileLock: bool, max_delay: int):
 
 
 def create_mp_limiter(max_delay: int, bucket: MultiprocessBucket):
-
     limiter = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
+                      retry_until_max_delay=True,
                       max_delay=max_delay)
-
-    limiter.lock = bucket.get_combined_lock(limiter.lock)  # type: ignore[assignment]
 
     return limiter
 
