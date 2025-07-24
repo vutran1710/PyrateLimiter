@@ -41,6 +41,7 @@ def create_sqlite_limiter(
     table_name: str = "rate_bucket",
     max_delay: Duration = Duration.DAY,
     use_file_lock: bool = False,
+    raise_when_fail: bool = False,
     async_wrapper: bool = False,
 ) -> Limiter:
     """
@@ -62,7 +63,7 @@ def create_sqlite_limiter(
         bucket = BucketAsyncWrapper(bucket)
 
     limiter = Limiter(
-        bucket, raise_when_fail=False, max_delay=max_delay, retry_until_max_delay=True
+        bucket, raise_when_fail=raise_when_fail, max_delay=max_delay, retry_until_max_delay=True
     )
 
     return limiter
@@ -72,6 +73,7 @@ def create_inmemory_limiter(
     rate_per_duration: int = 3,
     duration: Duration = Duration.SECOND,
     max_delay: Duration = Duration.DAY,
+    raise_when_fail: bool = False,
     async_wrapper: bool = False,
 ) -> Limiter:
     rate = Rate(rate_per_duration, duration)
@@ -82,7 +84,7 @@ def create_inmemory_limiter(
         bucket = BucketAsyncWrapper(InMemoryBucket(rate_limits))
 
     limiter = Limiter(
-        bucket, raise_when_fail=False, max_delay=max_delay, retry_until_max_delay=True
+        bucket, raise_when_fail=raise_when_fail, max_delay=max_delay, retry_until_max_delay=True
     )
 
     return limiter

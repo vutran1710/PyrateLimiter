@@ -234,8 +234,8 @@ class BucketFactory(ABC):
     def wrap_item(
         self,
         name: str,
-        max_delay: Optional[int],
         weight: int = 1,
+        max_delay: Optional[int] = None
     ) -> Union[RateItem, Awaitable[RateItem]]:
         """Add the current timestamp to the receiving item using any clock backend
         - Turn it into a RateItem

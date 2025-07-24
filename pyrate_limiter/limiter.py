@@ -44,7 +44,7 @@ class SingleBucketFactory(BucketFactory):
         self.bucket = bucket
         self.schedule_leak(bucket, clock)
 
-    def wrap_item(self, name: str, max_delay: Optional[int], weight: int = 1):
+    def wrap_item(self, name: str, weight: int = 1, max_delay: Optional[int] = None):
         now = self.clock.now()
 
         async def wrap_async():
@@ -405,14 +405,14 @@ class Limiter:
         item_max_delay_ms = self._get_item_max_delay_ms(max_delay_override_ms)
 
         with combined_lock(self.locks, item_max_delay_ms / 1000 if item_max_delay_ms else None):
-            item = self.bucket_factory.wrap_item(name=name, weight=weight, max_delay=item_max_delay)
-
             assert weight >= 0, "item's weight must be >= 0"
 
             if weight == 0:
                 # NOTE: if item is weightless, just let it go through
                 # NOTE: this might change in the future
                 return True
+
+            item = self.bucket_factory.wrap_item(name=name, weight=weight, max_delay=item_max_delay)
 
             if isawaitable(item):
 

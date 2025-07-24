@@ -35,14 +35,14 @@ class DemoBucketFactory(BucketFactory):
             self.schedule_leak(bucket, bucket_clock)
             self.buckets[item_name_pattern] = bucket
 
-    def wrap_item(self, name: str, weight: int = 1):  # type: ignore[override]
+    def wrap_item(self, name: str, weight: int = 1, max_delay: Optional[int] = None):  # type: ignore[override]
         now = self.clock.now()
 
         async def wrap_async():
-            return RateItem(name, await now, weight=weight)
+            return RateItem(name, await now, weight=weight, max_delay=max_delay)
 
         def wrap_sync():
-            return RateItem(name, now, weight=weight)
+            return RateItem(name, now, weight=weight, max_delay=max_delay)
 
         return wrap_async() if isawaitable(now) else wrap_sync()
 
@@ -77,14 +77,14 @@ class DemoAsyncGetBucketFactory(BucketFactory):
             self.schedule_leak(bucket, bucket_clock)
             self.buckets[item_name_pattern] = bucket
 
-    def wrap_item(self, name: str, weight: int = 1):   # type: ignore[override]
+    def wrap_item(self, name: str, weight: int = 1, max_delay: Optional[int] = None):   # type: ignore[override]
         now = self.clock.now()
 
         async def wrap_async():
-            return RateItem(name, await now, weight=weight)
+            return RateItem(name, await now, weight=weight, max_delay=max_delay)
 
         def wrap_sync():
-            return RateItem(name, now, weight=weight)
+            return RateItem(name, now, weight=weight, max_delay=max_delay)
 
         return wrap_async() if isawaitable(now) else wrap_sync()
 

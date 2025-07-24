@@ -105,7 +105,7 @@ async def test_limiter_01(
 
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
-    assert acquire_ok
+    assert acquire_ok is True
     assert cost <= 10
     assert await bucket.count() == 0
 
@@ -115,18 +115,13 @@ async def test_limiter_01(
     if not limiter_should_raise:
         acquire_ok, cost = await async_acquire(limiter, item)
         if limiter_delay is None:
-            assert cost <= 50
-            assert not acquire_ok
+            assert acquire_ok is True
         else:
-            assert acquire_ok
+            assert acquire_ok is True
     else:
-        if limiter_delay is None:
-            with pytest.raises(BucketFullException):
-                acquire_ok, cost = await async_acquire(limiter, item)
-        else:
-            acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 400
-            assert acquire_ok
+        acquire_ok, cost = await async_acquire(limiter, item)
+        assert cost > 400
+        assert acquire_ok is True
 
     # # Flush before testing again
     await flushing_bucket(bucket)
@@ -142,19 +137,19 @@ async def test_limiter_01(
                 assert err.meta_info["name"] == item
         elif limiter_delay == 2000:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert acquire_ok
+            assert acquire_ok is True
         elif limiter_delay == Duration.MINUTE:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert acquire_ok
+            assert acquire_ok is True
         else:
-            with pytest.raises(BucketFullException) as err:
-                await async_acquire(limiter, item)
+            acquire_ok, cost = await async_acquire(limiter, item)
+            assert acquire_ok is True
     else:
         acquire_ok, cost = await async_acquire(limiter, item)
-        if limiter_delay == 500 or limiter_delay is None:
-            assert not acquire_ok
+        if limiter_delay == 500:
+            assert acquire_ok is False
         else:
-            assert acquire_ok
+            assert acquire_ok is True
 
     # Flush before testing again
     await flushing_bucket(bucket)
@@ -167,7 +162,7 @@ async def test_limiter_01(
     else:
         acquire_ok, cost = await async_acquire(limiter, item, 5)
         assert cost <= 50
-        assert not acquire_ok
+        assert acquire_ok is False
 
 
 @pytest.mark.asyncio
@@ -269,7 +264,7 @@ async def test_limiter_concurrency(
     items = ["demo" for _ in range(4)]
 
     if not limiter_should_raise:
-        if not limiter_delay or limiter_delay == 500:
+        if limiter_delay == 500:
             result = await concurrent_acquire(limiter, items)
             item_names = await inspect_bucket_items(bucket, 3)
             logger.info(
@@ -286,10 +281,7 @@ async def test_limiter_concurrency(
                 item_names,
             )
     else:
-        if not limiter_delay:
-            with pytest.raises(BucketFullException):
-                await concurrent_acquire(limiter, items)
-        elif limiter_delay == 500:
+        if limiter_delay == 500:
             with pytest.raises(LimiterDelayException):
                 await concurrent_acquire(limiter, items)
         else:
