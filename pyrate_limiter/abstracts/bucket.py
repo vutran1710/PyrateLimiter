@@ -172,22 +172,26 @@ class Leaker(Thread):
         assert self.clocks
 
         while buckets:
-            for bucket_id, bucket in list(buckets.items()):
-                clock = self.clocks[bucket_id]
-                now = clock.now()
+            try:
+                for bucket_id, bucket in list(buckets.items()):
+                    clock = self.clocks[bucket_id]
+                    now = clock.now()
 
-                while isawaitable(now):
-                    now = await now
+                    while isawaitable(now):
+                        now = await now
 
-                assert isinstance(now, int)
-                leak = bucket.leak(now)
+                    assert isinstance(now, int)
+                    leak = bucket.leak(now)
 
-                while isawaitable(leak):
-                    leak = await leak
+                    while isawaitable(leak):
+                        leak = await leak
 
-                assert isinstance(leak, int)
+                    assert isinstance(leak, int)
 
-            await asyncio.sleep(self.leak_interval / 1000)
+                await asyncio.sleep(self.leak_interval / 1000)
+            except (RuntimeError):
+                logger.debug("Leak task stopped due to event loop shutdown.")
+                return
 
     def leak_async(self):
         if self.async_buckets and not self.aio_leak_task:
