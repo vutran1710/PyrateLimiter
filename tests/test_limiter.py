@@ -186,6 +186,8 @@ async def test_limiter_async_factory_get(
     )
     item = "demo"
 
+    factory.add_buckets([item])
+
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
     assert acquire_ok
