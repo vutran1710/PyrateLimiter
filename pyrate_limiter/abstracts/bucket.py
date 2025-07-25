@@ -103,6 +103,12 @@ class AbstractBucket(ABC):
         assert isinstance(bound_item, RateItem)
         return _calc_waiting(bound_item)
 
+    def limiter_lock(self) -> Optional[object]:  # type: ignore
+        """An additional lock to be used by Limiter in-front of the thread lock.
+        Intended for multiprocessing environments where a thread lock is insufficient.
+        """
+        return None
+
 
 class Leaker(Thread):
     """Responsible for scheduling buckets' leaking at the background either
@@ -166,22 +172,26 @@ class Leaker(Thread):
         assert self.clocks
 
         while buckets:
-            for bucket_id, bucket in list(buckets.items()):
-                clock = self.clocks[bucket_id]
-                now = clock.now()
+            try:
+                for bucket_id, bucket in list(buckets.items()):
+                    clock = self.clocks[bucket_id]
+                    now = clock.now()
 
-                while isawaitable(now):
-                    now = await now
+                    while isawaitable(now):
+                        now = await now
 
-                assert isinstance(now, int)
-                leak = bucket.leak(now)
+                    assert isinstance(now, int)
+                    leak = bucket.leak(now)
 
-                while isawaitable(leak):
-                    leak = await leak
+                    while isawaitable(leak):
+                        leak = await leak
 
-                assert isinstance(leak, int)
+                    assert isinstance(leak, int)
 
-            await asyncio.sleep(self.leak_interval / 1000)
+                await asyncio.sleep(self.leak_interval / 1000)
+            except RuntimeError as e:
+                logger.info("Leak task stopped due to event loop shutdown. %s", e)
+                return
 
     def leak_async(self):
         if self.async_buckets and not self.aio_leak_task:

@@ -72,6 +72,7 @@ class SQLiteBucket(AbstractBucket):
     table: str
     full_count_query: str
     lock: RLock
+    use_limiter_lock: bool
 
     def __init__(
         self, rates: List[Rate], conn: sqlite3.Connection, table: str, lock=None
@@ -81,9 +82,17 @@ class SQLiteBucket(AbstractBucket):
         self.rates = rates
 
         if not lock:
+            self.use_limiter_lock = False
             self.lock = RLock()
         else:
+            self.use_limiter_lock = True
             self.lock = lock
+
+    def limiter_lock(self):
+        if self.use_limiter_lock:
+            return self.lock
+        else:
+            return None
 
     def _build_full_count_query(self, current_timestamp: int) -> Tuple[str, dict]:
         full_query: List[str] = []
