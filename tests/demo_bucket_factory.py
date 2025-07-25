@@ -81,7 +81,7 @@ class DemoAsyncGetBucketFactory(BucketFactory):
                 await redis_db.delete(key)
                 bucket = await RedisBucket.init(DEFAULT_RATES, redis_db, key)
                 self.schedule_leak(bucket, self.clock)
-                self.buckets.update({name: bucket})
+                self.buckets[name] = bucket
 
     def get(self, item: RateItem) -> AbstractBucket:
         # name must be populated in create_buckets
