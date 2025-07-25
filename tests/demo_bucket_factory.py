@@ -1,5 +1,6 @@
 from os import getenv
 from typing import Dict
+from typing import List
 from typing import Optional
 
 from redis.asyncio import ConnectionPool as AsyncConnectionPool
@@ -65,7 +66,7 @@ class DemoAsyncGetBucketFactory(BucketFactory):
             self.schedule_leak(bucket, bucket_clock)
             self.buckets[item_name_pattern] = bucket
 
-    async def add_buckets(self, names: list[str]):
+    async def add_buckets(self, names: List[str]):
         # pre-initializes the required buckets
 
         for name in names:
