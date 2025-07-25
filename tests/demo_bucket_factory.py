@@ -1,4 +1,3 @@
-from inspect import isawaitable
 from os import getenv
 from typing import Dict
 from typing import Optional
@@ -35,17 +34,6 @@ class DemoBucketFactory(BucketFactory):
             self.schedule_leak(bucket, bucket_clock)
             self.buckets[item_name_pattern] = bucket
 
-    def wrap_item(self, name: str, weight: int = 1):
-        now = self.clock.now()
-
-        async def wrap_async():
-            return RateItem(name, await now, weight=weight)
-
-        def wrap_sync():
-            return RateItem(name, now, weight=weight)
-
-        return wrap_async() if isawaitable(now) else wrap_sync()
-
     def get(self, item: RateItem) -> AbstractBucket:
         assert self.buckets is not None
 
@@ -77,33 +65,26 @@ class DemoAsyncGetBucketFactory(BucketFactory):
             self.schedule_leak(bucket, bucket_clock)
             self.buckets[item_name_pattern] = bucket
 
-    def wrap_item(self, name: str, weight: int = 1):
-        now = self.clock.now()
+    async def add_buckets(self, names: list[str]):
+        # pre-initializes the required buckets
 
-        async def wrap_async():
-            return RateItem(name, await now, weight=weight)
+        for name in names:
+            assert self.buckets is not None
 
-        def wrap_sync():
-            return RateItem(name, now, weight=weight)
+            if name in self.buckets:
+                continue
+            else:
+                pool: AsyncConnectionPool = AsyncConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
+                redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)
+                key = f"test-bucket/{id_generator()}"
+                await redis_db.delete(key)
+                bucket = await RedisBucket.init(DEFAULT_RATES, redis_db, key)
+                self.schedule_leak(bucket, self.clock)
+                self.buckets.update({name: bucket})
 
-        return wrap_async() if isawaitable(now) else wrap_sync()
-
-    async def get(self, item: RateItem) -> AbstractBucket:
-        assert self.buckets is not None
-
-        if item.name in self.buckets:
-            bucket = self.buckets[item.name]
-            assert isinstance(bucket, AbstractBucket)
-            return bucket
-
-        pool: AsyncConnectionPool = AsyncConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
-        redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)
-        key = f"test-bucket/{id_generator()}"
-        await redis_db.delete(key)
-        bucket = await RedisBucket.init(DEFAULT_RATES, redis_db, key)
-        self.schedule_leak(bucket, self.clock)
-        self.buckets.update({item.name: bucket})
-        return bucket
+    def get(self, item: RateItem) -> AbstractBucket:
+        # name must be populated in create_buckets
+        return self.buckets[item.name]
 
     def schedule_leak(self, *args):
         if self.auto_leak:

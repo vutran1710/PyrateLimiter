@@ -220,6 +220,7 @@ class BucketFactory(ABC):
 
     _leaker: Optional[Leaker] = None
     _leak_interval: int = 10_000
+    clock: AbstractClock
 
     @property
     def leak_interval(self) -> int:
@@ -235,19 +236,15 @@ class BucketFactory(ABC):
             self._leaker.leak_interval = value
         self._leak_interval = value
 
-    @abstractmethod
-    def wrap_item(
-        self,
-        name: str,
-        weight: int = 1,
-    ) -> Union[RateItem, Awaitable[RateItem]]:
+    def wrap_item(self, name: str, weight: int = 1):
         """Add the current timestamp to the receiving item using any clock backend
         - Turn it into a RateItem
         - Can return either a coroutine or a RateItem instance
         """
+        return RateItem(name=name, timestamp=self.clock.now(), weight=weight)
 
     @abstractmethod
-    def get(self, item: RateItem) -> Union[AbstractBucket, Awaitable[AbstractBucket]]:
+    def get(self, item: RateItem) -> Union[AbstractBucket]:
         """Get the corresponding bucket to this item"""
 
     def create(
