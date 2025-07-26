@@ -19,6 +19,8 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
   - [Features](#features)
   - [Installation](#installation)
   - [Quickstart](#quickstart)
+    - [limiter_factory](#limiter_factory)
+    - [Examples](#examples)
   - [Basic usage](#basic-usage)
     - [Key concepts](#key-concepts)
     - [Defining rate limits & buckets](#defining-rate-limits-and-buckets)
@@ -89,8 +91,20 @@ for i in range(6):
         print(err, err.meta_info)
 ```
 
-Note: You can simplify initialization by using the factory functions provided in [limiter_factory](pyrate_limiter/limiter_factory.py), including
-`create_sqlite_limiter()` or `create_inmemory_limiter()`.
+
+
+## limiter_factory
+[limiter_factory.py](pyrate_limiter.limiter_factory.py) provides several functions to simplify common cases:
+- create_sqlite_limiter(rate_per_duration: int, duration: Duration, ...)
+- create_inmemory_limiter(rate_per_duration: int, duration: Duration, ...)
+- + more to be added...
+
+## Examples
+- Rate limiting asyncio tasks: [asyncio_ratelimit.py](examples/asyncio_ratelimit.py)
+- Rate limiting asyncio tasks w/ a decorator: [asyncio_decorator.py](examples/asyncio_decorator.py)
+- HTTPX rate limiting - asyncio, single process and multiprocess examples [httpx_ratelimiter.py](examples/httpx_ratelimiter.py)
+- Multiprocessing using an in-memory rate limiter - [in_memory_multiprocess.py](examples/in_memory_multiprocess.py)
+- Multiprocessing using SQLite and a file lock - this can be used for distributed processes not created within a multiprocessing [sql_filelock_multiprocess.py](examples/sql_filelock_multiprocess.py)
 
 ## Basic Usage
 
