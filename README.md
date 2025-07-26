@@ -466,12 +466,14 @@ them. In that case you pass the `max_delay` argument the maximum value of delay 
 limiter = Limiter(factory, max_delay=500) # Allow to delay up to 500ms
 ```
 
+Limiter has a default buffer_ms of 50ms. This means that when waiting, an additional 50ms will be added per step.
+
 As `max_delay` has been passed as a numeric value, when ingesting item, limiter will:
 
 - First, try to ingest such item using the routed bucket
 - If it fails to put item into the bucket, it will call `wait(item)` on the bucket to see how much time remains until the bucket can consume the item again?
 - Comparing the `wait` value to the `max_delay`.
-- if `max_delay` >= `wait`: delay (wait + 50ms as latency-tolerance) using either `asyncio.sleep` or `time.sleep` until the bucket can consume again
+- if `max_delay` >= `wait`: delay (wait + buffer_ms as latency-tolerance) using either `asyncio.sleep` or `time.sleep` until the bucket can consume again
 - if `max_delay` < `wait`: it raises `LimiterDelayException` if Limiter's `raise_when_fail=True`, otherwise silently fail and return False
 
 Example:
