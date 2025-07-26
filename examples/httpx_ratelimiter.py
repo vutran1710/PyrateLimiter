@@ -60,6 +60,63 @@ def fetch(start_time: int):
         client.get(url)
 
 
+def singleprocess_example():
+    from pyrate_limiter import limiter_factory, Duration
+    import httpx
+    import time
+    import os
+
+    start_time = time.time()
+
+    url = "https://httpbin.org/get"
+    limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1,
+                                                      duration=Duration.SECOND,
+                                                      max_delay=Duration.HOUR)
+    transport = RateLimiterTransport(limiter=limiter)
+    with httpx.Client(transport=transport) as client:
+        for _ in range(10):
+            response = client.get(url)
+            print(f"{round(time.time() - start_time, 2)}s-{os.getpid()}: {response.json()}")
+
+
+def asyncio_example():
+    import asyncio
+    import time
+    import httpx
+    from pyrate_limiter import limiter_factory, Duration
+
+    url = "https://httpbin.org/get"
+
+    async def ticker():
+        """loops and prints time, showing the eventloop isn't blocked"""
+        while True:
+            print(f"[TICK] {time.time()}")
+            await asyncio.sleep(1)
+
+    async def afetch(client: httpx.AsyncClient, start_time: int):
+        await client.get(url)
+
+    async def example():
+
+        limiter = limiter_factory.create_inmemory_limiter(
+            rate_per_duration=1,
+            duration=Duration.SECOND,
+            max_delay=Duration.HOUR,
+            async_wrapper=True
+        )
+        transport = AsyncRateLimiterTransport(limiter=limiter)
+        client = httpx.AsyncClient(transport=transport)
+
+        tasks = [afetch(client, url) for _ in range(10)]
+
+        asyncio.create_task(ticker())
+        results = await asyncio.gather(*tasks)
+
+        return results
+
+    asyncio.run(example())
+
+
 def init_process(bucket: AbstractBucket):
     """Initializes the process by creating a global LIMITER from the pickled
     bucket, which contains the ListProxy and multiprocess.Manager().Lock.
@@ -99,52 +156,6 @@ def multiprocess_example():
             print(f"Task raised: {e}")
 
 
-def singleprocess_example():
-    from pyrate_limiter import limiter_factory, Duration
-    import httpx
-    import time
-    import os
-
-    start_time = time.time()
-
-    url = "https://httpbin.org/get"
-    limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1,
-                                                      duration=Duration.SECOND,
-                                                      max_delay=Duration.HOUR)
-    transport = RateLimiterTransport(limiter=limiter)
-    with httpx.Client(transport=transport) as client:
-        for _ in range(10):
-            response = client.get(url)
-            print(f"{round(time.time() - start_time, 2)}s-{os.getpid()}: {response.json()}")
-
-
-def asyncio_example():
-    import asyncio
-    import time
-    import os
-    import httpx
-    from pyrate_limiter import limiter_factory, Duration
-
-    async def async_example():
-        start_time = time.time()
-        url = "https://httpbin.org/get"
-
-        limiter = limiter_factory.create_inmemory_limiter(
-            rate_per_duration=1,
-            duration=Duration.SECOND,
-            max_delay=Duration.HOUR,
-            async_wrapper=True
-        )
-
-        transport = AsyncRateLimiterTransport(limiter=limiter)
-        async with httpx.AsyncClient(transport=transport) as client:
-            for _ in range(10):
-                response = await client.get(url)
-                print(f"{round(time.time() - start_time, 2)}s-{os.getpid()}: {response.json()}")
-
-    asyncio.run(async_example())
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
@@ -152,11 +163,11 @@ if __name__ == "__main__":
                         )
     logger.setLevel(logging.DEBUG)
 
-    print("Single Process example: 10 requests")
-    singleprocess_example()
+    # print("Single Process example: 10 requests")
+    # singleprocess_example()
 
-    print("Multiprocessing example: 10 requests")
-    multiprocess_example()
+    # print("Multiprocessing example: 10 requests")
+    # multiprocess_example()
 
     print("Asyncio example: 10 requests")
     asyncio_example()
