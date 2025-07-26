@@ -163,11 +163,11 @@ if __name__ == "__main__":
                         )
     logger.setLevel(logging.DEBUG)
 
-    # print("Single Process example: 10 requests")
-    # singleprocess_example()
+    print("Single Process example: 10 requests")
+    singleprocess_example()
 
-    # print("Multiprocessing example: 10 requests")
-    # multiprocess_example()
+    print("Multiprocessing example: 10 requests")
+    multiprocess_example()
 
     print("Asyncio example: 10 requests")
     asyncio_example()
