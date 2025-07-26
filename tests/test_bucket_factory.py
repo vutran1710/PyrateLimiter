@@ -11,7 +11,6 @@ from .conftest import logger
 from .demo_bucket_factory import DemoBucketFactory
 from .helpers import async_count
 from pyrate_limiter import AbstractBucket
-from pyrate_limiter import RateItem
 
 
 @pytest.mark.asyncio
@@ -23,10 +22,6 @@ async def test_factory_01(clock, create_bucket):
 
     item = factory.wrap_item("hello", 1)
 
-    if isawaitable(item):
-        item = await item
-
-    assert isinstance(item, RateItem)
     assert item.weight == 1
 
     bucket = factory.get(item)
@@ -48,10 +43,6 @@ async def test_factory_leak(clock, create_bucket):
         for _ in range(3):
             is_async = False
             item = factory.wrap_item(item_name)
-
-            if isawaitable(item):
-                is_async = True
-                item = await item
 
             bucket = factory.get(item)
             put_ok = bucket.put(item)
