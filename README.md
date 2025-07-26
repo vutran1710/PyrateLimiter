@@ -16,8 +16,6 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
 
 ## Contents
 
-- [PyrateLimiter](#pyratelimiter)
-  - [Contents](#contents)
   - [Features](#features)
   - [Installation](#installation)
   - [Quickstart](#quickstart)
@@ -26,6 +24,8 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
     - [Defining rate limits & buckets](#defining-rate-limits-and-buckets)
     - [Defining clock & routing logic](#defining-clock--routing-logic-with-bucketfactory)
     - [Wrapping all up with Limiter](#wrapping-all-up-with-limiter)
+    - [asyncio and event loops](#asyncio-and-event-loops)
+    - [Decorators](#as_decorator-use-limiter-as-decorator)
     - [Limiter API](#limiter-api)
     - [Weight](#weight)
     - [Handling exceeded limits](#handling-exceeded-limits)
@@ -34,9 +34,11 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
       - [Rate limit delays](#rate-limit-delays)
     - [Backends](#backends)
       - [InMemoryBucket](#inmemorybucket)
+      - [MultiprocessBucket](#multiprocessbucket)
       - [SQLiteBucket](#sqlitebucket)
       - [RedisBucket](#redisbucket)
       - [PostgresBucket](#postgresbucket)
+      - [BucketAsyncWrapper](#bucketasyncwrapper)
     - [Async or Sync?](#async-or-sync)
   - [Advanced Usage](#advanced-usage)
     - [Component-level Diagram](#component-level-diagram)
@@ -47,13 +49,13 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
 
 ## Features
 
-- Tracks any number of rate limits and intervals you want to define
-- Independently tracks rate limits for multiple services or resources
-- Handles exceeded rate limits by either raising errors or adding delays
-- Several usage options including a normal function call, a decorator
-- Out-of-the-box workable with both sync & async
-- Includes optional SQLite and Redis backends, which can be used to persist limit tracking across
-  multiple threads, or application restarts
+- Supports unlimited rate limits and custom intervals.
+- Separately tracks limits for different services or resources.
+- Manages limit breaches by raising exceptions or applying delays.
+- Offers multiple usage modes: direct calls or decorators.
+- Fully compatible with both synchronous and asynchronous workflows.
+- Provides SQLite and Redis backends for persistent limit tracking across threads or restarts.
+- Includes MultiprocessBucket and SQLite File Lock backends for multiprocessing environments.
 
 ## Installation
 
@@ -73,27 +75,22 @@ conda install --channel conda-forge pyrate-limiter
 
 ## Quickstart
 
-Let's say you want to limit 5 requests over 2 seconds, and raise an exception if the limit is exceeded:
+To limit 5 requests within 2 seconds and raise an exception when the limit is exceeded:
 
 ```python
 from pyrate_limiter import Duration, Rate, Limiter, BucketFullException
 
-rate = Rate(5, Duration.SECOND * 2)
-limiter = Limiter(rate)
+limiter = Limiter(Rate(5, Duration.SECOND * 2))
 
-# Or you can pass multiple rates
-# rates = [Rate(5, Duration.SECOND * 2), Rate(10, Duration.MINUTE)]
-# limiter = Limiter(rates)
-
-for request in range(6):
+for i in range(6):
     try:
-        limiter.try_acquire(request)
+        limiter.try_acquire(i)
     except BucketFullException as err:
-        print(err)
-        print(err.meta_info)
-# Bucket for item=5 with Rate limit=5/2.0s is already full
-# {'error': 'Bucket for item=5 with Rate limit=5/2.0s is already full', 'name': 5, 'weight': 1, 'rate': 'limit=5/2.0s'}
+        print(err, err.meta_info)
 ```
+
+Note: You can simplify initialization by using the factory functions provided in [limiter_factory](pyrate_limiter/limiter_factory.py), including
+`create_sqlite_limiter()` or `create_inmemory_limiter()`.
 
 ## Basic Usage
 
@@ -101,32 +98,30 @@ for request in range(6):
 
 #### Clock
 
-- Timestamp items
+- Timestamps incoming items
 
 #### Bucket
 
-- Hold items with timestamps.
-- Behave like a FIFO queue
-- It can `leak` - popping items that are no longer relevant out of the queue
+- Stores items with timestamps.
+- Functions as a FIFO queue.
+- Can `leak` to remove outdated items.
 
 #### BucketFactory
 
-- BucketFactory keeps references to buckets & clocks: determine the exact time that items arrive then route them to their corresponding buckets
-- Help schedule background tasks to run buckets' `leak` periodically to make sure buckets will not explode from containing too many items
-- Where user define his own logic: routing, condition-checking, timing etc...
+- Manages buckets and clocks, routing items to their appropriate buckets.
+- Schedules periodic `leak` operations to prevent overflow.
+- Allows custom logic for routing, conditions, and timing.
 
 #### Limiter
 
-The Limiter's most important responsibility is to make user's life as easiest as possible:
-
-- Sums up all the underlying logic to a simple, intuitive API to work with
-- Handles async/sync context seamlessly (everything just `works` by adding/removing `async/await` keyword to the user's code)
-- Provides different ways of interacting with the underlying **BucketFactory** _(plain method call, decorator, context-manager (TBA))_
-- Provides thread-safety using RLock
+- Provides a simple, intuitive API by abstracting underlying logic.
+- Seamlessly supports both sync and async contexts.
+- Offers multiple interaction modes: direct calls, decorators, and (future) context managers.
+- Ensures thread-safety via RLock, and if needed, asyncio concurrency via asyncio.Lock
 
 ### Defining rate limits and buckets
 
-Consider some public API (like LinkedIn, GitHub, etc.) that has rate limits like the following:
+For example, an API (like LinkedIn or GitHub) might have these rate limits:
 
 ```
 - 500 requests per hour
@@ -151,7 +146,7 @@ Rates must be properly ordered:
 - Rates' intervals & limits must be ordered from least to greatest
 - Rates' ratio of **limit/interval** must be ordered from greatest to least
 
-Existing implementations of Bucket come with rate-validation when init. If you are to use your own implementation, use the validator provided by the lib
+Buckets validate rates during initialization. If using a custom implementation, use the built-in validator:
 
 ```python
 from pyrate_limiter import validate_rate_list
@@ -197,9 +192,9 @@ If you want to have finer grain control with routing & clocks etc, then you shou
 
 ### Defining Clock & routing logic with BucketFactory
 
-If you need more than one type of Bucket, and be able to route items to different buckets based on some condition, you can use BucketFactory to do that.
+When multiple bucket types are needed and items must be routed based on certain conditions, use `BucketFactory`.
 
-From the above steps, you already have your buckets. Now it's time to define what `Time` is (funny?!). Most of the time (again!?), you can use the existing Clock backend provided by **pyrate_limiter**.
+First, define your clock (time source). Most use cases work with the built-in clocks:
 
 ```python
 from pyrate_limiter.clock import TimeClock, MonotonicClock, SQLiteClock
@@ -207,7 +202,7 @@ from pyrate_limiter.clock import TimeClock, MonotonicClock, SQLiteClock
 base_clock = TimeClock()
 ```
 
-**PyrateLimiter** makes no assumption about users logic, so to map coming items to their correct buckets, implement your own **BucketFactory** class! At minimum, there are only 2 methods require implementing
+PyrateLimiter does not assume routing logic, so you implement a custom BucketFactory. At a minimum, these two methods must be defined:
 
 ```python
 from pyrate_limiter import BucketFactory
@@ -293,7 +288,11 @@ heavy_item = "the-sun"
 limiter.try_acquire(heavy_item, weight=10000)
 ```
 
-### asyncio: If your tasks are async, use an async bucket with limiter.try_acquire_async
+### asyncio and event loops
+
+To ensure the event loop isn't blocked, use `try_acquire_async` with an **async bucket**, which leverages `asyncio.Lock` for concurrency control.
+
+If your bucket isn't async, wrap it with `BucketAsyncWrapper`. This ensures `asyncio.sleep` is used instead of `time.sleep`, preventing event loop blocking:
 
 
 ```python
@@ -302,8 +301,30 @@ await limiter.try_acquire_async(item)
 
 Example: [asyncio_ratelimit.py](examples/asyncio_ratelimit.py)
 
-Alternatively, you can use `Limiter.try_acquire` as a function decorator. But you have to provide a `mapping` function that map the wrapped function's arguments to a proper `limiter.try_acquire` argument - which is a tuple of `(str, int)` or just `str`
 
+#### `as_decorator()`: use limiter as decorator
+
+`Limiter` can be used as a decorator, but you must provide a `mapping` function that maps the wrapped function's arguments to `limiter.try_acquire` arguments (either a `str` or a `(str, int)` tuple).
+
+The decorator works with both synchronous and asynchronous functions:
+
+```python
+decorator = limiter.as_decorator()
+
+def mapping(*args, **kwargs):
+    return "demo", 1
+
+@decorator(mapping)
+def handle_something(*args, **kwargs):
+    """function logic"""
+
+@decorator(mapping)
+async def handle_something_async(*args, **kwargs):
+    """function logic"""
+```
+
+
+Async Example:
 ```python
 my_beautiful_decorator = limiter.as_decorator()
 
@@ -320,7 +341,7 @@ async def async_request_function(some_number: int):
     requests.get('https://example.com')
 ```
 
-Example: [asyncio_decorator.py](examples/asyncio_decorator.py)
+For full example see [asyncio_decorator.py](examples/asyncio_decorator.py)
 
 
 ### Limiter API
@@ -350,28 +371,6 @@ assert limiter.dispose(bucket_to_remove)
 
 If a bucket is found and get deleted, calling this method will return **True**, otherwise **False**.
 If there is no more buckets in the limiter's bucket-factory, all the leaking tasks will be stopped.
-
-
-#### `as_decorator()`: use limiter as decorator
-
-Limiter can be used as decorator, but you have to provide a `mapping` function that maps the wrapped function's arguments to `limiter.try_acquire` function arguments. The mapping function must return either a tuple of `(str, int)` or just a `str`
-
-The decorator can work with both sync & async function
-
-```python
-decorator = limiter.as_decorator()
-
-def mapping(*args, **kwargs):
-    return "demo", 1
-
-@decorator(mapping)
-def handle_something(*args, **kwargs):
-    """function logic"""
-
-@decorator(mapping)
-async def handle_something_async(*args, **kwargs):
-    """function logic"""
-```
 
 
 ### Weight
