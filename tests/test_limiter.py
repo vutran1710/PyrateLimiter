@@ -101,6 +101,7 @@ async def test_limiter_01(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
+        buffer_ms=1
     )
     bucket = BucketAsyncWrapper(bucket)
     item = "demo"
@@ -127,7 +128,7 @@ async def test_limiter_01(
                 acquire_ok, cost = await async_acquire(limiter, item)
         else:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 400
+            assert cost > 350
             assert acquire_ok
 
     # # Flush before testing again
@@ -183,6 +184,7 @@ async def test_limiter_async_factory_get(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
+        buffer_ms=5
     )
     item = "demo"
 
@@ -207,7 +209,7 @@ async def test_limiter_async_factory_get(
                 acquire_ok, cost = await async_acquire(limiter, item)
         else:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 400
+            assert cost > 350
             assert acquire_ok
 
     # # Flush before testing again

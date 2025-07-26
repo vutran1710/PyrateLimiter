@@ -89,6 +89,7 @@ class Limiter:
     retry_until_max_delay: bool
     max_delay: Optional[int] = None
     lock: Union[RLock, Iterable]
+    buffer_ms: int
 
     # async_lock is thread local, created on first use
     _thread_local: local
@@ -100,6 +101,7 @@ class Limiter:
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
         retry_until_max_delay: bool = False,
+        buffer_ms: int = 50
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list.
@@ -116,6 +118,7 @@ class Limiter:
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
         self.retry_until_max_delay = retry_until_max_delay
+        self.buffer_ms = buffer_ms
         if max_delay is not None:
             if isinstance(max_delay, Duration):
                 max_delay = int(max_delay)
@@ -221,7 +224,7 @@ class Limiter:
                 assert isinstance(delay, int), "Delay not integer"
 
                 total_delay = 0
-                delay += 50
+                delay += self.buffer_ms
 
                 while True:
                     total_delay += delay
@@ -275,7 +278,7 @@ class Limiter:
             delay = bucket.waiting(item)
             assert isinstance(delay, int)
 
-            delay += 50
+            delay += self.buffer_ms
             total_delay += delay
 
             if self.max_delay is not None and total_delay > self.max_delay:
