@@ -32,8 +32,8 @@ Documentation = "https://pyrate-limiter.readthedocs.io"
 [dependency-groups]
 all = [
     "filelock>=3.0",
-    "redis>=5.0.0,<6",
-    "psycopg[pool]>=3.1.18,<4",
+    "redis>=6.2.0",
+    "psycopg[pool]>=3.2.9",
 ]
 docs = [
     "furo",
@@ -44,17 +44,17 @@ docs = [
     "sphinxcontrib-apidoc",
 ]
 dev = [
-    "dunamai",
-    "coverage==6",
+    "dunamai>=1.25.0",
+    "coverage>=7.10.1",
     "flake8_polyfill>=1.0.2,<2",
     "nox~=2025.5",
     "nox-poetry>=1.0",
-    "pre-commit>=2.17.0,<3",
-    "psycopg[pool]>=3.1.18,<4",
-    "pytest>=8.3",
-    "pytest-asyncio>=0.24",
-    "pytest-cov>=4.1.0,<5",
-    "pytest-xdist>=2.5.0,<3",
+    "pre-commit>=4.2.0",
+    "psycopg[pool]>=3.2.9",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
+    "pytest-xdist>=3.8.0",
     "schedule>=1.1.0,<2",
 ]
 
