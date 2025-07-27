@@ -123,7 +123,7 @@ def test_rate_limiter(
                 limiter = limiter_creator()
                 [limiter.try_acquire("task") for i in range(requests_per_second)]
 
-            limiter = limiter_creator() if limiter_creator is not None else None
+            limiter = limiter_creator()
             limiter_factory.LIMITER = limiter
 
             futures = [executor.submit(task) for _ in range(num_requests)]
