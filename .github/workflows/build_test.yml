@@ -67,6 +67,7 @@ jobs:
           exit 1
         fi
         echo "__version__ = '${PROJECT_VERSION}'" > pyrate_limiter/_version.py
+        echo update project version. This has side benefit of validating the pyproject.toml TOML.
         uvx --from=toml-cli toml set --toml-path=pyproject.toml project.version $PROJECT_VERSION
         echo _version.py is:
         cat pyrate_limiter/_version.py
