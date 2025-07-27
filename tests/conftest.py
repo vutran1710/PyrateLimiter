@@ -108,7 +108,7 @@ async def create_filelocksqlite_bucket(rates: List[Rate]):
 async def create_postgres_bucket(rates: List[Rate]):
     from psycopg_pool import ConnectionPool as PgConnectionPool
 
-    pool = PgConnectionPool("postgresql://postgres:postgres@localhost:5432")
+    pool = PgConnectionPool("postgresql://postgres:postgres@localhost:5432", open=True)
     table = f"test_bucket_{id_generator()}"
     bucket = PostgresBucket(pool, table, rates)
     assert bucket.count() == 0
