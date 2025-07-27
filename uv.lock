@@ -658,22 +658,12 @@ name = "pyrate-limiter"
 version = "0.0.0"
 source = { editable = "." }
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 all = [
     { name = "filelock" },
     { name = "psycopg", extra = ["pool"] },
     { name = "redis" },
 ]
-docs = [
-    { name = "furo" },
-    { name = "myst-parser" },
-    { name = "sphinx" },
-    { name = "sphinx-autodoc-typehints" },
-    { name = "sphinx-copybutton" },
-    { name = "sphinxcontrib-apidoc" },
-]
-
-[package.dev-dependencies]
 dev = [
     { name = "coverage" },
     { name = "dunamai" },
@@ -688,22 +678,23 @@ dev = [
     { name = "pytest-xdist" },
     { name = "schedule" },
 ]
+docs = [
+    { name = "furo" },
+    { name = "myst-parser" },
+    { name = "sphinx" },
+    { name = "sphinx-autodoc-typehints" },
+    { name = "sphinx-copybutton" },
+    { name = "sphinxcontrib-apidoc" },
+]
 
 [package.metadata]
-requires-dist = [
-    { name = "filelock", marker = "extra == 'all'", specifier = ">=3.0" },
-    { name = "furo", marker = "extra == 'docs'", specifier = ">=2022.3.4,<2023" },
-    { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=0.17" },
-    { name = "psycopg", extras = ["pool"], marker = "extra == 'all'", specifier = ">=3.1.18,<4" },
-    { name = "redis", marker = "extra == 'all'", specifier = ">=5.0.0,<6" },
-    { name = "sphinx", marker = "extra == 'docs'", specifier = ">=4.3.0,<5" },
-    { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = "~=1.17" },
-    { name = "sphinx-copybutton", marker = "extra == 'docs'", specifier = ">=0.5" },
-    { name = "sphinxcontrib-apidoc", marker = "extra == 'docs'", specifier = ">=0.3,<0.4" },
-]
-provides-extras = ["all", "docs"]
 
 [package.metadata.requires-dev]
+all = [
+    { name = "filelock", specifier = ">=3.0" },
+    { name = "psycopg", extras = ["pool"], specifier = ">=3.1.18,<4" },
+    { name = "redis", specifier = ">=5.0.0,<6" },
+]
 dev = [
     { name = "coverage", specifier = "==6" },
     { name = "dunamai" },
@@ -717,6 +708,14 @@ dev = [
     { name = "pytest-cov", specifier = ">=4.1.0,<5" },
     { name = "pytest-xdist", specifier = ">=2.5.0,<3" },
     { name = "schedule", specifier = ">=1.1.0,<2" },
+]
+docs = [
+    { name = "furo" },
+    { name = "myst-parser" },
+    { name = "sphinx" },
+    { name = "sphinx-autodoc-typehints" },
+    { name = "sphinx-copybutton" },
+    { name = "sphinxcontrib-apidoc" },
 ]
 
 [[package]]

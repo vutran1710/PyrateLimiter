@@ -23,20 +23,6 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-[project.optional-dependencies]
-all = [
-    "filelock>=3.0",
-    "redis>=5.0.0,<6",
-    "psycopg[pool]>=3.1.18,<4",
-]
-docs = [
-    "furo>=2022.3.4,<2023",
-    "myst-parser>=0.17",
-    "sphinx>=4.3.0,<5",
-    "sphinx-autodoc-typehints~=1.17",
-    "sphinx-copybutton>=0.5",
-    "sphinxcontrib-apidoc>=0.3,<0.4",
-]
 
 [project.urls]
 Homepage = "https://github.com/vutran1710/PyrateLimiter"
@@ -44,6 +30,19 @@ Repository = "https://github.com/vutran1710/PyrateLimiter"
 Documentation = "https://pyrate-limiter.readthedocs.io"
 
 [dependency-groups]
+all = [
+    "filelock>=3.0",
+    "redis>=5.0.0,<6",
+    "psycopg[pool]>=3.1.18,<4",
+]
+docs = [
+    "furo",
+    "myst-parser",
+    "sphinx",
+    "sphinx-autodoc-typehints",
+    "sphinx-copybutton",
+    "sphinxcontrib-apidoc",
+]
 dev = [
     "dunamai",
     "coverage==6",

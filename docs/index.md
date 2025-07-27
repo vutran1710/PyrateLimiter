@@ -15,4 +15,5 @@
 reference
 changelog
 contributing
+modules/index
 ```
