@@ -98,11 +98,11 @@ for i in range(6):
 - + more to be added...
 
 ## Examples
-- Rate limiting asyncio tasks: [asyncio_ratelimit.py](examples/asyncio_ratelimit.py)
-- Rate limiting asyncio tasks w/ a decorator: [asyncio_decorator.py](examples/asyncio_decorator.py)
-- HTTPX rate limiting - asyncio, single process and multiprocess examples [httpx_ratelimiter.py](examples/httpx_ratelimiter.py)
-- Multiprocessing using an in-memory rate limiter - [in_memory_multiprocess.py](examples/in_memory_multiprocess.py)
-- Multiprocessing using SQLite and a file lock - this can be used for distributed processes not created within a multiprocessing [sql_filelock_multiprocess.py](examples/sql_filelock_multiprocess.py)
+- Rate limiting asyncio tasks: [asyncio_ratelimit.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_ratelimit.py)
+- Rate limiting asyncio tasks w/ a decorator: [asyncio_decorator.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_decorator.py)
+- HTTPX rate limiting - asyncio, single process and multiprocess examples [httpx_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/httpx_ratelimiter.py)
+- Multiprocessing using an in-memory rate limiter - [in_memory_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/in_memory_multiprocess.py)
+- Multiprocessing using SQLite and a file lock - this can be used for distributed processes not created within a multiprocessing [sql_filelock_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/sql_filelock_multiprocess.py)
 
 ## Basic Usage
 
