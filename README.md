@@ -19,6 +19,8 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
   - [Features](#features)
   - [Installation](#installation)
   - [Quickstart](#quickstart)
+    - [limiter_factory](#limiter_factory)
+    - [Examples](#examples)
   - [Basic usage](#basic-usage)
     - [Key concepts](#key-concepts)
     - [Defining rate limits & buckets](#defining-rate-limits-and-buckets)
@@ -91,6 +93,20 @@ for i in range(6):
 
 Note: You can simplify initialization by using the factory functions provided in [limiter_factory](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/limiter_factory.py), including
 `create_sqlite_limiter()` or `create_inmemory_limiter()`.
+
+
+## limiter_factory
+[limiter_factory.py](pyrate_limiter.limiter_factory.py) provides several functions to simplify common cases:
+- create_sqlite_limiter(rate_per_duration: int, duration: Duration, ...)
+- create_inmemory_limiter(rate_per_duration: int, duration: Duration, ...)
+- + more to be added...
+
+## Examples
+- Rate limiting asyncio tasks: [asyncio_ratelimit.py](examples/asyncio_ratelimit.py)
+- Rate limiting asyncio tasks w/ a decorator: [asyncio_decorator.py](examples/asyncio_decorator.py)
+- HTTPX rate limiting - asyncio, single process and multiprocess examples [httpx_ratelimiter.py](examples/httpx_ratelimiter.py)
+- Multiprocessing using an in-memory rate limiter - [in_memory_multiprocess.py](examples/in_memory_multiprocess.py)
+- Multiprocessing using SQLite and a file lock - this can be used for distributed processes not created within a multiprocessing [sql_filelock_multiprocess.py](examples/sql_filelock_multiprocess.py)
 
 ## Basic Usage
 
@@ -466,12 +482,14 @@ them. In that case you pass the `max_delay` argument the maximum value of delay 
 limiter = Limiter(factory, max_delay=500) # Allow to delay up to 500ms
 ```
 
+Limiter has a default buffer_ms of 50ms. This means that when waiting, an additional 50ms will be added per step.
+
 As `max_delay` has been passed as a numeric value, when ingesting item, limiter will:
 
 - First, try to ingest such item using the routed bucket
 - If it fails to put item into the bucket, it will call `wait(item)` on the bucket to see how much time remains until the bucket can consume the item again?
 - Comparing the `wait` value to the `max_delay`.
-- if `max_delay` >= `wait`: delay (wait + 50ms as latency-tolerance) using either `asyncio.sleep` or `time.sleep` until the bucket can consume again
+- if `max_delay` >= `wait`: delay (wait + buffer_ms as latency-tolerance) using either `asyncio.sleep` or `time.sleep` until the bucket can consume again
 - if `max_delay` < `wait`: it raises `LimiterDelayException` if Limiter's `raise_when_fail=True`, otherwise silently fail and return False
 
 Example:

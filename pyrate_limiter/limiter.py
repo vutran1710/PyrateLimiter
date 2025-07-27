@@ -2,6 +2,7 @@
 """
 import asyncio
 import logging
+from contextlib import contextmanager
 from functools import wraps
 from inspect import isawaitable
 from threading import local
@@ -10,6 +11,7 @@ from time import sleep
 from typing import Any
 from typing import Awaitable
 from typing import Callable
+from typing import Iterable
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -58,6 +60,25 @@ class SingleBucketFactory(BucketFactory):
         return self.bucket
 
 
+@contextmanager
+def combined_lock(locks: Iterable, timeout_sec: Optional[float] = None):
+    """Acquires and releases multiple locks. Intended to be used in multiprocessing for a cross-process
+    lock combined with in process thread RLocks"""
+    acquired = []
+    try:
+        for lock in locks:
+            if timeout_sec is not None:
+                if not lock.acquire(timeout=timeout_sec):
+                    raise TimeoutError("Timeout while acquiring combined lock.")
+            else:
+                lock.acquire()
+            acquired.append(lock)
+        yield
+    finally:
+        for lock in reversed(acquired):
+            lock.release()
+
+
 class Limiter:
     """This class responsibility is to sum up all underlying logic
     and make working with async/sync functions easily
@@ -67,7 +88,8 @@ class Limiter:
     raise_when_fail: bool
     retry_until_max_delay: bool
     max_delay: Optional[int] = None
-    lock: RLock
+    lock: Union[RLock, Iterable]
+    buffer_ms: int
 
     # async_lock is thread local, created on first use
     _thread_local: local
@@ -79,6 +101,7 @@ class Limiter:
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
         retry_until_max_delay: bool = False,
+        buffer_ms: int = 50
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list.
@@ -95,6 +118,7 @@ class Limiter:
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
         self.retry_until_max_delay = retry_until_max_delay
+        self.buffer_ms = buffer_ms
         if max_delay is not None:
             if isinstance(max_delay, Duration):
                 max_delay = int(max_delay)
@@ -103,8 +127,12 @@ class Limiter:
 
         self.max_delay = max_delay
         self.lock = RLock()
-
         self._thread_local = local()
+
+        if isinstance(argument, AbstractBucket):
+            limiter_lock = argument.limiter_lock()
+            if limiter_lock is not None:
+                self.lock = (limiter_lock, self.lock)
 
     def buckets(self) -> List[AbstractBucket]:
         """Get list of active buckets
@@ -196,7 +224,7 @@ class Limiter:
                 assert isinstance(delay, int), "Delay not integer"
 
                 total_delay = 0
-                delay += 50
+                delay += self.buffer_ms
 
                 while True:
                     total_delay += delay
@@ -250,7 +278,7 @@ class Limiter:
             delay = bucket.waiting(item)
             assert isinstance(delay, int)
 
-            delay += 50
+            delay += self.buffer_ms
             total_delay += delay
 
             if self.max_delay is not None and total_delay > self.max_delay:
@@ -339,7 +367,7 @@ class Limiter:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
-        with self.lock:
+        with self.lock if not isinstance(self.lock, Iterable) else combined_lock(self.lock):
             assert weight >= 0, "item's weight must be >= 0"
 
             if weight == 0:

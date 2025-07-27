@@ -1,5 +1,6 @@
 """Complete Limiter test suite
 """
+import time
 from inspect import isawaitable
 
 import pytest
@@ -21,6 +22,7 @@ from pyrate_limiter import Duration
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import LimiterDelayException
+from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
 from pyrate_limiter import TimeClock
 
@@ -99,6 +101,7 @@ async def test_limiter_01(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
+        buffer_ms=1
     )
     bucket = BucketAsyncWrapper(bucket)
     item = "demo"
@@ -125,7 +128,7 @@ async def test_limiter_01(
                 acquire_ok, cost = await async_acquire(limiter, item)
         else:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 400
+            assert cost > 350
             assert acquire_ok
 
     # # Flush before testing again
@@ -181,6 +184,7 @@ async def test_limiter_async_factory_get(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
+        buffer_ms=5
     )
     item = "demo"
 
@@ -205,7 +209,7 @@ async def test_limiter_async_factory_get(
                 acquire_ok, cost = await async_acquire(limiter, item)
         else:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 400
+            assert cost > 350
             assert acquire_ok
 
     # # Flush before testing again
@@ -338,3 +342,33 @@ async def test_limiter_decorator(
 
     await async_inc_counter(1)
     assert counter == 2
+
+
+def test_wait_too_long():
+
+    requests_per_second = 10
+
+    rate = Rate(requests_per_second, Duration.SECOND)
+    bucket = InMemoryBucket([rate])
+    limiter = Limiter(bucket, raise_when_fail=False, clock=TimeClock(),
+                      max_delay=Duration.SECOND, retry_until_max_delay=True)
+
+    # raise_when_fail = False
+    for i in range(500):
+        success = limiter.try_acquire("mytest", 1)
+        if not success:
+            break
+
+    assert not success  # retried and then failed
+
+    time.sleep(1)
+
+    # raise_when_fail = True
+    limiter = Limiter(bucket, raise_when_fail=True, clock=TimeClock(),
+                      max_delay=Duration.SECOND, retry_until_max_delay=True)
+
+    with pytest.raises(LimiterDelayException):
+        for i in range(500):
+            success = limiter.try_acquire("mytest", 1)
+            if not success:
+                break
