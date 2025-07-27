@@ -91,12 +91,8 @@ for i in range(6):
         print(err, err.meta_info)
 ```
 
-Note: You can simplify initialization by using the factory functions provided in [limiter_factory](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/limiter_factory.py), including
-`create_sqlite_limiter()` or `create_inmemory_limiter()`.
-
-
 ## limiter_factory
-[limiter_factory.py](pyrate_limiter.limiter_factory.py) provides several functions to simplify common cases:
+[limiter_factory.py](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/limiter_factory.py) provides several functions to simplify common cases:
 - create_sqlite_limiter(rate_per_duration: int, duration: Duration, ...)
 - create_inmemory_limiter(rate_per_duration: int, duration: Duration, ...)
 - + more to be added...
