@@ -1,6 +1,6 @@
 [project]
 name = "pyrate-limiter"
-dynamic = ["version"]
+version = "0.0.0"
 description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = [{ name = "vutr", email = "me@vutr.io" }]
 requires-python = ">=3.9"
@@ -45,6 +45,7 @@ Documentation = "https://pyrate-limiter.readthedocs.io"
 
 [dependency-groups]
 dev = [
+    "dunamai",
     "coverage==6",
     "flake8_polyfill>=1.0.2,<2",
     "nox~=2025.5",
@@ -77,32 +78,17 @@ output = 'test-reports/coverage.xml'
 [tool.ipdb]
 context = 7
 
-
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.8.3,<0.9.0"]
+build-backend = "uv_build"
 
-[tool.hatch.version]
-source = "uv-dynamic-versioning"
-
-[tool.hatch.build.hooks.version]
-path = "pyrate_limiter/_version.py"
-template = '''
-__version__ = "{version}"
-'''
-
-
-[tool.hatch.build.targets.sdist]
-include = [
+[tool.uv.build-backend]
+module-name = "pyrate_limiter"
+module-root = ""
+source-include = [
     "LICENSE",
     "CHANGELOG.md",
     "examples",
     "pyrate_limiter",
     "tests",
 ]
-
-[tool.hatch.build.targets.wheel]
-include = ["pyrate_limiter"]
-
-[tool.hatch.build.targets.wheel.sources]
-"./pyrate_limiter" = "pyrate_limiter"

@@ -1,1 +1,1 @@
-__version__ = "filled by build"
+__version__ = "0.0.0"
