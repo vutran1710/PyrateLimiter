@@ -107,7 +107,7 @@ def test_rate_limiter(
     if use_process_pool:
         logger.info("Using ProcessPoolExecutor")
         with ProcessPoolExecutor(
-            initializer=partial(limiter_init, limiter_creator) if limiter_factory is not None else None
+            initializer=partial(limiter_init, limiter_creator) if limiter_creator is not None else None
         ) as executor:
             if PREFILL:
                 # Pre-load the buckets, after processes created
