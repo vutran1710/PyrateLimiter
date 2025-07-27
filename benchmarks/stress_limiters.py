@@ -8,19 +8,19 @@ from time import perf_counter
 from typing import Callable
 from typing import cast
 from typing import Literal
-from typing import Optional
 
-from pyrate_limiter import AbstractClock
 from pyrate_limiter import Duration
 from pyrate_limiter import Limiter
+from pyrate_limiter import limiter_factory
 from pyrate_limiter import MonotonicClock
 from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import Rate
-from pyrate_limiter import SQLiteBucket
-from pyrate_limiter import SQLiteClock
-from pyrate_limiter import TimeClock
 
 logger = logging.getLogger(__name__)
+
+BUFFER_MS: int = 1  # reduce the buffer to improve measurement
+TEST_DURATION_SEC: int = 1  # time per test
+PREFILL: bool = True
 
 
 @dataclass
@@ -33,22 +33,10 @@ class TestResult:
     percent_from_expected_duration: float
 
 
-def create_sqlite_limiter(rate: Rate, use_fileLock: bool, max_delay: int):
-    bucket = SQLiteBucket.init_from_file([rate], db_path="pyrate_limiter.sqlite", use_file_lock=use_fileLock)
-
-    # retry_until_max_delay=True
-    if use_fileLock:
-        clock: AbstractClock = SQLiteClock(bucket)
-    else:
-        clock = TimeClock()
-
-    return Limiter(bucket, raise_when_fail=False, max_delay=max_delay, clock=clock, retry_until_max_delay=True)
-
-
 def create_mp_limiter(max_delay: int, bucket: MultiprocessBucket):
     limiter = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
                       retry_until_max_delay=True,
-                      max_delay=max_delay)
+                      max_delay=max_delay, buffer_ms=BUFFER_MS)
 
     return limiter
 
@@ -63,14 +51,27 @@ def create_rate_limiter_factory(
     rate = Rate(requests_per_second, Duration.SECOND)
 
     if backend == "default":
-        return partial(Limiter, rate, raise_when_fail=False, max_delay=max_delay)
+        limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=requests_per_second,
+                                                          duration=Duration.SECOND,
+                                                          max_delay=max_delay,
+                                                          buffer_ms=BUFFER_MS)
+        return lambda: limiter
     elif backend == "sqlite":
-        return partial(
-            create_sqlite_limiter, rate, use_fileLock=False, max_delay=max_delay
-        )
+        limiter = limiter_factory.create_sqlite_limiter(rate_per_duration=requests_per_second,
+                                                        use_file_lock=False,
+                                                        max_delay=max_delay,
+                                                        buffer_ms=BUFFER_MS,
+                                                        db_path="pyrate_limiter.sqlite")
+        return lambda: limiter
     elif backend == "sqlite_filelock":
         return partial(
-            create_sqlite_limiter, rate, use_fileLock=True, max_delay=max_delay
+            limiter_factory.create_sqlite_limiter,
+            rate_per_duration=requests_per_second,
+            duration=Duration.SECOND,
+            use_file_lock=True,
+            max_delay=max_delay,
+            buffer_ms=BUFFER_MS,
+            db_path="pyrate_limiter.sqlite"
         )
     elif backend == "mp_limiter":
         bucket = MultiprocessBucket.init([rate])
@@ -81,27 +82,23 @@ def create_rate_limiter_factory(
         raise ValueError(f"Unexpected backend option: {backend}")
 
 
-LIMITER: Optional[Limiter] = None
-
-
 def task():
-    assert LIMITER is not None, "Limiter not initialized"
+    assert limiter_factory.LIMITER is not None, "Limiter not initialized"
 
     try:
-        while not LIMITER.try_acquire("task"):
+        while not limiter_factory.LIMITER.try_acquire("task"):
             # Keep trying
             pass
     except Exception as e:
         logger.exception(e)
 
 
-def limiter_init(limiter_factory: Callable[[], Limiter]):
-    global LIMITER
-    LIMITER = limiter_factory()
+def limiter_init(limiter_creator: Callable[[], Limiter]):
+    limiter_factory.LIMITER = limiter_creator()
 
 
 def test_rate_limiter(
-    limiter_factory: Optional[Callable[[], Limiter]],
+    limiter_creator: Callable[[], Limiter],
     num_requests: int,
     use_process_pool: bool,
 ):
@@ -110,15 +107,24 @@ def test_rate_limiter(
     if use_process_pool:
         logger.info("Using ProcessPoolExecutor")
         with ProcessPoolExecutor(
-            initializer=partial(limiter_init, limiter_factory) if limiter_factory is not None else None
+            initializer=partial(limiter_init, limiter_creator) if limiter_factory is not None else None
         ) as executor:
+            if PREFILL:
+                # Pre-load the buckets, after processes created
+                limiter = limiter_creator()
+                [limiter.try_acquire("task") for i in range(requests_per_second)]
+
             futures = [executor.submit(task) for _ in range(num_requests)]
             wait(futures)
     else:
         with ThreadPoolExecutor() as executor:
-            limiter = limiter_factory() if limiter_factory is not None else None
-            global LIMITER
-            LIMITER = limiter
+            if PREFILL:
+                # Pre-load the buckets, after threads created
+                limiter = limiter_creator()
+                [limiter.try_acquire("task") for i in range(requests_per_second)]
+
+            limiter = limiter_creator() if limiter_creator is not None else None
+            limiter_factory.LIMITER = limiter
 
             futures = [executor.submit(task) for _ in range(num_requests)]
             wait(futures)
@@ -127,7 +133,7 @@ def test_rate_limiter(
         try:
             f.result()
         except Exception as e:
-            print(f"Task raised: {e}")
+            logger.exception(f"Task raised: {e}")
 
     end = perf_counter()
 
@@ -135,7 +141,7 @@ def test_rate_limiter(
 
 
 def run_test_limiter(
-    limiter: Callable | None,
+    limiter_creator: Callable,
     label: str,
     requests_per_second: int,
     test_duration_seconds: int,
@@ -146,7 +152,7 @@ def run_test_limiter(
     )  # should finish in around 20 seconds
 
     duration = test_rate_limiter(
-        limiter, num_requests=num_requests, use_process_pool=use_process_pool
+        limiter_creator=limiter_creator, num_requests=num_requests, use_process_pool=use_process_pool
     )
 
     percent_from_expected_duration = (
@@ -169,7 +175,7 @@ if __name__ == "__main__":
 
     requests_per_second_list = [10, 100, 1000, 2500, 5000]
 
-    test_duration_seconds = 10
+    test_duration_seconds = TEST_DURATION_SEC
 
     test_results = []
 
@@ -179,15 +185,16 @@ if __name__ == "__main__":
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    for backend in ["default", "sqlite", "sqlite_filelock", "mp_limiter"]:
+    for backend in ["default", "sqlite", "mp_limiter"]:
         backend = cast(Literal["default", "sqlite", "sqlite_filelock", "mp_limiter"], backend)
         for requests_per_second in requests_per_second_list:
             logger.info(f"Testing with {backend=}, {requests_per_second=}")
-            limiter = create_rate_limiter_factory(
+            limiter_creator = create_rate_limiter_factory(
                 requests_per_second, max_delay_seconds=60, backend=backend
             )
+
             result = run_test_limiter(
-                limiter=limiter,
+                limiter_creator=limiter_creator,
                 label="Threads: " + backend,
                 requests_per_second=requests_per_second,
                 test_duration_seconds=test_duration_seconds,
@@ -201,11 +208,11 @@ if __name__ == "__main__":
         for requests_per_second in requests_per_second_list:
             logger.info(f"Testing with {backend=}, {requests_per_second=}")
 
-            limiter_factory = create_rate_limiter_factory(
+            limiter_creator = create_rate_limiter_factory(
                 requests_per_second, max_delay_seconds=60, backend=backend
             )
             result = run_test_limiter(
-                limiter=limiter_factory,
+                limiter_creator=limiter_creator,
                 label="Processes: " + backend,
                 requests_per_second=requests_per_second,
                 test_duration_seconds=test_duration_seconds,
