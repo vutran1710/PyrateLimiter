@@ -31,13 +31,6 @@ class TimeClock(AbstractClock):
         return int(1000 * time())
 
 
-class TimeAsyncClock(AbstractClock):
-    """Time Async Clock, meant for testing only"""
-
-    async def now(self) -> int:
-        return int(1000 * time())
-
-
 class SQLiteClock(AbstractClock):
     """Get timestamp using SQLite as remote clock backend"""
 
