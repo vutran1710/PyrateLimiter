@@ -9,9 +9,15 @@ from httpx import HTTPTransport
 from httpx import Request
 from httpx import Response
 
-from pyrate_limiter import AbstractBucket
 from pyrate_limiter import Limiter
+from pyrate_limiter import limiter_factory
+
 logger = logging.getLogger(__name__)
+
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S")
+logger.setLevel(logging.DEBUG)
 
 
 class RateLimiterTransport(HTTPTransport):
@@ -22,9 +28,9 @@ class RateLimiterTransport(HTTPTransport):
     def handle_request(self, request: Request, **kwargs) -> Response:
         # using a constant string for item name means that the same
         # rate is applied to all requests.
-        acquired = self.limiter.try_acquire("httpx_ratelimiter")
-        if not acquired:
-            raise RuntimeError("Did not acquire lock")
+        while not self.limiter.try_acquire("httpx_ratelimiter"):
+            logger.debug("Lock acquisition timed out, retrying")
+
         logger.debug("Acquired lock")
         return super().handle_request(request, **kwargs)
 
@@ -35,9 +41,9 @@ class AsyncRateLimiterTransport(AsyncHTTPTransport):
         self.limiter = limiter
 
     async def handle_async_request(self, request: Request, **kwargs) -> Response:
-        acquired = await self.limiter.try_acquire_async("httpx_ratelimiter")
-        if not acquired:
-            raise RuntimeError("Did not acquire lock")
+        while not await self.limiter.try_acquire_async("httpx_ratelimiter"):
+            logger.debug("Lock acquisition timed out, retrying")
+
         logger.debug("Acquired lock")
         response = await super().handle_async_request(request, **kwargs)
 
@@ -46,17 +52,15 @@ class AsyncRateLimiterTransport(AsyncHTTPTransport):
 
 # Example below
 
-LIMITER = None
-
 
 def fetch(start_time: int):
     import httpx
 
     url = "https://httpbin.org/get"
 
-    assert LIMITER is not None
+    assert limiter_factory.LIMITER is not None
 
-    with httpx.Client(transport=RateLimiterTransport(limiter=LIMITER)) as client:
+    with httpx.Client(transport=RateLimiterTransport(limiter=limiter_factory.LIMITER)) as client:
         client.get(url)
 
 
@@ -71,7 +75,8 @@ def singleprocess_example():
     url = "https://httpbin.org/get"
     limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1,
                                                       duration=Duration.SECOND,
-                                                      max_delay=Duration.HOUR)
+                                                      max_delay=Duration.HOUR
+                                                      )
     transport = RateLimiterTransport(limiter=limiter)
     with httpx.Client(transport=transport) as client:
         for _ in range(10):
@@ -112,27 +117,10 @@ def asyncio_example():
         asyncio.create_task(ticker())
         results = await asyncio.gather(*tasks)
 
+        await client.aclose()
         return results
 
     asyncio.run(example())
-
-
-def init_process(bucket: AbstractBucket):
-    """Initializes the process by creating a global LIMITER from the pickled
-    bucket, which contains the ListProxy and multiprocess.Manager().Lock.
-    """
-
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
-                        datefmt="%Y-%m-%d %H:%M:%S"
-                        )
-    logger.setLevel(logging.DEBUG)
-
-    from pyrate_limiter import Duration
-
-    global LIMITER
-    LIMITER = Limiter(bucket, raise_when_fail=False,
-                      max_delay=Duration.HOUR, retry_until_max_delay=True)
 
 
 def multiprocess_example():
@@ -145,23 +133,18 @@ def multiprocess_example():
     bucket = MultiprocessBucket.init([rate])
 
     start_time = time.time()
-    with ProcessPoolExecutor(initializer=partial(init_process, bucket)) as executor:
+    with ProcessPoolExecutor(initializer=partial(limiter_factory.init_global_limiter, bucket)) as executor:
         futures = [executor.submit(fetch, start_time) for _ in range(10)]
         wait(futures)
 
     for f in futures:
         try:
             f.result()
-        except Exception as e:
-            print(f"Task raised: {e}")
+        except Exception:
+            logger.exception("Task raised")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
-                        datefmt="%Y-%m-%d %H:%M:%S"
-                        )
-    logger.setLevel(logging.DEBUG)
 
     print("Single Process example: 10 requests")
     singleprocess_example()
