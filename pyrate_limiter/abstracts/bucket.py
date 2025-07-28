@@ -117,9 +117,9 @@ class Leaker(Thread):
 
     daemon = True
     name = "PyrateLimiter's Leaker"
-    sync_buckets: Optional[Dict[int, AbstractBucket]] = None
-    async_buckets: Optional[Dict[int, AbstractBucket]] = None
-    clocks: Optional[Dict[int, AbstractClock]] = None
+    sync_buckets: Dict[int, AbstractBucket]
+    async_buckets: Dict[int, AbstractBucket]
+    clocks: Dict[int, AbstractClock]
     leak_interval: int = 10_000
     aio_leak_task: Optional[asyncio.Task] = None
 
@@ -169,7 +169,8 @@ class Leaker(Thread):
         return False
 
     async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
-        assert self.clocks
+        if len(self.clocks) == 0:
+            return
 
         while buckets:
             try:
@@ -302,3 +303,11 @@ class BucketFactory(ABC):
             return False
 
         return self._leaker.deregister(bucket)
+
+    def __del__(self):
+        # Make sure all leakers are deregistered
+        for bucket in self.get_buckets():
+            try:
+                self.dispose(bucket)
+            except Exception as e:
+                logger.debug("Exception %s deleting bucket", e)
