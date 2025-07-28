@@ -233,6 +233,14 @@ async def test_mp_bucket_async():
         ]
         wait(futures)
 
+        time.sleep(2)
+
+        futures = [
+            executor.submit(my_task_async, num_requests // num_workers)
+            for _ in range(num_workers)
+        ]
+        wait(futures)
+
     times = []
     for f in futures:
         try:

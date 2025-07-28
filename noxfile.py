@@ -5,8 +5,10 @@ from nox_poetry import session
 nox.options.reuse_existing_virtualenvs = True
 
 PYTEST_MP_ARGS = ["--verbose", "--cov=pyrate_limiter", "--maxfail=1", "tests/test_multiprocessing.py"]
-
-PYTEST_ARGS = ["--verbose", "--maxfail=1", "--numprocesses=auto", "--ignore=tests/test_multiprocessing.py"]
+PYTEST_MP2_ARGS = ["--verbose", "--cov=pyrate_limiter", "--maxfail=1", "-m", "mpbucket and monotonic",
+                   "--ignore=tests/test_multiprocessing.py"]
+PYTEST_ARGS = ["--verbose", "--maxfail=1", "-m", "not mpbucket", "--numprocesses=auto",
+               "--ignore=tests/test_multiprocessing.py"]
 COVERAGE_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report=term", "--cov-report=xml", "--cov-report=html"]
 
 
@@ -18,7 +20,14 @@ def lint(session) -> None:
 @session(python=False)
 def cover(session) -> None:
     """Run tests and generate coverage reports in both terminal output and XML (for Codecov)"""
+
+    # Serial Files
     session.run("pytest", *PYTEST_MP_ARGS)
+
+    # Serial Markers
+    session.run("pytest", *PYTEST_MP2_ARGS)
+
+    # Everything else - concurrent
     session.run("pytest", *PYTEST_ARGS, *COVERAGE_ARGS)
 
 
