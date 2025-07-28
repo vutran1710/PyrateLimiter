@@ -66,21 +66,21 @@ class InMemoryBucket(AbstractBucket):
 
             if lower_bound > self.items[-1].timestamp:
                 remove_count = len(self.items)
-                self.items = []
+                del self.items[:]
                 return remove_count
 
             if lower_bound < self.items[0].timestamp:
                 return 0
 
             idx = binary_search(self.items, lower_bound)
-            self.items = self.items[idx:]
+            del self.items[:idx]
             return idx
 
         return 0
 
     def flush(self) -> None:
         self.failing_rate = None
-        self.items = []
+        del self.items[:]
 
     def count(self) -> int:
         return len(self.items)

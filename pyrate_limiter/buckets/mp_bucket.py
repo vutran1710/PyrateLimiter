@@ -1,11 +1,12 @@
 """multiprocessing In-memory Bucket using a multiprocessing.Manager.ListProxy
      and a multiprocessing.Lock.
 """
-from multiprocessing import Lock
 from multiprocessing import Manager
+from multiprocessing import RLock
 from multiprocessing.managers import ListProxy
-from multiprocessing.synchronize import Lock as LockType
+from multiprocessing.synchronize import RLock as LockType
 from typing import List
+from typing import Optional
 
 from ..abstracts import Rate
 from ..abstracts import RateItem
@@ -26,6 +27,14 @@ class MultiprocessBucket(InMemoryBucket):
         self.items = items
         self.mp_lock = mp_lock
 
+    def put(self, item: RateItem) -> bool:
+        with self.mp_lock:
+            return super().put(item)
+
+    def leak(self, current_timestamp: Optional[int] = None) -> int:
+        with self.mp_lock:
+            return super().leak(current_timestamp)
+
     def limiter_lock(self):
         return self.mp_lock
 
@@ -39,6 +48,6 @@ class MultiprocessBucket(InMemoryBucket):
         """
         shared_items: List[RateItem] = Manager().list()  # type: ignore[assignment]
 
-        mp_lock: LockType = Lock()
+        mp_lock: LockType = RLock()
 
         return cls(rates=rates, items=shared_items, mp_lock=mp_lock)

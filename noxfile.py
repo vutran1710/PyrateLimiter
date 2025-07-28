@@ -4,10 +4,14 @@ from nox_poetry import session
 # Reuse virtualenv created by poetry instead of creating new ones
 nox.options.reuse_existing_virtualenvs = True
 
+# Manually select serial tests. TODO: Add a "serial" marker
 PYTEST_MP_ARGS = ["--verbose", "--cov=pyrate_limiter", "--maxfail=1", "tests/test_multiprocessing.py"]
+PYTEST_MP2_ARGS = ["--verbose", "--cov=pyrate_limiter", "--cov-append", "--maxfail=1", "-m", "mpbucket and monotonic",
+                   "--ignore=tests/test_multiprocessing.py"]
 
-# reduced numprocesses to 3 (assuming GHA tunner is running on 4 cores)
-PYTEST_ARGS = ["--verbose", "--maxfail=1", "--numprocesses=3", "--ignore=tests/test_multiprocessing.py"]
+# Reduce # of cores to 3: one less than GHA runner's cores: timing tests are sensitive to high load
+PYTEST_ARGS = ["--verbose", "--maxfail=1", "-m", "not mpbucket", "--numprocesses=3",
+               "--ignore=tests/test_multiprocessing.py"]
 COVERAGE_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report=term", "--cov-report=xml", "--cov-report=html"]
 
 
@@ -19,7 +23,14 @@ def lint(session) -> None:
 @session(python=False)
 def cover(session) -> None:
     """Run tests and generate coverage reports in both terminal output and XML (for Codecov)"""
+
+    # Serial Files
     session.run("pytest", *PYTEST_MP_ARGS)
+
+    # Serial Markers
+    session.run("pytest", *PYTEST_MP2_ARGS)
+
+    # Everything else - concurrent
     session.run("pytest", *PYTEST_ARGS, *COVERAGE_ARGS)
 
 
