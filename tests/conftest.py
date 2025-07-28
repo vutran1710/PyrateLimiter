@@ -123,7 +123,7 @@ async def create_postgres_bucket(rates: List[Rate]):
         create_async_redis_bucket,
         create_postgres_bucket,
         create_filelocksqlite_bucket,
-        create_mp_bucket
+        # create_mp_bucket
     ]
 )
 def create_bucket(request):
