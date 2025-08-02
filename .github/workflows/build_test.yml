@@ -56,20 +56,6 @@ jobs:
       with:
         enable-cache: true
         python-version: ${{ matrix.python-version }}
-    - uses: mtkennerly/dunamai-action@v1
-      with:
-        env-var: PROJECT_VERSION
-        args: --style semver
-    - name: Update __version__ and pyproject.toml
-      run: |
-        if [[ "$PROJECT_VERSION" == 0.0.0* ]]; then
-          echo "Invalid version: $PROJECT_VERSION"
-          exit 1
-        fi
-        echo update project version. This has side benefit of validating the pyproject.toml TOML.
-        uvx --from=toml-cli toml set --toml-path=pyproject.toml project.version $PROJECT_VERSION
-        echo pyproject.toml version is
-        grep version pyproject.toml
     - name: Install dependencies
       run: uv sync --all-groups --all-extras
     # Run linting (latest python version only)
