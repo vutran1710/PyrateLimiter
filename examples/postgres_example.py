@@ -24,7 +24,7 @@ def create_postgres_bucket(rates: List[Rate]):
     return bucket
 
 
-def main():
+def test_postgres():
     rates = [Rate(3, Duration.SECOND * 3)]
 
     def task(name, weight):
@@ -41,4 +41,4 @@ if __name__ == "__main__":
     print("To start a postgres container: ")
     print("# docker run --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres")
 
-    main()
+    test_postgres()

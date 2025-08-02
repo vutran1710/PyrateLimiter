@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from typing import List
 
+import pytest
 import redis
 
 from pyrate_limiter import Duration
@@ -34,8 +35,8 @@ async def create_async_redis_bucket(rates: List[Rate]):
     return bucket
 
 
-async def main_async_bucket():
-    print("To start a redis container: \n# docker run -d --name redis-test -p 6379:6379 redis:7")
+@pytest.mark.asyncio
+async def test_redis_async():
     rates = [Rate(3, Duration.SECOND)]
 
     redis_bucket = await create_async_redis_bucket(rates)
@@ -50,7 +51,7 @@ async def main_async_bucket():
     print(f'Run 10 calls in {time.time() - start:,.2f} sec')
 
 
-def main_sync_bucket():
+def test_redis_sync():
     rates = [Rate(3, Duration.SECOND)]
 
     def task(name, weight):
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     print("To start a redis container: \n# docker run -d --name redis-test -p 6379:6379 redis:7")
 
     print("Redis (non-Async) bucket")
-    main_sync_bucket()
+    test_redis_sync()
 
     print("AsyncRedis bucket")
-    asyncio.run(main_async_bucket())
+    asyncio.run(test_redis_async())
