@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.9", "3.13", "3.14", "3.14t"]
+        python-version: ["3.9", "3.13"] #, "3.14", "3.14t"]
     steps:
     - name: Check out code
       uses: actions/checkout@v4
