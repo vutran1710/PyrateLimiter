@@ -13,7 +13,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import wait
 from functools import partial
-from multiprocessing import Lock
+from typing import Optional
 
 from pyrate_limiter import Duration
 from pyrate_limiter import Limiter
@@ -21,7 +21,7 @@ from pyrate_limiter import MonotonicClock
 from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import Rate
 
-LIMITER: Limiter | None = None
+LIMITER: Optional[Limiter] = None
 MAX_DELAY = Duration.DAY
 REQUESTS_PER_SECOND = 100
 NUM_REQUESTS = REQUESTS_PER_SECOND * 5  # Run for ~5 seconds
@@ -43,17 +43,11 @@ def my_task():
     return result
 
 
-if __name__ == "__main__":
-    logging.basicConfig(
-        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
-        level=logging.INFO,
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+def test_in_memory_multiprocess():
 
     rate = Rate(REQUESTS_PER_SECOND, Duration.SECOND)
 
     bucket = MultiprocessBucket.init([rate])
-    mp_lock = Lock()
 
     # create a limiter and feed it 100 requests to prime it
     # Otherwise, the test appears to run too fast
@@ -80,3 +74,13 @@ if __name__ == "__main__":
     end = time.monotonic()
 
     print(f"Completed {NUM_REQUESTS=} in {end - start} seconds, at a rate of {REQUESTS_PER_SECOND=}")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)-8s %(message)s",
+        level=logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    test_in_memory_multiprocess()
