@@ -310,4 +310,7 @@ class BucketFactory(ABC):
             try:
                 self.dispose(bucket)
             except Exception as e:
-                logger.debug("Exception %s deleting bucket", e)
+                logger.debug(
+                    "Exception %s (%s) deleting bucket %r",
+                    type(e).__name__, e, bucket
+                )
