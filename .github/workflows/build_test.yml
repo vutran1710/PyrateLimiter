@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.9", "3.13"]
+        python-version: ["3.9", "3.13", "3.14", "3.14t"]
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -66,11 +66,8 @@ jobs:
           echo "Invalid version: $PROJECT_VERSION"
           exit 1
         fi
-        echo "__version__ = '${PROJECT_VERSION}'" > pyrate_limiter/_version.py
         echo update project version. This has side benefit of validating the pyproject.toml TOML.
         uvx --from=toml-cli toml set --toml-path=pyproject.toml project.version $PROJECT_VERSION
-        echo _version.py is:
-        cat pyrate_limiter/_version.py
         echo pyproject.toml version is
         grep version pyproject.toml
     - name: Install dependencies
