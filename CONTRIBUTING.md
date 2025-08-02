@@ -2,11 +2,11 @@
 Here are some basic instructions for local development setup and contributing to the project.
 
 ## Setup & Commands
-To setup local development, *Poetry* and *Python 3.7+* are required. Python can be installed using *Pyenv* or normal installation from binary source. To install *poetry*, follow the official guideline (https://python-poetry.org/docs/#installation).
+To setup local development, *uv* and *Python 3.9+* are required. Follow instructions at <https://docs.astral.sh/uv/getting-started/installation/> for installing uv.
 
 Then, in the repository directory, run the following to install all optional backend dependencies and dev dependencies:
 ```shell
-$ poetry install -E all
+$ uv sync --all-groups --all-extras
 ```
 
 Some shortcuts are included for some common development tasks, using [nox](https://nox.thea.codes):
@@ -19,7 +19,6 @@ Some shortcuts are included for some common development tasks, using [nox](https
 Documentation is generated using [Sphinx](https://www.sphinx-doc.org) and published on readthedocs.io.
 To build this documentation locally:
 ```
-poetry install -E docs
 nox -e docs
 ```
 

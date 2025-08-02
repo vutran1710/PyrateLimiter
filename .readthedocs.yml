@@ -2,9 +2,13 @@
 version: 2
 
 build:
-  os: ubuntu-22.04
+  os: "ubuntu-24.04"
   tools:
-    python: "3.8"
+    python: "3.12"
+  commands:
+    - pip install uv
+    - uv sync --all-groups --all-extras
+    - uv run python -m sphinx docs $READTHEDOCS_OUTPUT/html -b html -W
 
 sphinx:
   builder: html

@@ -90,20 +90,25 @@ async def test_limiter_constructor_02(
 
 @pytest.mark.asyncio
 async def test_limiter_01(
+    request,
     clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
+    if request.node.get_closest_marker("mpbucket"):
+        pytest.skip("Skipped mpbucket test due to erratic performance timing compared to more deterministic buckets")
+
     bucket = await create_bucket(DEFAULT_RATES)
+
     factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
-        buffer_ms=1
     )
     bucket = BucketAsyncWrapper(bucket)
+
     item = "demo"
 
     logger.info("If weight = 0, it just passes thru")

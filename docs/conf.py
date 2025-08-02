@@ -28,6 +28,7 @@ extensions = [
 ]
 
 myst_enable_extensions = ["html_image"]
+myst_heading_anchors = 6
 
 # Enable automatic links to other projects' Sphinx docs
 intersphinx_mapping = {
@@ -51,7 +52,7 @@ apidoc_module_dir = PACKAGE_DIR
 apidoc_output_dir = MODULE_DOCS_DIR
 apidoc_module_first = True
 apidoc_separate_modules = True
-apidoc_toc_file = False
+apidoc_toc_file = "index"
 
 # HTML general settings
 html_show_sphinx = False

@@ -360,7 +360,7 @@ class Limiter:
             if isawaitable(acquired):
                 return await acquired
             else:
-                logger.warning("async call made without an async bucket.")
+                logger.debug("async call made without an async bucket.")
                 return acquired
 
     def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
