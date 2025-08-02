@@ -50,7 +50,6 @@ docs = [
     "sphinxcontrib-apidoc",
 ]
 dev = [
-    "dunamai>=1.25.0",
     "coverage>=7.10.1",
     "flake8_polyfill>=1.0.2,<2",
     "nox~=2025.5",
