@@ -1,6 +1,6 @@
 [project]
 name = "pyrate-limiter"
-version = "0.0.0"
+dynamic = ["version"]
 description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = [{ name = "vutr", email = "me@vutr.io" }]
 requires-python = ">=3.9"
@@ -85,19 +85,20 @@ output = 'test-reports/coverage.xml'
 context = 7
 
 [build-system]
-requires = ["uv_build>=0.8.3,<0.9.0"]
-build-backend = "uv_build"
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
 
-[tool.uv.build-backend]
-module-name = "pyrate_limiter"
-module-root = ""
-source-include = [
-    "LICENSE",
-    "CHANGELOG.md",
-    "examples",
-    "pyrate_limiter",
-    "tests",
-]
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.hatch.build.targets.sdist]
+include = ["pyrate_limiter"]
+
+[tool.hatch.build.targets.wheel]
+include = ["pyrate_limiter"]
+
+[tool.hatch.build.targets.wheel.sources]
+"./pyrate_limiter" = "pyrate_limiter"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
