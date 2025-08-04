@@ -1,3 +1,5 @@
+from glob import glob
+
 import nox
 from nox_poetry import session
 
@@ -12,7 +14,12 @@ PYTEST_MP2_ARGS = ["--verbose", "--cov=pyrate_limiter", "--cov-append", "--maxfa
 # Reduce # of cores to 3: one less than GHA runner's cores: timing tests are sensitive to high load
 PYTEST_ARGS = ["--verbose", "--maxfail=1", "-m", "not mpbucket", "--numprocesses=3",
                "--ignore=tests/test_multiprocessing.py"]
-COVERAGE_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report=term", "--cov-report=xml", "--cov-report=html"]
+COVERAGE_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report=term", "--cov-report=xml", "--cov-report=html",
+                 ]
+
+
+def get_examples():
+    return [f for f in glob("examples/*.py") if f != "examples/httpx_ratelimiter.py"]
 
 
 @session(python=False)
@@ -31,13 +38,14 @@ def cover(session) -> None:
     session.run("pytest", *PYTEST_MP2_ARGS)
 
     # Everything else - concurrent
-    session.run("pytest", *PYTEST_ARGS, *COVERAGE_ARGS)
+    session.run("pytest", *PYTEST_ARGS, *COVERAGE_ARGS, "tests", *get_examples())
 
 
 @session(python=False)
 def test(session) -> None:
     session.run("pytest", *PYTEST_MP_ARGS)
-    session.run("pytest", *PYTEST_ARGS)
+    session.run("pytest", *PYTEST_MP2_ARGS)
+    session.run("pytest", *PYTEST_ARGS, "tests", *get_examples())
 
 
 @session(python=False)
