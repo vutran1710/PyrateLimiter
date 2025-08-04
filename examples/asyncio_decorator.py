@@ -3,6 +3,8 @@ import logging
 import time
 from datetime import datetime
 
+import pytest
+
 from pyrate_limiter.limiter_factory import create_inmemory_limiter
 logging.basicConfig(level=logging.DEBUG)
 
@@ -17,14 +19,17 @@ def mapping(name, weight, i):
     return "mytask", 1
 
 
-async def main():
+@pytest.mark.asyncio
+async def test_asyncio_decorator():
     print("Running task_async using try_acquire_async and AsyncBucketWrapper")
     print("Note that the TICKs continue while the tasks are waiting")
 
     start = time.time()
     limiter = create_inmemory_limiter(async_wrapper=True)
 
-    @limiter.as_decorator()(lambda name, weight: (name, weight))  # type: ignore[arg-type]
+    limiter_decorator = limiter.as_decorator()(lambda name, weight: (name, weight))  # type: ignore[arg-type]
+
+    @limiter_decorator
     async def task_async(name: str, weight: int):
         print(f"try_acquire_async: {datetime.now()} {name}: {weight}")
 
@@ -33,4 +38,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_asyncio_decorator())
