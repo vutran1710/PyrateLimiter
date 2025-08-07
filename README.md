@@ -27,7 +27,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
     - [Defining clock & routing logic](#defining-clock--routing-logic-with-bucketfactory)
     - [Wrapping all up with Limiter](#wrapping-all-up-with-limiter)
     - [asyncio and event loops](#asyncio-and-event-loops)
-    - [Decorators](#as_decorator-use-limiter-as-decorator)
+    - [`as_decorator()`: use limiter as decorator](#as_decorator-use-limiter-as-decorator)
     - [Limiter API](#limiter-api)
     - [Weight](#weight)
     - [Handling exceeded limits](#handling-exceeded-limits)
@@ -41,7 +41,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
       - [RedisBucket](#redisbucket)
       - [PostgresBucket](#postgresbucket)
       - [BucketAsyncWrapper](#bucketasyncwrapper)
-    - [Async or Sync?](#async-or-sync)
+    - [Async or Sync or Multiprocessing](#async-or-sync-or-multiprocessing)
   - [Advanced Usage](#advanced-usage)
     - [Component-level Diagram](#component-level-diagram)
     - [Time sources](#time-sources)
@@ -91,20 +91,18 @@ for i in range(6):
         print(err, err.meta_info)
 ```
 
-
-
 ## limiter_factory
-[limiter_factory.py](pyrate_limiter.limiter_factory.py) provides several functions to simplify common cases:
+[limiter_factory.py](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/limiter_factory.py) provides several functions to simplify common cases:
 - create_sqlite_limiter(rate_per_duration: int, duration: Duration, ...)
 - create_inmemory_limiter(rate_per_duration: int, duration: Duration, ...)
 - + more to be added...
 
 ## Examples
-- Rate limiting asyncio tasks: [asyncio_ratelimit.py](examples/asyncio_ratelimit.py)
-- Rate limiting asyncio tasks w/ a decorator: [asyncio_decorator.py](examples/asyncio_decorator.py)
-- HTTPX rate limiting - asyncio, single process and multiprocess examples [httpx_ratelimiter.py](examples/httpx_ratelimiter.py)
-- Multiprocessing using an in-memory rate limiter - [in_memory_multiprocess.py](examples/in_memory_multiprocess.py)
-- Multiprocessing using SQLite and a file lock - this can be used for distributed processes not created within a multiprocessing [sql_filelock_multiprocess.py](examples/sql_filelock_multiprocess.py)
+- Rate limiting asyncio tasks: [asyncio_ratelimit.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_ratelimit.py)
+- Rate limiting asyncio tasks w/ a decorator: [asyncio_decorator.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_decorator.py)
+- HTTPX rate limiting - asyncio, single process and multiprocess examples [httpx_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/httpx_ratelimiter.py)
+- Multiprocessing using an in-memory rate limiter - [in_memory_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/in_memory_multiprocess.py)
+- Multiprocessing using SQLite and a file lock - this can be used for distributed processes not created within a multiprocessing [sql_filelock_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/sql_filelock_multiprocess.py)
 
 ## Basic Usage
 
@@ -313,7 +311,7 @@ If your bucket isn't async, wrap it with `BucketAsyncWrapper`. This ensures `asy
 await limiter.try_acquire_async(item)
 ```
 
-Example: [asyncio_ratelimit.py](examples/asyncio_ratelimit.py)
+Example: [asyncio_ratelimit.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_ratelimit.py)
 
 
 #### `as_decorator()`: use limiter as decorator
@@ -355,7 +353,7 @@ async def async_request_function(some_number: int):
     requests.get('https://example.com')
 ```
 
-For full example see [asyncio_decorator.py](examples/asyncio_decorator.py)
+For full example see [asyncio_decorator.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_decorator.py)
 
 
 ### Limiter API
@@ -407,7 +405,7 @@ Yet, putting this big, heavy item into bucket is expected to be transactional & 
 
 Any additional, custom implementation of Bucket are expected to behave alike - as we have unit tests to cover the case.
 
-See [Advanced usage options](#advanced-usage) below for more details.
+See [Advanced Usage](#advanced-usage) below for more details.
 
 ### Handling exceeded limits
 
@@ -538,7 +536,7 @@ MultiprocessBucket uses a ListProxy to store items within a python multiprocessi
 
 The bucket is shared across instances.
 
-An example is provided in [in_memory_multiprocess](examples/in_memory_multiprocess.py)
+An example is provided in [in_memory_multiprocess](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/in_memory_multiprocess.py)
 
 Whenever multiprocessing, bucket.waiting calculations will be often wrong because of the concurrency involved. Set Limiter.retry_until_max_delay=True so that the
 item keeps retrying rather than returning False when contention causes an extra delay.
@@ -616,7 +614,7 @@ Options:
 - `db_path`: If not provided, uses `tempdir / "pyrate-limiter.sqlite"`
 - `use_file_lock`: Should be False for single process workloads. For multi process, uses a [filelock](https://pypi.org/project/filelock/) to ensure single access to the SQLite bucket across multiple processes, allowing multi process rate limiting on a single host.
 
-Example: [limiter_factory.py::create_sqlite_limiter()](pyrate_limiter/limiter_factory.py)
+Example: [limiter_factory.py::create_sqlite_limiter()](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/limiter_factory.py)
 
 #### PostgresBucket
 
@@ -640,7 +638,7 @@ The BucketAsyncWrapper wraps a sync bucket to ensure all its methods return awai
 asynchronous behavior and use asyncio.sleep() instead of time.sleep() during delay handling,
 preventing blocking of the asyncio event loop.
 
-Example: [limiter_factory.py::create_inmemory_limiter()](pyrate_limiter/limiter_factory.py)
+Example: [limiter_factory.py::create_inmemory_limiter()](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/limiter_factory.py)
 
 ### Async or Sync or Multiprocessing
 

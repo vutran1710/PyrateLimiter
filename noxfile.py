@@ -7,15 +7,21 @@ from nox_poetry import session
 nox.options.reuse_existing_virtualenvs = True
 
 # Manually select serial tests. TODO: Add a "serial" marker
-PYTEST_MP_ARGS = ["--verbose", "--cov=pyrate_limiter", "--maxfail=1", "tests/test_multiprocessing.py"]
-PYTEST_MP2_ARGS = ["--verbose", "--cov=pyrate_limiter", "--cov-append", "--maxfail=1", "-m", "mpbucket and monotonic",
+PYTEST_MP_ARGS = ["--verbose", "--maxfail=1", "tests/test_multiprocessing.py"]
+COVERAGE_APPEND_ARGS = ["--cov=pyrate_limiter", "--cov-report="]
+
+PYTEST_MP2_ARGS = ["--verbose", "--maxfail=1", "-m", "mpbucket and monotonic",
                    "--ignore=tests/test_multiprocessing.py"]
+COVERAGE_APPEND2_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report="]
 
 # Reduce # of cores to 3: one less than GHA runner's cores: timing tests are sensitive to high load
 PYTEST_ARGS = ["--verbose", "--maxfail=1", "-m", "not mpbucket", "--numprocesses=3",
                "--ignore=tests/test_multiprocessing.py"]
-COVERAGE_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report=term", "--cov-report=xml", "--cov-report=html",
-                 ]
+COVERAGE_REPORT_ARGS = ["--cov=pyrate_limiter",
+                        "--cov-append",
+                        "--cov-report=term",
+                        "--cov-report=xml",
+                        "--cov-report=html"]
 
 
 def get_examples():
@@ -32,13 +38,13 @@ def cover(session) -> None:
     """Run tests and generate coverage reports in both terminal output and XML (for Codecov)"""
 
     # Serial Files
-    session.run("pytest", *PYTEST_MP_ARGS)
+    session.run("pytest", *PYTEST_MP_ARGS, *COVERAGE_APPEND_ARGS)
 
     # Serial Markers
-    session.run("pytest", *PYTEST_MP2_ARGS)
+    session.run("pytest", *PYTEST_MP2_ARGS, *COVERAGE_APPEND2_ARGS)
 
     # Everything else - concurrent
-    session.run("pytest", *PYTEST_ARGS, *COVERAGE_ARGS, "tests", *get_examples())
+    session.run("pytest", *PYTEST_ARGS, *COVERAGE_REPORT_ARGS, "tests", *get_examples())
 
 
 @session(python=False)
