@@ -106,6 +106,7 @@ async def test_limiter_01(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
+        buffer_ms=10
     )
     bucket = BucketAsyncWrapper(bucket)
 
