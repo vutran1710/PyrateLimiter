@@ -23,7 +23,7 @@ async def test_asyncio_ratelimit():
     print("Note that the TICKs continue while the tasks are waiting")
 
     start = time.time()
-    limiter = create_inmemory_limiter(async_wrapper=True)
+    limiter = create_inmemory_limiter()
 
     async def task_async(name, weight, i, limiter: Limiter):
         await limiter.try_acquire_async(name, weight)
