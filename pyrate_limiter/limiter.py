@@ -196,7 +196,7 @@ class Limiter:
         self,
         bucket: AbstractBucket,
         item: RateItem,
-        use_async: bool
+        _force_async: bool = False
     ) -> Union[bool, Awaitable[bool]]:
         """On `try_acquire` failed, handle delay or raise error immediately"""
         assert bucket.failing_rate is not None
@@ -217,7 +217,7 @@ class Limiter:
 
             return re_acquire
 
-        if use_async or isawaitable(delay):
+        if _force_async or isawaitable(delay):
             async def _handle_async():
                 nonlocal delay
                 if isawaitable(delay):
@@ -311,13 +311,13 @@ class Limiter:
         self,
         bucket: AbstractBucket,
         item: RateItem,
-        use_async: bool
+        _force_async: bool = False
     ) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
 
         def _handle_result(is_success: bool):
             if not is_success:
-                return self.delay_or_raise(bucket, item, use_async=use_async)
+                return self.delay_or_raise(bucket, item, _force_async=_force_async)
 
             return True
 
@@ -360,14 +360,14 @@ class Limiter:
             This does not make the entire code async: use an async bucket for that.
         """
         async with self._get_async_lock():
-            acquired = self._try_acquire(name=name, weight=weight, _use_async=True)
+            acquired = self._try_acquire(name=name, weight=weight, _force_async=True)
 
             if isawaitable(acquired):
                 return await acquired
             else:
                 return acquired
 
-    def _try_acquire(self, name: str, weight: int = 1, _use_async: bool = False) -> Union[bool, Awaitable[bool]]:
+    def _try_acquire(self, name: str, weight: int = 1, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
@@ -390,7 +390,7 @@ class Limiter:
                     if isawaitable(bucket):
                         bucket = await bucket
                     assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-                    result = self.handle_bucket_put(bucket, item, use_async=_use_async)
+                    result = self.handle_bucket_put(bucket, item, _force_async=_force_async)
 
                     while isawaitable(result):
                         result = await result
@@ -407,7 +407,7 @@ class Limiter:
                     nonlocal bucket
                     bucket = await bucket
                     assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-                    result = self.handle_bucket_put(bucket, item, use_async=_use_async)
+                    result = self.handle_bucket_put(bucket, item, _force_async=_force_async)
 
                     while isawaitable(result):
                         result = await result
@@ -417,7 +417,7 @@ class Limiter:
                 return _handle_async_bucket()
 
             assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-            result = self.handle_bucket_put(bucket, item, use_async=_use_async)
+            result = self.handle_bucket_put(bucket, item, _force_async=_force_async)
 
             if isawaitable(result):
 
