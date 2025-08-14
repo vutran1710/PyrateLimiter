@@ -25,7 +25,7 @@ async def test_asyncio_decorator():
     print("Note that the TICKs continue while the tasks are waiting")
 
     start = time.time()
-    limiter = create_inmemory_limiter(async_wrapper=True)
+    limiter = create_inmemory_limiter()
 
     limiter_decorator = limiter.as_decorator()(lambda name, weight: (name, weight))  # type: ignore[arg-type]
 
