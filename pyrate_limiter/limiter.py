@@ -83,7 +83,7 @@ class Limiter:
     def __init__(
         self,
         argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
-        clock: AbstractClock | None = None,
+        clock: Optional[AbstractClock] = None,
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
         retry_until_max_delay: bool = False,
