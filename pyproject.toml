@@ -122,10 +122,7 @@ extend-include = ["*.ipynb"]
 [tool.ruff.lint]
 select = ["F", "E", "W", "S", "B", "G", "N", "I001", "T", "PD", "C90"]
 ignore = [
-  "W291",
   "E501",
-  "S608",
-  "PD901",
   "C901",
   "S101"
 ]
