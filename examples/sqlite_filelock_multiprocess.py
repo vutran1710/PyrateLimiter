@@ -1,3 +1,4 @@
+# ruff: noqa: T201
 """
 Demonstrates using a SQLite Bucket across multiple processes, using a filelock to enforce synchronization.
 
@@ -7,17 +8,15 @@ applications.
 The SQLite Bucket uses a .lock file to ensure that only one process is active at a time.
 
 """
+
 import logging
 import os
 import time
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures import wait
+from concurrent.futures import ProcessPoolExecutor, wait
 from functools import partial
 from typing import Optional
 
-from pyrate_limiter import Duration
-from pyrate_limiter import Limiter
-from pyrate_limiter import limiter_factory
+from pyrate_limiter import Duration, Limiter, limiter_factory
 
 LIMITER: Optional[Limiter] = None
 REQUESTS_PER_SECOND = 10
@@ -29,10 +28,9 @@ logger = logging.getLogger(__name__)
 def init_process():
     global LIMITER
 
-    LIMITER = limiter_factory.create_sqlite_limiter(rate_per_duration=REQUESTS_PER_SECOND,
-                                                    duration=Duration.SECOND,
-                                                    db_path="pyrate_limiter.sqlite",
-                                                    use_file_lock=True)
+    LIMITER = limiter_factory.create_sqlite_limiter(
+        rate_per_duration=REQUESTS_PER_SECOND, duration=Duration.SECOND, db_path="pyrate_limiter.sqlite", use_file_lock=True
+    )
 
 
 def my_task():
@@ -50,9 +48,7 @@ def test_sqlite_filelock_multiprocess():
 
     start = time.monotonic()
 
-    with ProcessPoolExecutor(
-        initializer=partial(init_process)
-    ) as executor:
+    with ProcessPoolExecutor(initializer=partial(init_process)) as executor:
         futures = [executor.submit(my_task) for _ in range(NUM_REQUESTS)]
         wait(futures)
 

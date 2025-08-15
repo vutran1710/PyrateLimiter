@@ -1,3 +1,4 @@
+# ruff: noqa: T201
 """
 Demonstrates using a MultiprocessBucket using a ProcessPoolExecutor, running a simple task.
 
@@ -7,19 +8,15 @@ The mp_bucket stores its items in a multiprocessing ListProxy, and a multiproces
 across Limiter instances.
 
 """
+
 import logging
 import os
 import time
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures import wait
+from concurrent.futures import ProcessPoolExecutor, wait
 from functools import partial
 from typing import Optional
 
-from pyrate_limiter import Duration
-from pyrate_limiter import Limiter
-from pyrate_limiter import MonotonicClock
-from pyrate_limiter import MultiprocessBucket
-from pyrate_limiter import Rate
+from pyrate_limiter import Duration, Limiter, MonotonicClock, MultiprocessBucket, Rate
 
 LIMITER: Optional[Limiter] = None
 MAX_DELAY = Duration.DAY
@@ -32,8 +29,7 @@ logger = logging.getLogger(__name__)
 def init_process(bucket: MultiprocessBucket):
     global LIMITER
 
-    LIMITER = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
-                      max_delay=MAX_DELAY, retry_until_max_delay=True)
+    LIMITER = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(), max_delay=MAX_DELAY, retry_until_max_delay=True)
 
 
 def my_task():
@@ -44,7 +40,6 @@ def my_task():
 
 
 def test_in_memory_multiprocess():
-
     rate = Rate(REQUESTS_PER_SECOND, Duration.SECOND)
 
     bucket = MultiprocessBucket.init([rate])
@@ -57,9 +52,7 @@ def test_in_memory_multiprocess():
 
     start = time.monotonic()
 
-    with ProcessPoolExecutor(
-        initializer=partial(init_process, bucket)
-    ) as executor:
+    with ProcessPoolExecutor(initializer=partial(init_process, bucket)) as executor:
         futures = [executor.submit(my_task) for _ in range(NUM_REQUESTS)]
         wait(futures)
 

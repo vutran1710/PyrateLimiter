@@ -5,8 +5,7 @@ from pathlib import Path
 from tempfile import gettempdir
 from typing import List
 
-from .abstracts import Rate
-from .abstracts import RateItem
+from .abstracts import Rate, RateItem
 
 
 def binary_search(items: List[RateItem], value: int) -> int:
@@ -68,7 +67,7 @@ def id_generator(
     size=6,
     chars=string.ascii_uppercase + string.digits + string.ascii_lowercase,
 ) -> str:
-    return "".join(random.choice(chars) for _ in range(size))
+    return "".join(random.choice(chars) for _ in range(size))  # noqa: S311
 
 
 def dedicated_sqlite_clock_connection():

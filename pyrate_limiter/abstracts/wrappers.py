@@ -1,5 +1,5 @@
-""" Wrappers over different abstract types
-"""
+"""Wrappers over different abstract types"""
+
 from inspect import isawaitable
 from typing import Optional
 

@@ -1,17 +1,11 @@
-"""A bucket using PostgreSQL as backend
-"""
+"""A bucket using PostgreSQL as backend"""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Awaitable
-from typing import List
-from typing import Optional
-from typing import TYPE_CHECKING
-from typing import Union
+from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
-from ..abstracts import AbstractBucket
-from ..abstracts import Rate
-from ..abstracts import RateItem
+from ..abstracts import AbstractBucket, Rate, RateItem
 
 if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool  # type: ignore[import-untyped]
@@ -61,7 +55,7 @@ class PostgresBucket(AbstractBucket):
         self.pool = pool
         assert rates
         self.rates = rates
-        self._full_tbl = f'ratelimit___{self.table}'
+        self._full_tbl = f"ratelimit___{self.table}"
         self._create_table()
 
     @contextmanager
@@ -72,7 +66,7 @@ class PostgresBucket(AbstractBucket):
     def _create_table(self):
         with self._get_conn() as conn:
             conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
-            index_name = f'timestampIndex_{self.table}'
+            index_name = f"timestampIndex_{self.table}"
             conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
 
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
@@ -85,7 +79,7 @@ class PostgresBucket(AbstractBucket):
         with self._get_conn() as conn:
             for rate in self.rates:
                 bound = f"SELECT TO_TIMESTAMP({item.timestamp / 1000}) - INTERVAL '{rate.interval} milliseconds'"
-                query = f'SELECT COUNT(*) FROM {self._full_tbl} WHERE item_timestamp >= ({bound})'
+                query = f"SELECT COUNT(*) FROM {self._full_tbl} WHERE item_timestamp >= ({bound})"  # noqa: S608  # FIXME: SQL Parameterization and table name sanitization
                 cur = conn.execute(query)
                 count = int(cur.fetchone()[0])
                 cur.close()

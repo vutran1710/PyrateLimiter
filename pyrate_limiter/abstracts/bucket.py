@@ -1,24 +1,17 @@
-""" Implement this class to create
+"""Implement this class to create
 a workable bucket for Limiter to use
 """
+
 import asyncio
 import logging
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import defaultdict
-from inspect import isawaitable
-from inspect import iscoroutine
+from inspect import isawaitable, iscoroutine
 from threading import Thread
-from typing import Awaitable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Type
-from typing import Union
+from typing import Awaitable, Dict, List, Optional, Type, Union
 
 from .clock import AbstractClock
-from .rate import Rate
-from .rate import RateItem
+from .rate import Rate, RateItem
 
 logger = logging.getLogger("pyrate_limiter")
 
@@ -199,14 +192,14 @@ class Leaker(Thread):
             self.aio_leak_task = asyncio.create_task(self._leak(self.async_buckets))
 
     def run(self) -> None:
-        """ Override the original method of Thread
+        """Override the original method of Thread
         Not meant to be called directly
         """
         assert self.sync_buckets
         asyncio.run(self._leak(self.sync_buckets))
 
     def start(self) -> None:
-        """ Override the original method of Thread
+        """Override the original method of Thread
         Call to run leaking sync buckets
         """
         if self.sync_buckets and not self.is_alive():
@@ -275,8 +268,7 @@ class BucketFactory(ABC):
         self._leaker.leak_async()
 
     def get_buckets(self) -> List[AbstractBucket]:
-        """Iterator over all buckets in the factory
-        """
+        """Iterator over all buckets in the factory"""
         if not self._leaker:
             return []
 
@@ -310,7 +302,4 @@ class BucketFactory(ABC):
             try:
                 self.dispose(bucket)
             except Exception as e:
-                logger.debug(
-                    "Exception %s (%s) deleting bucket %r",
-                    type(e).__name__, e, bucket
-                )
+                logger.debug("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)

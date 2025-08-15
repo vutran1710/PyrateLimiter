@@ -1,20 +1,12 @@
-"""Bucket implementation using Redis
-"""
+"""Bucket implementation using Redis"""
+
 from __future__ import annotations
 
 from inspect import isawaitable
-from typing import Awaitable
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import TYPE_CHECKING
-from typing import Union
+from typing import TYPE_CHECKING, Awaitable, List, Optional, Tuple, Union
 
-from ..abstracts import AbstractBucket
-from ..abstracts import Rate
-from ..abstracts import RateItem
+from ..abstracts import AbstractBucket, Rate, RateItem
 from ..utils import id_generator
-
 
 if TYPE_CHECKING:
     from redis import Redis

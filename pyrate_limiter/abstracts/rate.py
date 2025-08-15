@@ -1,5 +1,5 @@
-"""Unit classes that deals with rate, item & duration
-"""
+"""Unit classes that deals with rate, item & duration"""
+
 from enum import Enum
 from typing import Union
 

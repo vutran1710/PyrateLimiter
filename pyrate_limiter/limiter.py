@@ -1,32 +1,18 @@
-"""Limiter class implementation
-"""
+"""Limiter class implementation"""
+
 import asyncio
 import logging
 from contextlib import contextmanager
 from functools import wraps
 from inspect import isawaitable
-from threading import local
-from threading import RLock
+from threading import RLock, local
 from time import sleep
-from typing import Any
-from typing import Awaitable
-from typing import Callable
-from typing import Iterable
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
+from typing import Any, Awaitable, Callable, Iterable, List, Optional, Tuple, Union
 
-from .abstracts import AbstractBucket
-from .abstracts import AbstractClock
-from .abstracts import BucketFactory
-from .abstracts import Duration
-from .abstracts import Rate
-from .abstracts import RateItem
+from .abstracts import AbstractBucket, AbstractClock, BucketFactory, Duration, Rate, RateItem
 from .buckets import InMemoryBucket
 from .clocks import TimeClock
-from .exceptions import BucketFullException
-from .exceptions import LimiterDelayException
+from .exceptions import BucketFullException, LimiterDelayException
 
 logger = logging.getLogger("pyrate_limiter")
 
@@ -97,11 +83,11 @@ class Limiter:
     def __init__(
         self,
         argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
-        clock: AbstractClock = TimeClock(),
+        clock: AbstractClock | None = None,
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
         retry_until_max_delay: bool = False,
-        buffer_ms: int = 50
+        buffer_ms: int = 50,
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
         / single rate / rate list.
@@ -115,6 +101,8 @@ class Limiter:
             retry_until_max_delay (bool, optional): If True, retry operations until the maximum delay is reached.
                 Useful for ensuring operations eventually succeed within the allowed delay window. Defaults to False.
         """
+        if clock is None:
+            clock = TimeClock()
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
         self.retry_until_max_delay = retry_until_max_delay
@@ -135,8 +123,7 @@ class Limiter:
                 self.lock = (limiter_lock, self.lock)
 
     def buckets(self) -> List[AbstractBucket]:
-        """Get list of active buckets
-        """
+        """Get list of active buckets"""
         return self.bucket_factory.get_buckets()
 
     def dispose(self, bucket: Union[int, AbstractBucket]) -> bool:
@@ -192,12 +179,7 @@ class Limiter:
                 self.max_delay,
             )
 
-    def delay_or_raise(
-        self,
-        bucket: AbstractBucket,
-        item: RateItem,
-        _force_async: bool = False
-    ) -> Union[bool, Awaitable[bool]]:
+    def delay_or_raise(self, bucket: AbstractBucket, item: RateItem, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """On `try_acquire` failed, handle delay or raise error immediately"""
         assert bucket.failing_rate is not None
 
@@ -218,6 +200,7 @@ class Limiter:
             return re_acquire
 
         if _force_async or isawaitable(delay):
+
             async def _handle_async():
                 nonlocal delay
                 if isawaitable(delay):
@@ -232,8 +215,7 @@ class Limiter:
 
                     if self.retry_until_max_delay:
                         if self.max_delay is not None and total_delay > self.max_delay:
-                            logger.error("Total delay exceeded max_delay: total_delay=%s, max_delay=%s",
-                                         total_delay, self.max_delay)
+                            logger.error("Total delay exceeded max_delay: total_delay=%s, max_delay=%s", total_delay, self.max_delay)
                             self._raise_delay_exception_if_necessary(bucket, item, total_delay)
                             return False
                     else:
@@ -307,12 +289,7 @@ class Limiter:
             elif re_acquire:
                 return True
 
-    def handle_bucket_put(
-        self,
-        bucket: AbstractBucket,
-        item: RateItem,
-        _force_async: bool = False
-    ) -> Union[bool, Awaitable[bool]]:
+    def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
 
         def _handle_result(is_success: bool):
@@ -353,11 +330,11 @@ class Limiter:
 
     async def try_acquire_async(self, name: str, weight: int = 1) -> bool:
         """
-            async version of try_acquire.
+        async version of try_acquire.
 
-            This uses a top level, thread-local async lock to ensure that the async loop doesn't block
+        This uses a top level, thread-local async lock to ensure that the async loop doesn't block
 
-            This does not make the entire code async: use an async bucket for that.
+        This does not make the entire code async: use an async bucket for that.
         """
         async with self._get_async_lock():
             acquired = self._try_acquire(name=name, weight=weight, _force_async=True)
@@ -436,6 +413,7 @@ class Limiter:
         """Use limiter decorator
         Use with both sync & async function
         """
+
         def with_mapping_func(mapping: ItemMapping) -> DecoratorWrapper:
             def decorator_wrapper(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
                 """Actual function wrapper"""
@@ -456,6 +434,7 @@ class Limiter:
 
                     return wrapper_async
                 else:
+
                     @wraps(func)
                     def wrapper(*args, **kwargs):
                         (name, weight) = mapping(*args, **kwargs)
