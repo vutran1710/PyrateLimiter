@@ -27,7 +27,6 @@ extensions = [
     "sphinxcontrib.apidoc",
     "myst_parser",
 ]
-nitpick_ignore = [("ref", "with-connection")]
 
 myst_enable_extensions = ["html_image"]
 myst_heading_anchors = 6
