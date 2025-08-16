@@ -4,7 +4,7 @@ import asyncio
 import logging
 from contextlib import contextmanager
 from functools import wraps
-from inspect import isawaitable
+from inspect import isawaitable, iscoroutinefunction
 from threading import RLock, local
 from time import sleep
 from typing import Any, Awaitable, Callable, Iterable, List, Tuple, Union
@@ -346,7 +346,7 @@ class Limiter:
 
     def as_decorator(self, *, name="ratelimiter", weight=1):
         def deco(func: Callable[..., Any]) -> Callable[..., Any]:
-            if asyncio.iscoroutinefunction(func):
+            if iscoroutinefunction(func):
 
                 @wraps(func)
                 async def wrapper(*args, **kwargs):
