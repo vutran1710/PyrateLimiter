@@ -10,6 +10,9 @@ from pyrate_limiter import Duration
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
 from pyrate_limiter import SQLiteClock
+from pyrate_limiter import MonotonicClock
+from pyrate_limiter import AbstractClock
+
 from pyrate_limiter import validate_rate_list
 
 
@@ -122,9 +125,11 @@ def test_rate_validator():
 
 
 @pytest.mark.asyncio
-async def test_clock(clock):
+async def test_clock(clock: AbstractClock | None = None):
     """Testing clock backends
     """
+    if clock is None:
+        clock = MonotonicClock()
     now = clock.now()
 
     while isawaitable(now):

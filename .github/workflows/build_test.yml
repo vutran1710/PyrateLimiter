@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.9", "3.13"] #, "3.14", "3.14t"]
+        python-version: ["3.10", "3.13", "3.14", "3.14t"]
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
         enable-cache: true
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      run: uv sync --group all --group dev
+      run: uv sync --all-groups
     # Run linting (latest python version only)
     - name: Lint
       if: ${{ matrix.python-version == env.LATEST_PY_VERSION }}
