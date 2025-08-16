@@ -16,11 +16,9 @@ async def test_delay_waiter_blocks_until_slot_available(create_bucket):
     assert await limiter.try_acquire_async("x")        # 2nd ok
     assert await limiter.try_acquire_async("x")        # 3rd ok
 
-    # This 4th call should block ~2s until 10s window resets, 
-    # but with the bug it returns immediately.
     start = time.time()
     ok = await limiter.try_acquire_async("x")
     elapsed = time.time() - start
 
     assert ok
-    assert elapsed >= 2, f"BUG: returned too early, elapsed={elapsed:.2f}s"
+    assert elapsed >= 2, f"returned too early, elapsed={elapsed:.2f}s"
