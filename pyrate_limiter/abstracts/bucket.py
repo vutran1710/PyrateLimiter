@@ -102,6 +102,15 @@ class AbstractBucket(ABC):
         """
         return None
 
+    def close(self) -> None:  # noqa: B027
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
 
 class Leaker(Thread):
     """Responsible for scheduling buckets' leaking at the background either
@@ -205,6 +214,11 @@ class Leaker(Thread):
         if self.sync_buckets and not self.is_alive():
             super().start()
 
+    def close(self):
+        self.clocks.clear()
+        self.sync_buckets.clear()
+        self.async_buckets.clear()
+
 
 class BucketFactory(ABC):
     """Asbtract BucketFactory class.
@@ -303,3 +317,18 @@ class BucketFactory(ABC):
                 self.dispose(bucket)
             except Exception as e:
                 logger.debug("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)
+
+    def close(self) -> None:
+        try:
+            if self._leaker is not None:
+                self._leaker.close()
+                self._leaker = None
+        except Exception as e:
+            logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, self._leaker)
+
+        for bucket in self.get_buckets():
+            try:
+                logger.info("Closing bucket %s", bucket)
+                bucket.close()
+            except Exception as e:
+                logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)

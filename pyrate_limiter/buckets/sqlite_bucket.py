@@ -164,6 +164,14 @@ class SQLiteBucket(AbstractBucket):
 
             return RateItem(item[0], item[1])
 
+    def close(self):
+        if self.conn is not None:
+            try:
+                self.conn.close()
+                self.conn = None
+            except Exception as e:
+                logger.debug("Exception %s closing sql connection", e)
+
     @classmethod
     def init_from_file(
         cls, rates: List[Rate], table: str = "rate_bucket", db_path: Optional[str] = None, create_new_table: bool = True, use_file_lock: bool = False

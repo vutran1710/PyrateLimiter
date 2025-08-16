@@ -158,3 +158,7 @@ class PostgresBucket(AbstractBucket):
                 item = RateItem(name=name, weight=weight, timestamp=timestamp)
 
         return item
+
+    def close(self):
+        if self.pool is not None and not self.pool.closed:
+            self.pool.close()
