@@ -17,8 +17,6 @@ class AbstractClock(ABC):
     def now(self) -> Union[int, Awaitable[int]]:
         """Get time as of now, in miliseconds"""
 
-    from psycopg_pool import ConnectionPool
-
 
 class MonotonicClock(AbstractClock):
     def __init__(self):

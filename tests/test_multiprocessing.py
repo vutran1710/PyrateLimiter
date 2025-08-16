@@ -4,7 +4,6 @@ import time
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import wait
-from functools import partial
 from pathlib import Path
 from tempfile import gettempdir
 from typing import List
@@ -13,51 +12,31 @@ from typing import Optional
 import pytest
 
 from pyrate_limiter import AbstractBucket
-from pyrate_limiter import BucketAsyncWrapper
-from pyrate_limiter import BucketFullException
 from pyrate_limiter import Duration
 from pyrate_limiter import Limiter
-from pyrate_limiter import LimiterDelayException
 from pyrate_limiter import Rate
 from pyrate_limiter import SQLiteBucket
 from pyrate_limiter import SQLiteClock
 from pyrate_limiter.buckets.mp_bucket import MultiprocessBucket
+from pyrate_limiter import limiter_factory
 
-MAX_DELAY = Duration.DAY
+import logging
 
-LIMITER: Optional[Limiter] = None
+logger = logging.getLogger(__name__)
+
 BUCKET: Optional[AbstractBucket] = None
 
 
-def init_process_mp(
-    bucket: MultiprocessBucket,
-    use_async_bucket: bool,
-    raise_when_fail: bool = False,
-    max_delay: Duration = MAX_DELAY,
-):
-    global LIMITER
-    global BUCKET
-
-    BUCKET = bucket
-
-    if not use_async_bucket:
-        # if we're doing async, don't initialize the limiter here, we'll do it in the task so it's in the event loop
-        LIMITER = Limiter(
-            bucket,
-            raise_when_fail=raise_when_fail,
-            max_delay=max_delay,
-            retry_until_max_delay=not raise_when_fail,
-        )
-
-
 def my_task():
-    assert LIMITER is not None
+    assert limiter_factory.LIMITER is not None
 
-    while not LIMITER.try_acquire("my_task"):
-        time.sleep(0.01)
+    acquired = limiter_factory.LIMITER.try_acquire("my_task")
 
+    
     result = time.time()
     time.sleep(0.01)
+
+    assert acquired
     return result
 
 
@@ -77,15 +56,11 @@ def analyze_times(start: float, requests_per_second: int, times: List[float]):
 
 
 def init_process_sqlite(requests_per_second, db_path):
-    global LIMITER
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, use_file_lock=True)
     bucket._clock = SQLiteClock(bucket)
-    LIMITER = Limiter(
-        bucket,
-        raise_when_fail=False,
-        max_delay=MAX_DELAY,
-        retry_until_max_delay=True,
+    limiter_factory.LIMITER = Limiter(
+        bucket
     )
 
 
@@ -96,17 +71,9 @@ def my_task_async(num_requests):
         return time.monotonic()
 
     async def run_many_async_tasks():
-        assert BUCKET is not None
-        bucket = BucketAsyncWrapper(BUCKET)
-        limiter = Limiter(
-            bucket,
-            raise_when_fail=False,
-            max_delay=MAX_DELAY,
-            retry_until_max_delay=True,
-        )
 
         return await asyncio.gather(
-            *(task_async(limiter, str(i), 1) for i in range(num_requests))
+            *(task_async(limiter_factory.LIMITER, str(i), 1) for i in range(num_requests))
         )
 
     return asyncio.run(run_many_async_tasks())
@@ -128,7 +95,8 @@ def test_mp_bucket():
     start = time.time()
 
     with ProcessPoolExecutor(
-        initializer=partial(init_process_mp, bucket, False),
+        initializer=limiter_factory.init_global_limiter,
+        initargs=(bucket,)
     ) as executor:
         prime_bucket()
         futures = [executor.submit(my_task) for _ in range(num_requests)]
@@ -157,28 +125,21 @@ def test_sqlite_filelock_bucket():
     # prime the bucket
     def prime_bucket():
         rate = Rate(requests_per_second, Duration.SECOND)
-        bucket = SQLiteBucket.init_from_file(
+
+        with SQLiteBucket.init_from_file(
             [rate], db_path=db_path, use_file_lock=True
-        )
-        bucket._clock = SQLiteClock(bucket)
-        limiter = Limiter(
-            bucket,
-            raise_when_fail=False,
-            max_delay=MAX_DELAY,
-            retry_until_max_delay=True,
-        )
-        [limiter.try_acquire("mytest") for i in range(requests_per_second)]
+        ) as bucket:
+            bucket._clock = SQLiteClock(bucket)
+            limiter = Limiter(
+                bucket,
+                
+            )
+            [limiter.try_acquire("mytest") for i in range(requests_per_second)]
 
     # Start the ProcessPoolExecutor
     start = time.time()
 
-    with ProcessPoolExecutor(
-        initializer=partial(
-            init_process_sqlite,
-            requests_per_second=requests_per_second,
-            db_path=db_path,
-        )
-    ) as executor:
+    with ProcessPoolExecutor(initializer=init_process_sqlite, initargs=(requests_per_second,db_path)) as executor:
         prime_bucket()
         futures = [executor.submit(my_task) for _ in range(num_requests)]
         wait(futures)
@@ -206,8 +167,6 @@ async def test_mp_bucket_async():
         # prime the bucket
         limiter = Limiter(
             bucket,
-            retry_until_max_delay=True,
-            max_delay=MAX_DELAY,
         )
         for i in range(100):
             await limiter.try_acquire_async("mytest")
@@ -215,7 +174,8 @@ async def test_mp_bucket_async():
     start = time.time()
 
     with ProcessPoolExecutor(
-        initializer=partial(init_process_mp, bucket, True),
+        initializer=limiter_factory.init_global_limiter,
+        initargs=(bucket,)
     ) as executor:
         # make sure requests is divisible by num workers
         num_workers = executor._max_workers
@@ -256,17 +216,17 @@ def test_mp_bucket_failures():
     bucket = MultiprocessBucket.init([rate])
 
     with ProcessPoolExecutor(
-        initializer=partial(init_process_mp, bucket, False, True, Duration.SECOND),
+        initializer=limiter_factory.init_global_limiter,
+        initargs=(bucket,)
     ) as executor:
         futures = [executor.submit(my_task) for _ in range(num_requests)]
         wait(futures)
 
-    with pytest.raises(LimiterDelayException):
-        for f in futures:
-            try:
-                f.result()
-            except Exception as e:
-                raise e
+    for f in futures:
+        try:
+            f.result()
+        except Exception as e:
+            raise e
 
 
 def test_limiter_delay():
@@ -277,29 +237,26 @@ def test_limiter_delay():
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = MultiprocessBucket.init([rate])
 
-    with pytest.raises(LimiterDelayException):
-        limiter = Limiter(
-            bucket,
-            raise_when_fail=True,
-            max_delay=Duration.SECOND,
-            retry_until_max_delay=False,
-        )
+    limiter = Limiter(
+        bucket
+    )
 
-        for i in range(1000):
-            limiter.try_acquire("mytest", 1)
+    for _ in range(1000):
+        last_success = limiter.try_acquire("mytest", 1, blocking=False)
 
-    with ProcessPoolExecutor(
-        initializer=partial(init_process_mp, bucket, False, True, Duration.SECOND),
+    assert not last_success 
+    with ProcessPoolExecutor( 
+        initializer=limiter_factory.init_global_limiter,
+        initargs=(bucket,),
     ) as executor:
         futures = [executor.submit(my_task) for _ in range(num_requests)]
         wait(futures)
 
-    with pytest.raises(LimiterDelayException):
-        for f in futures:
-            try:
-                f.result()
-            except Exception as e:
-                raise e
+    for f in futures:
+        try:
+            f.result()
+        except Exception as e:
+            raise e
 
 
 def test_bucket_full():
@@ -310,25 +267,22 @@ def test_bucket_full():
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = MultiprocessBucket.init([rate])
     limiter = Limiter(
-        bucket,
-        raise_when_fail=True,
-        max_delay=None,
-        retry_until_max_delay=False,
-    )
+        bucket
+)
 
-    with pytest.raises(BucketFullException):
-        for i in range(1000):
-            limiter.try_acquire("mytest", 1)
+    for _ in range(1000):
+        last_success = limiter.try_acquire("mytest", 1, blocking=False)
+
+    assert not last_success
 
     with ProcessPoolExecutor(
-        initializer=partial(init_process_mp, bucket, False, True, None),
+        initializer=limiter_factory.init_global_limiter, initargs=(bucket,)
     ) as executor:
         futures = [executor.submit(my_task) for _ in range(num_requests)]
         wait(futures)
 
-    with pytest.raises(BucketFullException):
-        for f in futures:
-            try:
-                f.result()
-            except Exception as e:
-                raise e
+    for f in futures:
+        try:
+            f.result()
+        except Exception as e:
+            raise e

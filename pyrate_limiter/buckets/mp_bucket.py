@@ -17,7 +17,7 @@ class MultiprocessBucket(InMemoryBucket):
     mp_lock: LockType
 
     def __init__(self, rates: List[Rate], items: List[RateItem], mp_lock: LockType):
-        if not isinstance(items, ListProxy):
+        if not isinstance(items, ListProxy):  # pragma: no cover - guard only
             raise ValueError("items must be a ListProxy")
 
         self.rates = sorted(rates, key=lambda r: r.interval)
