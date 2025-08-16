@@ -13,12 +13,10 @@ from pyrate_limiter import Duration
 from pyrate_limiter import id_generator
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import limiter_factory
-from pyrate_limiter import MonotonicClock
 from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import RedisBucket
-from pyrate_limiter import MonotonicAsyncClock
 
 
 # Make log messages visible on test failure (or with pytest -s)
@@ -28,23 +26,6 @@ logger = getLogger("pyrate_limiter")
 logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 
 DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
-
-clocks = [
-    pytest.param(MonotonicClock(), marks=pytest.mark.monotonic),
-    pytest.param(MonotonicAsyncClock(), marks=pytest.mark.asyncclock),
-]
-
-ClockSet = Union[
-    MonotonicClock,
-    MonotonicAsyncClock,
-]
-
-
-@pytest.fixture(params=clocks)
-def clock(request):
-    """Parametrization for different clock."""
-    return request.param
-
 
 async def create_in_memory_bucket(rates: List[Rate]):
     return InMemoryBucket(rates)

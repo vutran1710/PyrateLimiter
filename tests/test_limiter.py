@@ -24,29 +24,25 @@ from pyrate_limiter import Limiter
 from pyrate_limiter import LimiterDelayException
 from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
-from pyrate_limiter import MonotonicClock
 
 
 @pytest.mark.asyncio
-async def test_limiter_constructor_01(clock):
-    limiter = Limiter(DEFAULT_RATES[0], clock=clock)
+async def test_limiter_constructor_01():
+    limiter = Limiter(DEFAULT_RATES[0])
     assert isinstance(limiter.bucket_factory, BucketFactory)
     assert isinstance(limiter.bucket_factory.bucket, InMemoryBucket)
     assert limiter.bucket_factory.bucket.rates == [DEFAULT_RATES[0]]
-    assert limiter.bucket_factory.clock == clock
 
-    limiter = Limiter(DEFAULT_RATES, clock=clock)
+    limiter = Limiter(DEFAULT_RATES)
     assert isinstance(limiter.bucket_factory, BucketFactory)
     assert isinstance(limiter.bucket_factory.bucket, InMemoryBucket)
     assert limiter.bucket_factory.bucket.rates == DEFAULT_RATES
-    assert limiter.bucket_factory.clock == clock
 
     assert len(limiter.buckets()) == 1
 
 
 @pytest.mark.asyncio
 async def test_limiter_constructor_02(
-    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
@@ -55,13 +51,11 @@ async def test_limiter_constructor_02(
 
     limiter = Limiter(bucket)
     assert isinstance(limiter.bucket_factory, SingleBucketFactory)
-    assert isinstance(limiter.bucket_factory.clock, MonotonicClock)
     assert limiter.max_delay is None
     assert limiter.raise_when_fail is True
 
     limiter = Limiter(
         bucket,
-        clock=clock,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
     )
@@ -77,7 +71,7 @@ async def test_limiter_constructor_02(
 
     assert acquire_ok
 
-    factory = DemoBucketFactory(clock, demo=bucket)
+    factory = DemoBucketFactory(demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -91,7 +85,6 @@ async def test_limiter_constructor_02(
 @pytest.mark.asyncio
 async def test_limiter_01(
     request,
-    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
@@ -101,7 +94,7 @@ async def test_limiter_01(
 
     bucket = await create_bucket(DEFAULT_RATES)
 
-    factory = DemoBucketFactory(clock, demo=bucket)
+    factory = DemoBucketFactory(demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -181,11 +174,10 @@ async def test_limiter_01(
 
 @pytest.mark.asyncio
 async def test_limiter_async_factory_get(
-    clock,
     limiter_should_raise,
     limiter_delay,
 ):
-    factory = DemoAsyncGetBucketFactory(clock)
+    factory = DemoAsyncGetBucketFactory()
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -262,13 +254,12 @@ async def test_limiter_async_factory_get(
 
 @pytest.mark.asyncio
 async def test_limiter_concurrency(
-    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
-    bucket: AbstractBucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(clock, demo=bucket)
+    bucket = await create_bucket(DEFAULT_RATES)
+    factory = DemoBucketFactory(demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -310,13 +301,12 @@ async def test_limiter_concurrency(
 
 @pytest.mark.asyncio
 async def test_limiter_decorator(
-    clock,
     create_bucket,
     limiter_should_raise,
     limiter_delay,
 ):
     bucket = await create_bucket(DEFAULT_RATES)
-    factory = DemoBucketFactory(clock, demo=bucket)
+    factory = DemoBucketFactory(demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
@@ -356,7 +346,7 @@ def test_wait_too_long():
 
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = InMemoryBucket([rate])
-    limiter = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
+    limiter = Limiter(bucket, raise_when_fail=False,
                       max_delay=Duration.SECOND, retry_until_max_delay=True)
 
     # raise_when_fail = False
@@ -370,7 +360,7 @@ def test_wait_too_long():
     time.sleep(1)
 
     # raise_when_fail = True
-    limiter = Limiter(bucket, raise_when_fail=True, clock=MonotonicClock(),
+    limiter = Limiter(bucket, raise_when_fail=True, 
                       max_delay=Duration.SECOND, retry_until_max_delay=True)
 
     with pytest.raises(LimiterDelayException):
