@@ -1,12 +1,10 @@
 # pylint: disable=C0114,C0115
-from typing import Dict
-from typing import Union
+from typing import Dict, Union
 
-from .abstracts.rate import Rate
-from .abstracts.rate import RateItem
+from .abstracts.rate import Rate, RateItem
 
 
-class BucketFullException(Exception):
+class BucketFullException(Exception):  # noqa: N818
     def __init__(self, item: RateItem, rate: Rate):
         error = f"Bucket for item={item.name} with Rate {rate} is already full"
         self.item = item
@@ -23,7 +21,7 @@ class BucketFullException(Exception):
         return (self.__class__, (self.item, self.rate))
 
 
-class LimiterDelayException(Exception):
+class LimiterDelayException(Exception):  # noqa: N818
     def __init__(self, item: RateItem, rate: Rate, actual_delay: int, max_delay: int):
         self.item = item
         self.rate = rate

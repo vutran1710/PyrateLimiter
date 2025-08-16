@@ -1,20 +1,12 @@
+# ruff: noqa: G004
 import logging
-from concurrent.futures import ProcessPoolExecutor
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import wait
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from functools import partial
 from time import perf_counter
-from typing import Callable
-from typing import cast
-from typing import Literal
+from typing import Callable, Literal, cast
 
-from pyrate_limiter import Duration
-from pyrate_limiter import Limiter
-from pyrate_limiter import limiter_factory
-from pyrate_limiter import MonotonicClock
-from pyrate_limiter import MultiprocessBucket
-from pyrate_limiter import Rate
+from pyrate_limiter import Duration, Limiter, MonotonicClock, MultiprocessBucket, Rate, limiter_factory
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +26,7 @@ class TestResult:
 
 
 def create_mp_limiter(max_delay: int, bucket: MultiprocessBucket):
-    limiter = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
-                      retry_until_max_delay=True,
-                      max_delay=max_delay, buffer_ms=BUFFER_MS)
+    limiter = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(), retry_until_max_delay=True, max_delay=max_delay, buffer_ms=BUFFER_MS)
 
     return limiter
 
@@ -51,17 +41,14 @@ def create_rate_limiter_factory(
     rate = Rate(requests_per_second, Duration.SECOND)
 
     if backend == "default":
-        limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=requests_per_second,
-                                                          duration=Duration.SECOND,
-                                                          max_delay=max_delay,
-                                                          buffer_ms=BUFFER_MS)
+        limiter = limiter_factory.create_inmemory_limiter(
+            rate_per_duration=requests_per_second, duration=Duration.SECOND, max_delay=max_delay, buffer_ms=BUFFER_MS
+        )
         return lambda: limiter
     elif backend == "sqlite":
-        limiter = limiter_factory.create_sqlite_limiter(rate_per_duration=requests_per_second,
-                                                        use_file_lock=False,
-                                                        max_delay=max_delay,
-                                                        buffer_ms=BUFFER_MS,
-                                                        db_path="pyrate_limiter.sqlite")
+        limiter = limiter_factory.create_sqlite_limiter(
+            rate_per_duration=requests_per_second, use_file_lock=False, max_delay=max_delay, buffer_ms=BUFFER_MS, db_path="pyrate_limiter.sqlite"
+        )
         return lambda: limiter
     elif backend == "sqlite_filelock":
         return partial(
@@ -71,13 +58,11 @@ def create_rate_limiter_factory(
             use_file_lock=True,
             max_delay=max_delay,
             buffer_ms=BUFFER_MS,
-            db_path="pyrate_limiter.sqlite"
+            db_path="pyrate_limiter.sqlite",
         )
     elif backend == "mp_limiter":
         bucket = MultiprocessBucket.init([rate])
-        return partial(
-            create_mp_limiter, max_delay=max_delay, bucket=bucket
-        )
+        return partial(create_mp_limiter, max_delay=max_delay, bucket=bucket)
     else:
         raise ValueError(f"Unexpected backend option: {backend}")
 
@@ -106,9 +91,7 @@ def test_rate_limiter(
 
     if use_process_pool:
         logger.info("Using ProcessPoolExecutor")
-        with ProcessPoolExecutor(
-            initializer=partial(limiter_init, limiter_creator) if limiter_creator is not None else None
-        ) as executor:
+        with ProcessPoolExecutor(initializer=partial(limiter_init, limiter_creator) if limiter_creator is not None else None) as executor:
             if PREFILL:
                 # Pre-load the buckets, after processes created
                 limiter = limiter_creator()
@@ -147,17 +130,11 @@ def run_test_limiter(
     test_duration_seconds: int,
     use_process_pool: bool = False,
 ):
-    num_requests = (
-        test_duration_seconds * requests_per_second
-    )  # should finish in around 20 seconds
+    num_requests = test_duration_seconds * requests_per_second  # should finish in around 20 seconds
 
-    duration = test_rate_limiter(
-        limiter_creator=limiter_creator, num_requests=num_requests, use_process_pool=use_process_pool
-    )
+    duration = test_rate_limiter(limiter_creator=limiter_creator, num_requests=num_requests, use_process_pool=use_process_pool)
 
-    percent_from_expected_duration = (
-        abs(duration) - test_duration_seconds
-    ) / test_duration_seconds
+    percent_from_expected_duration = (abs(duration) - test_duration_seconds) / test_duration_seconds
 
     return TestResult(
         label=label,
@@ -189,9 +166,7 @@ if __name__ == "__main__":
         backend = cast(Literal["default", "sqlite", "sqlite_filelock", "mp_limiter"], backend)
         for requests_per_second in requests_per_second_list:
             logger.info(f"Testing with {backend=}, {requests_per_second=}")
-            limiter_creator = create_rate_limiter_factory(
-                requests_per_second, max_delay_seconds=60, backend=backend
-            )
+            limiter_creator = create_rate_limiter_factory(requests_per_second, max_delay_seconds=60, backend=backend)
 
             result = run_test_limiter(
                 limiter_creator=limiter_creator,
@@ -208,9 +183,7 @@ if __name__ == "__main__":
         for requests_per_second in requests_per_second_list:
             logger.info(f"Testing with {backend=}, {requests_per_second=}")
 
-            limiter_creator = create_rate_limiter_factory(
-                requests_per_second, max_delay_seconds=60, backend=backend
-            )
+            limiter_creator = create_rate_limiter_factory(requests_per_second, max_delay_seconds=60, backend=backend)
             result = run_test_limiter(
                 limiter_creator=limiter_creator,
                 label="Processes: " + backend,
@@ -222,9 +195,7 @@ if __name__ == "__main__":
 
     results_df = pd.DataFrame(test_results).sort_values(by="requests_per_second")
     results_df["requests_per_second"] = results_df["requests_per_second"].astype(str)
-    fig = px.line(
-        results_df, x="requests_per_second", y="duration", color="label", markers=True
-    )
+    fig = px.line(results_df, x="requests_per_second", y="duration", color="label", markers=True)
     fig.write_html("chart.html")
 
     logger.info("Output written to chart.html")

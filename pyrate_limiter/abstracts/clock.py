@@ -1,7 +1,5 @@
-from abc import ABC
-from abc import abstractmethod
-from typing import Awaitable
-from typing import Union
+from abc import ABC, abstractmethod
+from typing import Awaitable, Union
 
 
 class AbstractClock(ABC):

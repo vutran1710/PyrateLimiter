@@ -1,18 +1,11 @@
 """
 A collection of common use cases and patterns for pyrate_limiter
 """
-import logging
-from typing import List
-from typing import Optional
-from typing import Union
 
-from pyrate_limiter import AbstractBucket
-from pyrate_limiter import BucketAsyncWrapper
-from pyrate_limiter import Duration
-from pyrate_limiter import InMemoryBucket
-from pyrate_limiter import Limiter
-from pyrate_limiter import Rate
-from pyrate_limiter import SQLiteBucket
+import logging
+from typing import List, Optional, Union
+
+from pyrate_limiter import AbstractBucket, BucketAsyncWrapper, Duration, InMemoryBucket, Limiter, Rate, SQLiteBucket
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +33,7 @@ def create_sqlite_bucket(
     Returns:
         SQLiteBucket: Initialized SQLite-backed bucket.
     """
-    logger.info(f"{table_name=}")
+    logger.info("Table name is %s", table_name)
     bucket = SQLiteBucket.init_from_file(
         rates,
         db_path=str(db_path),
@@ -92,9 +85,7 @@ def create_sqlite_limiter(
     if async_wrapper:
         bucket = BucketAsyncWrapper(bucket)
 
-    limiter = Limiter(
-        bucket, raise_when_fail=False, max_delay=max_delay, retry_until_max_delay=True, buffer_ms=buffer_ms
-    )
+    limiter = Limiter(bucket, raise_when_fail=False, max_delay=max_delay, retry_until_max_delay=True, buffer_ms=buffer_ms)
 
     return limiter
 
@@ -126,18 +117,18 @@ def create_inmemory_limiter(
     if async_wrapper:
         bucket = BucketAsyncWrapper(InMemoryBucket(rate_limits))
 
-    limiter = Limiter(
-        bucket, raise_when_fail=False, max_delay=max_delay, retry_until_max_delay=True, buffer_ms=buffer_ms
-    )
+    limiter = Limiter(bucket, raise_when_fail=False, max_delay=max_delay, retry_until_max_delay=True, buffer_ms=buffer_ms)
 
     return limiter
 
 
-def init_global_limiter(bucket: AbstractBucket,
-                        max_delay: Union[int, Duration] = Duration.HOUR,
-                        raise_when_fail: bool = False,
-                        retry_until_max_delay: bool = True,
-                        buffer_ms: int = 50):
+def init_global_limiter(
+    bucket: AbstractBucket,
+    max_delay: Union[int, Duration] = Duration.HOUR,
+    raise_when_fail: bool = False,
+    retry_until_max_delay: bool = True,
+    buffer_ms: int = 50,
+):
     """
     Initialize a global Limiter instance using the provided bucket.
 
@@ -152,5 +143,4 @@ def init_global_limiter(bucket: AbstractBucket,
     """
 
     global LIMITER
-    LIMITER = Limiter(bucket, raise_when_fail=raise_when_fail,
-                      max_delay=max_delay, retry_until_max_delay=retry_until_max_delay, buffer_ms=buffer_ms)
+    LIMITER = Limiter(bucket, raise_when_fail=raise_when_fail, max_delay=max_delay, retry_until_max_delay=retry_until_max_delay, buffer_ms=buffer_ms)

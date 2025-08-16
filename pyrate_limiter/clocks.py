@@ -1,21 +1,20 @@
 """Clock implementation using different backend"""
+
 from __future__ import annotations
 
 import sqlite3
 from contextlib import nullcontext
-from time import monotonic
-from time import time
-from typing import Optional
-from typing import TYPE_CHECKING
-from typing import Union
+from time import monotonic, time
+from typing import TYPE_CHECKING, Optional, Union
 
 from .abstracts import AbstractClock
 from .buckets import SQLiteBucket
 from .utils import dedicated_sqlite_clock_connection
 
 if TYPE_CHECKING:
-    from psycopg_pool import ConnectionPool
     from threading import RLock
+
+    from psycopg_pool import ConnectionPool
 
 
 class MonotonicClock(AbstractClock):
@@ -41,9 +40,7 @@ class TimeAsyncClock(AbstractClock):
 class SQLiteClock(AbstractClock):
     """Get timestamp using SQLite as remote clock backend"""
 
-    time_query = (
-        "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
-    )
+    time_query = "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
 
     def __init__(self, conn: Union[sqlite3.Connection, SQLiteBucket]):
         """

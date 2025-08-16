@@ -1,22 +1,18 @@
+# ruff: noqa: T201
 """
 Example of using pyrate_limiter with httpx.
 
 """
+
 import logging
 
-from httpx import AsyncHTTPTransport
-from httpx import HTTPTransport
-from httpx import Request
-from httpx import Response
+from httpx import AsyncHTTPTransport, HTTPTransport, Request, Response
 
-from pyrate_limiter import Limiter
-from pyrate_limiter import limiter_factory
+from pyrate_limiter import Limiter, limiter_factory
 
 logger = logging.getLogger(__name__)
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
-                    datefmt="%Y-%m-%d %H:%M:%S")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logger.setLevel(logging.DEBUG)
 
 
@@ -65,18 +61,17 @@ def fetch(start_time: int):
 
 
 def singleprocess_example():
-    from pyrate_limiter import limiter_factory, Duration
-    import httpx
-    import time
     import os
+    import time
+
+    import httpx
+
+    from pyrate_limiter import Duration, limiter_factory
 
     start_time = time.time()
 
     url = "https://httpbin.org/get"
-    limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1,
-                                                      duration=Duration.SECOND,
-                                                      max_delay=Duration.HOUR
-                                                      )
+    limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR)
     transport = RateLimiterTransport(limiter=limiter)
     with httpx.Client(transport=transport) as client:
         for _ in range(10):
@@ -87,8 +82,10 @@ def singleprocess_example():
 def asyncio_example():
     import asyncio
     import time
+
     import httpx
-    from pyrate_limiter import limiter_factory, Duration
+
+    from pyrate_limiter import Duration, limiter_factory
 
     url = "https://httpbin.org/get"
 
@@ -102,13 +99,7 @@ def asyncio_example():
         await client.get(url)
 
     async def example():
-
-        limiter = limiter_factory.create_inmemory_limiter(
-            rate_per_duration=1,
-            duration=Duration.SECOND,
-            max_delay=Duration.HOUR,
-            async_wrapper=True
-        )
+        limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR, async_wrapper=True)
         transport = AsyncRateLimiterTransport(limiter=limiter)
         client = httpx.AsyncClient(transport=transport)
 
@@ -127,6 +118,7 @@ def multiprocess_example():
     import time
     from concurrent.futures import ProcessPoolExecutor, wait
     from functools import partial
+
     from pyrate_limiter import Duration, MultiprocessBucket, Rate
 
     rate = Rate(1, Duration.SECOND)
@@ -145,7 +137,6 @@ def multiprocess_example():
 
 
 if __name__ == "__main__":
-
     print("Single Process example: 10 requests")
     singleprocess_example()
 

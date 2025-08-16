@@ -1,22 +1,21 @@
-"""
-    May need to install the psycopg binaries:
-    # uv pip install psycopg[binary]
+# ruff: noqa: T201
 
 """
+May need to install the psycopg binaries:
+# uv pip install psycopg[binary]
+
+"""
+
 import time
 from datetime import datetime
 from typing import List
 
 from psycopg_pool import ConnectionPool as PgConnectionPool
 
-from pyrate_limiter import Duration
-from pyrate_limiter import Limiter
-from pyrate_limiter import PostgresBucket
-from pyrate_limiter import Rate
+from pyrate_limiter import Duration, Limiter, PostgresBucket, Rate
 
 
 def create_postgres_bucket(rates: List[Rate]):
-
     pool = PgConnectionPool("postgresql://postgres:postgres@localhost:5432")
     table = f"test_bucket_{int(time.time())}"
     bucket = PostgresBucket(pool, table, rates)

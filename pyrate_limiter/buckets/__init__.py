@@ -1,6 +1,6 @@
 # flake8: noqa
-"""Conrete bucket implementations
-"""
+"""Conrete bucket implementations"""
+
 from .in_memory_bucket import InMemoryBucket
 from .mp_bucket import MultiprocessBucket
 from .postgres import PostgresBucket

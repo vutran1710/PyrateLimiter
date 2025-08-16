@@ -1,3 +1,4 @@
+# ruff: noqa: T201
 import asyncio
 import time
 from datetime import datetime
@@ -6,14 +7,11 @@ from typing import List
 import pytest
 import redis
 
-from pyrate_limiter import Duration
-from pyrate_limiter import Limiter
-from pyrate_limiter import Rate
-from pyrate_limiter import RedisBucket
+from pyrate_limiter import Duration, Limiter, Rate, RedisBucket
 
 
 async def ticker():
-    for i in range(8):
+    for _ in range(8):
         print(f"[TICK] {datetime.now()}")
         await asyncio.sleep(0.5)
 
@@ -27,7 +25,6 @@ def create_redis_bucket(rates: List[Rate]):
 
 
 async def create_async_redis_bucket(rates: List[Rate]):
-
     redis_db = redis.asyncio.Redis(host="localhost")
     bucket = await RedisBucket.init(rates, redis_db, "test3")
     await bucket.flush()
@@ -48,7 +45,7 @@ async def test_redis_async():
 
     start = time.time()
     await asyncio.gather(ticker(), *[task(str(i), 1) for i in range(10)])
-    print(f'Run 10 calls in {time.time() - start:,.2f} sec')
+    print(f"Run 10 calls in {time.time() - start:,.2f} sec")
 
 
 def test_redis_sync():
