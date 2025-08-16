@@ -145,50 +145,43 @@ class Limiter:
         if not blocking:
             return False
 
-        delay = bucket.waiting(item)
+        if _force_async or iscoroutinefunction(bucket.waiting):
 
-        if _force_async or isawaitable(delay):
-
-            async def _handle_async(delay):
-                if isawaitable(delay):
-                    delay = await delay
-                assert isinstance(delay, int), "Delay not integer"
-
-                delay += self.buffer_ms
-
+            async def _handle_async():
                 while True:
-                    await asyncio.sleep(delay / 1000)
-                    item.timestamp += delay
-                    re_acquire = bucket.put(item)
-
-                    if isawaitable(re_acquire):
-                        re_acquire = await re_acquire
-
-                    if re_acquire:
+                    d = bucket.waiting(item)
+                    d = await d if isawaitable(d) else d
+                    assert isinstance(d, int) and d >= 0
+                    d += self.buffer_ms
+                    await asyncio.sleep(d / 1000)
+                    item.timestamp += d
+                    r = bucket.put(item)
+                    r = await r if isawaitable(r) else r
+                    if r:
                         return True
 
-            return _handle_async(delay)
+            return _handle_async()
+        else:
+            total_delay = 0
 
-        assert isinstance(delay, int)
-        assert delay >= 0, "Delay should never be less than 0"
+            while True:
+                delay = bucket.waiting(item)
 
-        total_delay = 0
+                assert not isawaitable(delay)
 
-        while True:
-            logger.debug("delay=%d, total_delay=%s", delay, total_delay)
-            delay = bucket.waiting(item)
-            assert isinstance(delay, int)
+                logger.debug("delay=%d, total_delay=%s", delay, total_delay)
 
-            delay += self.buffer_ms
-            total_delay += delay
+                delay += self.buffer_ms
+                total_delay += delay
 
-            sleep(delay / 1000)
-            item.timestamp += delay
-            re_acquire = bucket.put(item)
-            # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
-            assert isinstance(re_acquire, bool)
+                sleep(delay / 1000)
+                item.timestamp += delay
+                re_acquire = bucket.put(item)
+                # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
+                assert isinstance(re_acquire, bool)
 
-            return True
+                if re_acquire:
+                    return True
 
     def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
