@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-import sqlite3
-from contextlib import nullcontext
+from abc import ABC, abstractmethod
 from time import monotonic
-from typing import TYPE_CHECKING, Optional, Union
-
-from .abstracts import AbstractClock
-from .buckets import SQLiteBucket
-from .utils import dedicated_sqlite_clock_connection
+from typing import TYPE_CHECKING, Awaitable, Union
 
 if TYPE_CHECKING:
-    from threading import RLock
+    from psycopg_pool import ConnectionPool
+
+
+class AbstractClock(ABC):
+    """Clock that return timestamp for `now`"""
+
+    @abstractmethod
+    def now(self) -> Union[int, Awaitable[int]]:
+        """Get time as of now, in miliseconds"""
 
     from psycopg_pool import ConnectionPool
 
@@ -30,37 +33,6 @@ class MonotonicAsyncClock(AbstractClock):
 
     async def now(self) -> int:
         return int(1000 * monotonic())
-
-
-class SQLiteClock(AbstractClock):
-    """Get timestamp using SQLite as remote clock backend"""
-
-    time_query = "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
-
-    def __init__(self, conn: Union[sqlite3.Connection, SQLiteBucket]):
-        """
-        In multiprocessing cases, use the bucket, so that a shared lock is used.
-        """
-
-        self.lock: Optional[RLock] = None
-
-        if isinstance(conn, SQLiteBucket):
-            self.conn = conn.conn
-            self.lock = conn.lock
-        else:
-            self.conn = conn
-
-    @classmethod
-    def default(cls):
-        conn = dedicated_sqlite_clock_connection()
-        return cls(conn)
-
-    def now(self) -> int:
-        with self.lock if self.lock else nullcontext():
-            cur = self.conn.execute(self.time_query)
-            now = cur.fetchone()[0]
-            cur.close()
-            return int(now)
 
 
 class PostgresClock(AbstractClock):
