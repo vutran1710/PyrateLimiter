@@ -138,8 +138,8 @@ class Limiter:
 
         return argument
 
-    def delay_or_raise(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
-        """On `try_acquire` failed, handle delay or raise error immediately"""
+    def _delay_waiter(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
+        """On `try_acquire` failed, handle delay"""
         assert bucket.failing_rate is not None
 
         if not blocking:
@@ -195,7 +195,7 @@ class Limiter:
 
         def _handle_result(is_success: bool):
             if not is_success:
-                return self.delay_or_raise(bucket, item, blocking=blocking, _force_async=_force_async)
+                return self._delay_waiter(bucket, item, blocking=blocking, _force_async=_force_async)
 
             return True
 
