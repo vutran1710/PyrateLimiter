@@ -231,7 +231,7 @@ class Limiter:
         self._thread_local.async_lock_loop = loop
         return lock
 
-    def try_acquire(self, name: str, weight: int = 1, timeout: int = -1, blocking: bool = True) -> Union[bool, Awaitable[bool]]:
+    def try_acquire(self, name: str = __name__, weight: int = 1, timeout: int = -1, blocking: bool = True) -> Union[bool, Awaitable[bool]]:
         try:
             return self._try_acquire(name=name, weight=weight, timeout=timeout, blocking=blocking)
         except TimeoutError:
@@ -241,7 +241,7 @@ class Limiter:
     async def _acquire_async(self, blocking, name, weight):
         return await self._handle_async_result(self._try_acquire(name, weight, blocking=blocking, _force_async=True))
 
-    async def try_acquire_async(self, name: str, weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool:
+    async def try_acquire_async(self, name: str = __name__, weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool:
         """
         async version of try_acquire. This uses a top level, thread-local async lock to ensure that the async loop doesn't block
 
