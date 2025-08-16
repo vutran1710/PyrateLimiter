@@ -64,6 +64,7 @@ dev = [
     "pytest-retry>=1.7.0",
     "httpx",
     "aiohttp",
+    "requests",
 ]
 
 
