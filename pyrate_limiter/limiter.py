@@ -145,12 +145,13 @@ class Limiter:
         if not blocking:
             return False
 
-        if _force_async or iscoroutinefunction(bucket.waiting):
+        delay = bucket.waiting(item)
 
-            async def _handle_async():
+        if _force_async or isawaitable(delay):
+
+            async def _handle_async(delay):
                 while True:
-                    d = bucket.waiting(item)
-                    d = await d if isawaitable(d) else d
+                    d = await delay if isawaitable(delay) else delay
                     assert isinstance(d, int) and d >= 0
                     d += self.buffer_ms
                     await asyncio.sleep(d / 1000)
@@ -159,16 +160,14 @@ class Limiter:
                     r = await r if isawaitable(r) else r
                     if r:
                         return True
+                    delay = bucket.waiting(item)
 
-            return _handle_async()
+            return _handle_async(delay)
         else:
             total_delay = 0
 
             while True:
-                delay = bucket.waiting(item)
-
                 assert not isawaitable(delay)
-
                 logger.debug("delay=%d, total_delay=%s", delay, total_delay)
 
                 delay += self.buffer_ms
@@ -182,6 +181,7 @@ class Limiter:
 
                 if re_acquire:
                     return True
+                delay = bucket.waiting(item)
 
     def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
@@ -339,7 +339,9 @@ class Limiter:
 
                 @wraps(func)
                 async def wrapper(*args, **kwargs):
-                    await self.try_acquire_async(name=name, weight=weight)
+                    r = await self.try_acquire_async(name=name, weight=weight)
+                    while isawaitable(r):
+                        r = await r
                     return await func(*args, **kwargs)
 
                 return wrapper
@@ -347,7 +349,9 @@ class Limiter:
 
                 @wraps(func)
                 def wrapper(*args, **kwargs):
-                    self.try_acquire(name=name, weight=weight)
+                    r = self.try_acquire(name=name, weight=weight)
+                    if isawaitable(r):
+                        raise RuntimeError("Can't use async bucket with sync decorator")
                     return func(*args, **kwargs)
 
                 return wrapper

@@ -20,6 +20,7 @@ from pyrate_limiter import BucketFactory
 from pyrate_limiter import Duration
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
+from pyrate_limiter import RedisBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
 
@@ -228,25 +229,33 @@ async def test_limiter_decorator(
 
     counter = 0
 
-    @limiter_wrapper
-    def inc_counter(num: int):
-        nonlocal counter
-        counter += num
 
     @limiter_wrapper
     async def async_inc_counter(num: int):
         nonlocal counter
         counter += num
 
-    inc = inc_counter(1)
+    if isawaitable(bucket.count()):
+        with pytest.raises(RuntimeError):
+            @limiter_wrapper
+            def inc_counter(num: int):
+                nonlocal counter
+                counter += num
+            inc = inc_counter(1)
 
-    if isawaitable(inc):
-        await inc
+    else:
+        @limiter_wrapper
+        def inc_counter(num: int):
+            nonlocal counter
+            counter += num
+        inc = inc_counter(1)
+        if isawaitable(inc):
+            await inc
 
-    assert counter == 1
+        assert counter == 1
 
-    await async_inc_counter(1)
-    assert counter == 2
+        await async_inc_counter(1)
+        assert counter == 2
 
 
 def test_wait_too_long():
