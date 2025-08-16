@@ -1,8 +1,3 @@
-# ruff: noqa: T201
-"""
-Library helper + example of using pyrate_limiter with aiohttp.
-"""
-
 import logging
 
 import aiohttp
@@ -13,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class RateLimitedSession:
+    """Use this in place of a aiohttp.ClientSession"""
+
     def __init__(self, limiter: Limiter, name: str = __name__, **kwargs):
         self._limiter = limiter
         self._session = aiohttp.ClientSession(**kwargs)

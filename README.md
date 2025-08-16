@@ -18,6 +18,10 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
 
   - [Features](#features)
   - [Installation](#installation)
+  - [Web Requests](#web-request-rate-limiting)
+    - [AIOHTTP](#aiohttp)
+    - [HTTPX](#httpx)
+    - [Requests](#requests)
   - [Quickstart](#quickstart)
     - [limiter_factory](#limiter_factory)
     - [Examples](#examples)
@@ -103,6 +107,59 @@ for i in range(6):
 - HTTPX rate limiting - asyncio, single process and multiprocess examples [httpx_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/httpx_ratelimiter.py)
 - Multiprocessing using an in-memory rate limiter - [in_memory_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/in_memory_multiprocess.py)
 - Multiprocessing using SQLite and a file lock - this can be used for distributed processes not created within a multiprocessing [sql_filelock_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/sql_filelock_multiprocess.py)
+
+
+## Web Request Rate Limiting
+
+pyrate_limiter provides three extras for popular web request libraries:
+- [AIOHTTP](https://pypi.org/project/aiohttp/)
+- [HTTPX](https://pypi.org/project/httpx/)
+- [Requests](https://pypi.org/project/requests/)
+
+### AIOHTTP
+```py
+from pyrate_limiter import limiter_factory
+from pyrate_limiter.extras.aiohttp_limiter import RateLimitedSession
+
+limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=2, duration=Duration.SECOND)
+session = RateLimitedRequestsSession(limiter)
+
+```
+
+Example: [aiohttp_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/extras/aiohttp_ratelimiter.py)
+
+### HTTPX
+
+```py
+from pyrate_limiter import limiter_factory
+from pyrate_limiter.extras.httpx_limiter import AsyncRateLimiterTransport, RateLimiterTransport
+
+limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR)
+
+with httpx.Client(transport=RateLimiterTransport(limiter=limiter_factory.LIMITER)) as client:
+    client.get(url)
+
+# or async
+async with httpx.AsyncClient(transport=AsyncRateLimiterTransport(limiter=limiter_factory.LIMITER)) as client:
+    client.get(url)
+
+...
+```
+Example: [httpx_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/extras/httpx_ratelimiter.py)
+
+### Requests
+```py
+from pyrate_limiter import limiter_factory
+from pyrate_limiter.extras.requests_limiter import RateLimitedRequestsSession
+
+limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=2, duration=Duration.SECOND)
+session = RateLimitedRequestsSession(limiter)
+....
+```
+
+Example: [requests_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/extras/requests_ratelimiter.py)
+
+
 
 ## Basic Usage
 

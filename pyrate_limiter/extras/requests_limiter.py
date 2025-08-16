@@ -7,7 +7,7 @@ from pyrate_limiter import Limiter
 logger = logging.getLogger(__name__)
 
 
-class RateLimitedRequestsSession:
+class RateLimitedRequestsSession(requests.Session):
     def __init__(self, limiter: Limiter, name: str = __name__, **kwargs):
         self._limiter = limiter
         self._session = requests.Session(**kwargs)

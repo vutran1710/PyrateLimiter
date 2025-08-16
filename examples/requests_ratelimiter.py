@@ -7,7 +7,7 @@ import logging
 import time
 
 from pyrate_limiter import Duration, limiter_factory
-from pyrate_limiter.extras.requests import RateLimitedRequestsSession
+from pyrate_limiter.extras.requests_limiter import RateLimitedRequestsSession
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
