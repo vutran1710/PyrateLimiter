@@ -171,7 +171,7 @@ class Leaker(Thread):
     async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
         while not self._stop.is_set() and buckets:
             try:
-                for _, bucket in buckets.items():
+                for _, bucket in tuple(buckets.items()):
                     now = bucket.now()
 
                     while isawaitable(now):
