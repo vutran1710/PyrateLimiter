@@ -13,8 +13,7 @@ class RateLimiterTransport(HTTPTransport):
         self.limiter = limiter
 
     def handle_request(self, request: Request, **kwargs) -> Response:
-        # using a constant string for item name means that the same
-        # rate is applied to all requests.
+        """using a constant string for item name means that the same rate is applied to all requests."""
         while not self.limiter.try_acquire(__name__):
             logger.debug("Lock acquisition timed out, retrying")
 
