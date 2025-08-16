@@ -7,8 +7,8 @@ import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from inspect import isawaitable, iscoroutine
-from threading import Thread
-from typing import Awaitable, Dict, List, Optional, Type, Union
+from threading import Event, Thread
+from typing import Any, Awaitable, Dict, List, Optional, Type, Union
 
 from ..clocks import AbstractClock, MonotonicClock
 from .rate import Rate, RateItem
@@ -127,11 +127,14 @@ class Leaker(Thread):
     async_buckets: Dict[int, AbstractBucket]
     leak_interval: int = 10_000
     aio_leak_task: Optional[asyncio.Task] = None
+    self_stop: Any
 
     def __init__(self, leak_interval: int):
         self.sync_buckets = defaultdict()
         self.async_buckets = defaultdict()
         self.leak_interval = leak_interval
+        self._stop = Event()  # <--- add here
+
         super().__init__()
 
     def register(self, bucket: AbstractBucket):
@@ -166,9 +169,9 @@ class Leaker(Thread):
         return False
 
     async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
-        while buckets:
+        while not self._stop.is_set() and buckets:
             try:
-                for _, bucket in list(buckets.items()):
+                for _, bucket in buckets.items():
                     now = bucket.now()
 
                     while isawaitable(now):
@@ -206,6 +209,7 @@ class Leaker(Thread):
             super().start()
 
     def close(self):
+        self._stop.set()
         self.clocks.clear()
         self.sync_buckets.clear()
         self.async_buckets.clear()
