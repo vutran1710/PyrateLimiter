@@ -11,7 +11,7 @@ from typing import Any, Awaitable, Callable, Iterable, List, Optional, Tuple, Un
 
 from .abstracts import AbstractBucket, AbstractClock, BucketFactory, Duration, Rate, RateItem
 from .buckets import InMemoryBucket
-from .clocks import TimeClock
+from .clocks import MonotonicClock
 from .exceptions import BucketFullException, LimiterDelayException
 
 logger = logging.getLogger("pyrate_limiter")
@@ -94,7 +94,7 @@ class Limiter:
 
         Parameters:
             argument (Union[BucketFactory, AbstractBucket, Rate, List[Rate]]): The bucket or rate configuration.
-            clock (AbstractClock, optional): The clock instance to use for rate limiting. Defaults to TimeClock().
+            clock (AbstractClock, optional): The clock instance to use for rate limiting. Defaults to MonotonicClock().
             raise_when_fail (bool, optional): Whether to raise an exception when rate limiting fails. Defaults to True.
             max_delay (Optional[Union[int, Duration]], optional): The maximum delay allowed for rate limiting.
             Defaults to None.
@@ -102,7 +102,7 @@ class Limiter:
                 Useful for ensuring operations eventually succeed within the allowed delay window. Defaults to False.
         """
         if clock is None:
-            clock = TimeClock()
+            clock = MonotonicClock()
         self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
         self.raise_when_fail = raise_when_fail
         self.retry_until_max_delay = retry_until_max_delay

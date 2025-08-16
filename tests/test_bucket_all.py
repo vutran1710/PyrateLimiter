@@ -13,7 +13,7 @@ from pyrate_limiter import AbstractClock
 from pyrate_limiter import BucketAsyncWrapper
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
-from pyrate_limiter import TimeClock
+from pyrate_limiter import MonotonicClock
 
 
 async def get_now(clock: AbstractClock) -> int:
@@ -218,7 +218,7 @@ async def test_bucket_flush(create_bucket):
     rates = [Rate(50, 1000)]
     bucket = BucketAsyncWrapper(await create_bucket(rates))
     assert isinstance(bucket.rates[0], Rate)
-    clock = TimeClock()
+    clock = MonotonicClock()
 
     while await bucket.put(RateItem("item", clock.now())):
         pass
@@ -236,7 +236,7 @@ async def test_bucket_performance(create_bucket):
     Putting a very large number of item into bucket
     Only need to test with a single clock type
     """
-    clock = TimeClock()
+    clock = MonotonicClock()
     rates = [Rate(30000, 50000)]
     bucket = BucketAsyncWrapper(await create_bucket(rates))
     before = time()

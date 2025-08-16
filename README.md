@@ -193,7 +193,7 @@ from pyrate_limiter import Limiter
 
 # Limiter constructor accepts single bucket as the only parameter,
 # the rest are 3 optional parameters with default values as following
-# Limiter(bucket, clock=TimeClock(), raise_when_fail=True, max_delay=None)
+# Limiter(bucket, clock=MonotonicClock(), raise_when_fail=True, max_delay=None)
 limiter = Limiter(bucket)
 
 # Limiter is now ready to work!
@@ -209,9 +209,9 @@ When multiple bucket types are needed and items must be routed based on certain 
 First, define your clock (time source). Most use cases work with the built-in clocks:
 
 ```python
-from pyrate_limiter.clock import TimeClock, MonotonicClock, SQLiteClock
+from pyrate_limiter.clock import MonotonicClock, MonotonicClock, SQLiteClock
 
-base_clock = TimeClock()
+base_clock = MonotonicClock()
 ```
 
 PyrateLimiter does not assume routing logic, so you implement a custom BucketFactory. At a minimum, these two methods must be defined:
@@ -439,7 +439,7 @@ Here's an example that will raise an exception on the 4th request:
 ```python
 rate = Rate(3, Duration.SECOND)
 bucket = InMemoryBucket([rate])
-clock = TimeClock()
+clock = MonotonicClock()
 
 
 class MyBucketFactory(BucketFactory):
@@ -662,7 +662,7 @@ Multiprocessing: If using MultiprocessBucket, two locks are used in Limiter: a t
 Time source can be anything from anywhere: be it python's built-in time, or monotonic clock, sqliteclock, or crawling from world time server(well we don't have that, but you can!).
 
 ```python
-from pyrate_limiter import TimeClock      # use python' time.time()
+from pyrate_limiter import MonotonicClock      # use python' time.time()
 from pyrate_limiter import MonotonicClock # use python time.monotonic()
 ```
 

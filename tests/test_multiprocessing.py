@@ -21,7 +21,7 @@ from pyrate_limiter import LimiterDelayException
 from pyrate_limiter import Rate
 from pyrate_limiter import SQLiteBucket
 from pyrate_limiter import SQLiteClock
-from pyrate_limiter import TimeClock
+from pyrate_limiter import MonotonicClock
 from pyrate_limiter.buckets.mp_bucket import MultiprocessBucket
 
 MAX_DELAY = Duration.DAY
@@ -46,7 +46,7 @@ def init_process_mp(
         LIMITER = Limiter(
             bucket,
             raise_when_fail=raise_when_fail,
-            clock=TimeClock(),
+            clock=MonotonicClock(),
             max_delay=max_delay,
             retry_until_max_delay=not raise_when_fail,
         )
@@ -286,7 +286,7 @@ def test_limiter_delay():
         limiter = Limiter(
             bucket,
             raise_when_fail=True,
-            clock=TimeClock(),
+            clock=MonotonicClock(),
             max_delay=Duration.SECOND,
             retry_until_max_delay=False,
         )
@@ -318,7 +318,7 @@ def test_bucket_full():
     limiter = Limiter(
         bucket,
         raise_when_fail=True,
-        clock=TimeClock(),
+        clock=MonotonicClock(),
         max_delay=None,
         retry_until_max_delay=False,
     )

@@ -24,7 +24,7 @@ from pyrate_limiter import Limiter
 from pyrate_limiter import LimiterDelayException
 from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
-from pyrate_limiter import TimeClock
+from pyrate_limiter import MonotonicClock
 
 
 @pytest.mark.asyncio
@@ -55,7 +55,7 @@ async def test_limiter_constructor_02(
 
     limiter = Limiter(bucket)
     assert isinstance(limiter.bucket_factory, SingleBucketFactory)
-    assert isinstance(limiter.bucket_factory.clock, TimeClock)
+    assert isinstance(limiter.bucket_factory.clock, MonotonicClock)
     assert limiter.max_delay is None
     assert limiter.raise_when_fail is True
 
@@ -356,7 +356,7 @@ def test_wait_too_long():
 
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = InMemoryBucket([rate])
-    limiter = Limiter(bucket, raise_when_fail=False, clock=TimeClock(),
+    limiter = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(),
                       max_delay=Duration.SECOND, retry_until_max_delay=True)
 
     # raise_when_fail = False
@@ -370,7 +370,7 @@ def test_wait_too_long():
     time.sleep(1)
 
     # raise_when_fail = True
-    limiter = Limiter(bucket, raise_when_fail=True, clock=TimeClock(),
+    limiter = Limiter(bucket, raise_when_fail=True, clock=MonotonicClock(),
                       max_delay=Duration.SECOND, retry_until_max_delay=True)
 
     with pytest.raises(LimiterDelayException):
