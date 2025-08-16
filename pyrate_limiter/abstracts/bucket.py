@@ -127,13 +127,13 @@ class Leaker(Thread):
     async_buckets: Dict[int, AbstractBucket]
     leak_interval: int = 10_000
     aio_leak_task: Optional[asyncio.Task] = None
-    self_stop: Any
+    _stop_event: Any
 
     def __init__(self, leak_interval: int):
         self.sync_buckets = defaultdict()
         self.async_buckets = defaultdict()
         self.leak_interval = leak_interval
-        self._stop = Event()  # <--- add here
+        self._stop_event = Event()  # <--- add here
 
         super().__init__()
 
@@ -169,7 +169,7 @@ class Leaker(Thread):
         return False
 
     async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
-        while not self._stop.is_set() and buckets:
+        while not self._stop_event.is_set() and buckets:
             try:
                 for _, bucket in tuple(buckets.items()):
                     now = bucket.now()
@@ -187,7 +187,7 @@ class Leaker(Thread):
 
                 await asyncio.sleep(self.leak_interval / 1000)
             except RuntimeError as e:
-                logger.info("Leak task stopped due to event loop shutdown. %s", e)
+                logger.debug("Leak task stopped due to event loop shutdown. %s", e)
                 return
 
     def leak_async(self):
@@ -209,7 +209,7 @@ class Leaker(Thread):
             super().start()
 
     def close(self):
-        self._stop.set()
+        self._stop_event.set()
         self.clocks.clear()
         self.sync_buckets.clear()
         self.async_buckets.clear()
