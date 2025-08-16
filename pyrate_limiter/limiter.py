@@ -45,13 +45,16 @@ class SingleBucketFactory(BucketFactory):
 @contextmanager
 def combined_lock(locks: Iterable | RLock, blocking: bool, timeout: int | float = -1):
     if not isinstance(locks, Iterable):
+        acquired_ok = locks.acquire(blocking=blocking, timeout=timeout)
+        if not acquired_ok:
+            raise TimeoutError("acquire failed")
         try:
-            yield locks.acquire(blocking=blocking, timeout=timeout)
+            yield
         finally:
             locks.release()
 
     else:
-        acquired = []
+        acquired_locks = []
         try:
             for lock in locks:
                 if not blocking:
@@ -63,10 +66,10 @@ def combined_lock(locks: Iterable | RLock, blocking: bool, timeout: int | float 
 
                 if not ok:
                     raise TimeoutError("Timeout while acquiring combined lock.")
-                acquired.append(lock)
+                acquired_locks.append(lock)
             yield
         finally:
-            for lock in reversed(acquired):
+            for lock in reversed(acquired_locks):
                 lock.release()
 
 
@@ -235,9 +238,8 @@ class Limiter:
             logger.debug("Acquisition TimeoutError")
             return False
 
-    async def _blocking_acquire(self, lock, name, weight):
-        async with lock:
-            return await self._handle_async_result(self._try_acquire(name, weight, blocking=True, _force_async=True))
+    async def _acquire_async(self, blocking, name, weight):
+        return await self._handle_async_result(self._try_acquire(name, weight, blocking=blocking, _force_async=True))
 
     async def try_acquire_async(self, name: str, weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool:
         """
@@ -251,23 +253,17 @@ class Limiter:
         if not blocking and timeout != -1:
             raise RuntimeError("Can't set timeout with non-blocking")
 
-        lock = self._get_async_lock()
+        async def run():
+            lock = self._get_async_lock()
+            async with lock:
+                return await self._acquire_async(blocking=blocking, name=name, weight=weight)
 
-        if blocking:
-            if timeout == -1:
-                return await self._blocking_acquire(lock, name=name, weight=weight)
-            else:  # wrap in wait_for for timeout
-                return await asyncio.wait_for(self._blocking_acquire(lock, name, weight), timeout=timeout)
-        else:
-            # try to acquire with an immediate timeout=0
-            try:
-                await asyncio.wait_for(lock.acquire(), timeout=0)
-            except asyncio.TimeoutError:
-                return False
-            try:
-                return await self._handle_async_result(self._try_acquire(name, weight, blocking=False, _force_async=True))
-            finally:
-                lock.release()
+        if timeout == -1:
+            return await run()
+        try:
+            return await asyncio.wait_for(run(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return False
 
     async def _handle_async_acquire(
         self,
@@ -350,9 +346,7 @@ class Limiter:
 
                 @wraps(func)
                 async def wrapper(*args, **kwargs):
-                    ok = self.try_acquire_async(name=name, weight=weight)
-                    if isawaitable(ok):
-                        await ok
+                    await self.try_acquire_async(name=name, weight=weight)
                     return await func(*args, **kwargs)
 
                 return wrapper
@@ -360,17 +354,7 @@ class Limiter:
 
                 @wraps(func)
                 def wrapper(*args, **kwargs):
-                    if hasattr(self, "try_acquire"):
-                        self.try_acquire(name=name, weight=weight)
-                    else:
-                        ok = self.try_acquire_async(name=name, weight=weight)
-                        if isawaitable(ok):
-                            try:
-                                asyncio.get_running_loop()
-                            except RuntimeError:
-                                asyncio.run(ok)
-                            else:
-                                raise RuntimeError("Running loop: cannot await async acquire in sync wrapper")
+                    self.try_acquire(name=name, weight=weight)
                     return func(*args, **kwargs)
 
                 return wrapper
