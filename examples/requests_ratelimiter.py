@@ -15,6 +15,11 @@ logger.setLevel(logging.DEBUG)
 
 
 def test_requests():
+    """Demonstrates a rate limited sequence of http get requests using the requests library.
+
+    Rate is limited to 2 requests per second. Some drift occurs because these are synchronous requests
+    and get requests have duration.
+    """
     url = "https://httpbin.org/get"
     limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=2, duration=Duration.SECOND)
 
