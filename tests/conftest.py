@@ -13,13 +13,10 @@ from pyrate_limiter import Duration
 from pyrate_limiter import id_generator
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import limiter_factory
-from pyrate_limiter import MonotonicClock
 from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
-from pyrate_limiter import RedisBucket
-from pyrate_limiter import TimeAsyncClock
-from pyrate_limiter import TimeClock
+from pyrate_limiter import RedisBucket, AsyncRedisBucket, AsyncAbstractBucket, SyncAbstractBucket, BaseAbstractBucket, BucketAsyncWrapper
 
 
 # Make log messages visible on test failure (or with pytest -s)
@@ -29,25 +26,6 @@ logger = getLogger("pyrate_limiter")
 logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 
 DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
-
-clocks = [
-    pytest.param(MonotonicClock(), marks=pytest.mark.monotonic),
-    pytest.param(TimeClock(), marks=pytest.mark.timeclock),
-    pytest.param(TimeAsyncClock(), marks=pytest.mark.asyncclock),
-]
-
-ClockSet = Union[
-    MonotonicClock,
-    TimeClock,
-    TimeAsyncClock,
-]
-
-
-@pytest.fixture(params=clocks)
-def clock(request):
-    """Parametrization for different clock."""
-    return request.param
-
 
 async def create_in_memory_bucket(rates: List[Rate]):
     return InMemoryBucket(rates)
@@ -76,7 +54,7 @@ async def create_async_redis_bucket(rates: List[Rate]):
     redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)
     bucket_key = f"test-bucket/{id_generator()}"
     await redis_db.delete(bucket_key)
-    bucket = await RedisBucket.init(rates, redis_db, bucket_key)
+    bucket = await AsyncRedisBucket.init(rates, redis_db, bucket_key)
     assert await bucket.count() == 0
     return bucket
 
@@ -130,12 +108,8 @@ def create_bucket(request):
     """Parametrization for different bucket."""
     return request.param
 
-
-@pytest.fixture(params=[True, False])
-def limiter_should_raise(request):
-    return request.param
-
-
-@pytest.fixture(params=[None, 500, Duration.SECOND * 2, Duration.MINUTE])
-def limiter_delay(request):
-    return request.param
+def wrap_bucket(bucket: SyncAbstractBucket | AsyncAbstractBucket) -> AsyncAbstractBucket:
+    if isinstance(bucket, AsyncAbstractBucket):
+        return bucket
+    else:
+        return BucketAsyncWrapper(bucket)

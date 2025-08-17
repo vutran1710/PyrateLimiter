@@ -6,17 +6,17 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from inspect import isawaitable, iscoroutine
-from threading import Thread
-from typing import Awaitable, Dict, List, Optional, Type, Union
+from inspect import isawaitable
+from threading import Event, Thread
+from typing import Any, Awaitable, Dict, List, Optional, Type, Union
 
-from .clock import AbstractClock
+from ..clocks import AbstractClock, AsyncAbstractClock, MonotonicClock
 from .rate import Rate, RateItem
 
 logger = logging.getLogger("pyrate_limiter")
 
 
-class AbstractBucket(ABC):
+class BaseAbstractBucket(ABC):
     """Base bucket interface
     Assumption: len(rates) always > 0
     TODO: allow empty rates
@@ -24,9 +24,13 @@ class AbstractBucket(ABC):
 
     rates: List[Rate]
     failing_rate: Optional[Rate] = None
+    _clock: AbstractClock | AsyncAbstractClock = MonotonicClock()
+
+    def now(self) -> int | Awaitable[int]:
+        return self._clock.now()
 
     @abstractmethod
-    def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
+    def put(self, item: RateItem) -> bool | Awaitable[bool]:
         """Put an item (typically the current time) in the bucket
         return true if successful, otherwise false
         """
@@ -35,27 +39,27 @@ class AbstractBucket(ABC):
     def leak(
         self,
         current_timestamp: Optional[int] = None,
-    ) -> Union[int, Awaitable[int]]:
+    ) -> int | Awaitable[int]:
         """leaking bucket - removing items that are outdated"""
 
     @abstractmethod
-    def flush(self) -> Union[None, Awaitable[None]]:
+    def flush(self) -> None | Awaitable[None]:
         """Flush the whole bucket
         - Must remove `failing-rate` after flushing
         """
 
     @abstractmethod
-    def count(self) -> Union[int, Awaitable[int]]:
+    def count(self) -> int | Awaitable[int]:
         """Count number of items in the bucket"""
 
     @abstractmethod
-    def peek(self, index: int) -> Union[Optional[RateItem], Awaitable[Optional[RateItem]]]:
+    def peek(self, index: int) -> Optional[RateItem] | Awaitable[Optional[RateItem]]:
         """Peek at the rate-item at a specific index in latest-to-earliest order
         NOTE: The reason we cannot peek from the start of the queue(earliest-to-latest) is
         we can't really tell how many outdated items are still in the queue
         """
 
-    def waiting(self, item: RateItem) -> Union[int, Awaitable[int]]:
+    def waiting(self, item: RateItem) -> int | Awaitable[int]:
         """Calculate time until bucket become availabe to consume an item again"""
         if self.failing_rate is None:
             return 0
@@ -96,11 +100,104 @@ class AbstractBucket(ABC):
         assert isinstance(bound_item, RateItem)
         return _calc_waiting(bound_item)
 
-    def limiter_lock(self) -> Optional[object]:  # type: ignore
+    def limiter_lock(self) -> Any:  # type: ignore
         """An additional lock to be used by Limiter in-front of the thread lock.
         Intended for multiprocessing environments where a thread lock is insufficient.
         """
         return None
+
+    def close(self) -> None:  # noqa: B027
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+
+class SyncAbstractBucket(BaseAbstractBucket):
+    def now(self) -> int:
+        assert isinstance(self._clock, AbstractClock)
+        return self._clock.now()
+
+    @abstractmethod
+    def put(self, item: RateItem) -> bool:
+        """Put an item (typically the current time) in the bucket
+        return true if successful, otherwise false
+        """
+
+    @abstractmethod
+    def leak(
+        self,
+        current_timestamp: Optional[int] = None,
+    ) -> Union[int, Awaitable[int]]:
+        """leaking bucket - removing items that are outdated"""
+
+    @abstractmethod
+    def flush(self) -> None:
+        """Flush the whole bucket
+        - Must remove `failing-rate` after flushing
+        """
+
+    @abstractmethod
+    def count(self) -> int:
+        """Count number of items in the bucket"""
+
+    @abstractmethod
+    def peek(self, index: int) -> Optional[RateItem]:
+        """Peek at the rate-item at a specific index in latest-to-earliest order
+        NOTE: The reason we cannot peek from the start of the queue(earliest-to-latest) is
+        we can't really tell how many outdated items are still in the queue
+        """
+
+    def waiting(self, item: RateItem) -> int:
+        return super().waiting(item)  # type: ignore[return-value]
+
+
+class AsyncAbstractBucket(BaseAbstractBucket):
+    async def now(self) -> int:
+        if isinstance(self._clock, AbstractClock):
+            return self._clock.now()
+        else:
+            return await self._clock.now()
+
+    @abstractmethod
+    async def put(self, item: RateItem) -> bool:
+        """Put an item (typically the current time) in the bucket
+        return true if successful, otherwise false
+        """
+
+    @abstractmethod
+    async def leak(
+        self,
+        current_timestamp: Optional[int] = None,
+    ) -> int:
+        """leaking bucket - removing items that are outdated"""
+
+    @abstractmethod
+    async def flush(self) -> None:
+        """Flush the whole bucket
+        - Must remove `failing-rate` after flushing
+        """
+
+    @abstractmethod
+    async def count(self) -> int:
+        """Count number of items in the bucket"""
+
+    @abstractmethod
+    async def peek(self, index: int) -> Optional[RateItem]:
+        """Peek at the rate-item at a specific index in latest-to-earliest order
+        NOTE: The reason we cannot peek from the start of the queue(earliest-to-latest) is
+        we can't really tell how many outdated items are still in the queue
+        """
+
+    async def waiting(self, item: RateItem) -> int:
+        i = super().waiting(item)
+        if isawaitable(i):
+            return await i
+        else:
+            return i
 
 
 class Leaker(Thread):
@@ -110,48 +207,36 @@ class Leaker(Thread):
 
     daemon = True
     name = "PyrateLimiter's Leaker"
-    sync_buckets: Dict[int, AbstractBucket]
-    async_buckets: Dict[int, AbstractBucket]
-    clocks: Dict[int, AbstractClock]
+    sync_buckets: Dict[int, SyncAbstractBucket]
+    async_buckets: Dict[int, AsyncAbstractBucket]
     leak_interval: int = 10_000
     aio_leak_task: Optional[asyncio.Task] = None
+    _stop_event: Any
 
     def __init__(self, leak_interval: int):
         self.sync_buckets = defaultdict()
         self.async_buckets = defaultdict()
-        self.clocks = defaultdict()
         self.leak_interval = leak_interval
+        self._stop_event = Event()  # <--- add here
+
         super().__init__()
 
-    def register(self, bucket: AbstractBucket, clock: AbstractClock):
+    def register(self, bucket: SyncAbstractBucket | AsyncAbstractBucket):
         """Register a new bucket with its associated clock"""
-        assert self.sync_buckets is not None
-        assert self.clocks is not None
-        assert self.async_buckets is not None
 
-        try_leak = bucket.leak(0)
-        bucket_id = id(bucket)
-
-        if iscoroutine(try_leak):
-            try_leak.close()
-            self.async_buckets[bucket_id] = bucket
+        if isinstance(bucket, SyncAbstractBucket):
+            self.sync_buckets[id(bucket)] = bucket
         else:
-            self.sync_buckets[bucket_id] = bucket
-
-        self.clocks[bucket_id] = clock
+            self.async_buckets[id(bucket)] = bucket
 
     def deregister(self, bucket_id: int) -> bool:
         """Deregister a bucket"""
         if self.sync_buckets and bucket_id in self.sync_buckets:
             del self.sync_buckets[bucket_id]
-            assert self.clocks
-            del self.clocks[bucket_id]
             return True
 
         if self.async_buckets and bucket_id in self.async_buckets:
             del self.async_buckets[bucket_id]
-            assert self.clocks
-            del self.clocks[bucket_id]
 
             if not self.async_buckets and self.aio_leak_task:
                 self.aio_leak_task.cancel()
@@ -161,15 +246,11 @@ class Leaker(Thread):
 
         return False
 
-    async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
-        if len(self.clocks) == 0:
-            return
-
-        while buckets:
+    async def _leak(self, buckets: Dict[int, SyncAbstractBucket] | Dict[int, AsyncAbstractBucket]) -> None:
+        while not self._stop_event.is_set() and buckets:
             try:
-                for bucket_id, bucket in list(buckets.items()):
-                    clock = self.clocks[bucket_id]
-                    now = clock.now()
+                for _, bucket in tuple(buckets.items()):
+                    now = bucket.now()
 
                     while isawaitable(now):
                         now = await now
@@ -184,7 +265,7 @@ class Leaker(Thread):
 
                 await asyncio.sleep(self.leak_interval / 1000)
             except RuntimeError as e:
-                logger.info("Leak task stopped due to event loop shutdown. %s", e)
+                logger.debug("Leak task stopped due to event loop shutdown. %s", e)
                 return
 
     def leak_async(self):
@@ -204,6 +285,12 @@ class Leaker(Thread):
         """
         if self.sync_buckets and not self.is_alive():
             super().start()
+
+    def close(self):
+        self._stop_event.set()
+        self.clocks.clear()
+        self.sync_buckets.clear()
+        self.async_buckets.clear()
 
 
 class BucketFactory(ABC):
@@ -241,52 +328,46 @@ class BucketFactory(ABC):
         """
 
     @abstractmethod
-    def get(self, item: RateItem) -> Union[AbstractBucket, Awaitable[AbstractBucket]]:
+    def get(self, item: RateItem) -> SyncAbstractBucket | AsyncAbstractBucket | Awaitable[SyncAbstractBucket] | Awaitable[AsyncAbstractBucket]:
         """Get the corresponding bucket to this item"""
 
     def create(
         self,
-        clock: AbstractClock,
-        bucket_class: Type[AbstractBucket],
+        bucket_class: Type[SyncAbstractBucket] | Type[AsyncAbstractBucket],
         *args,
         **kwargs,
-    ) -> AbstractBucket:
+    ) -> SyncAbstractBucket | AsyncAbstractBucket:
         """Creating a bucket dynamically"""
         bucket = bucket_class(*args, **kwargs)
-        self.schedule_leak(bucket, clock)
+        self.schedule_leak(bucket)
         return bucket
 
-    def schedule_leak(self, new_bucket: AbstractBucket, associated_clock: AbstractClock) -> None:
+    def schedule_leak(self, new_bucket: SyncAbstractBucket | AsyncAbstractBucket) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
         assert new_bucket.rates, "Bucket rates are not set"
 
         if not self._leaker:
             self._leaker = Leaker(self.leak_interval)
 
-        self._leaker.register(new_bucket, associated_clock)
+        self._leaker.register(new_bucket)
         self._leaker.start()
         self._leaker.leak_async()
 
-    def get_buckets(self) -> List[AbstractBucket]:
+    def get_buckets(self) -> List[SyncAbstractBucket | AsyncAbstractBucket]:
         """Iterator over all buckets in the factory"""
         if not self._leaker:
             return []
 
-        buckets = []
+        buckets: List[SyncAbstractBucket | AsyncAbstractBucket] = []
 
-        if self._leaker.sync_buckets:
-            for _, bucket in self._leaker.sync_buckets.items():
-                buckets.append(bucket)
-
-        if self._leaker.async_buckets:
-            for _, bucket in self._leaker.async_buckets.items():
-                buckets.append(bucket)
+        buckets.extend(self._leaker.sync_buckets.values())
+        buckets.extend(self._leaker.async_buckets.values())
 
         return buckets
 
-    def dispose(self, bucket: Union[int, AbstractBucket]) -> bool:
+    def dispose(self, bucket: Union[int, BaseAbstractBucket]) -> bool:
         """Delete a bucket from the factory"""
-        if isinstance(bucket, AbstractBucket):
+        if isinstance(bucket, BaseAbstractBucket):
             bucket = id(bucket)
 
         assert isinstance(bucket, int), "not valid bucket id"
@@ -303,3 +384,18 @@ class BucketFactory(ABC):
                 self.dispose(bucket)
             except Exception as e:
                 logger.debug("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)
+
+    def close(self) -> None:
+        try:
+            if self._leaker is not None:
+                self._leaker.close()
+                self._leaker = None
+        except Exception as e:
+            logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, self._leaker)
+
+        for bucket in self.get_buckets():
+            try:
+                logger.info("Closing bucket %s", bucket)
+                bucket.close()
+            except Exception as e:
+                logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)

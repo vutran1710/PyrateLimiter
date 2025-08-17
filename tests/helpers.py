@@ -8,12 +8,13 @@ from typing import List
 from typing import Tuple
 
 from .conftest import logger
-from pyrate_limiter import AbstractBucket
+from pyrate_limiter import BaseAbstractBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import RateItem
+import asyncio
 
 
-async def inspect_bucket_items(bucket: AbstractBucket, expected_item_count: int):
+async def inspect_bucket_items(bucket: BaseAbstractBucket, expected_item_count: int):
     """Inspect items in the bucket
     - Assert number of item == expected-item-count
     - Assert that items are ordered by timestamps, from latest to earliest
@@ -38,28 +39,28 @@ async def inspect_bucket_items(bucket: AbstractBucket, expected_item_count: int)
 
     return item_names
 
+async def concurrent_acquire_async(limiter: Limiter, items: list[str], blocking: bool = True) -> list[bool]:
+    return await asyncio.gather(*(limiter.try_acquire_async(i, blocking=blocking) for i in items))
 
-async def concurrent_acquire(limiter: Limiter, items: List[str]):
+async def concurrent_acquire(limiter: Limiter, items: List[str], blocking: bool = True):
     with ThreadPoolExecutor() as executor:
         result = list(executor.map(limiter.try_acquire, items))
         for idx, coro in enumerate(result):
-            while isawaitable(coro):
-                coro = await coro
-                result[idx] = coro
+            result[idx] = coro
 
         return result
 
 
-async def async_acquire(limiter: Limiter, item: str, weight: int = 1) -> Tuple[bool, int]:
+async def async_acquire(limiter: Limiter, item: str, weight: int = 1, blocking: bool = True) -> Tuple[bool, int]:
     start = time()
-    acquire = await limiter.try_acquire_async(item, weight=weight)
+    acquire = await limiter.try_acquire_async(item, weight=weight, blocking = blocking)
 
     time_cost_in_ms = int((time() - start) * 1000)
     assert isinstance(acquire, bool)
     return acquire, time_cost_in_ms
 
 
-async def async_count(bucket: AbstractBucket) -> int:
+async def async_count(bucket: BaseAbstractBucket) -> int:
     count = bucket.count()
 
     if isawaitable(count):
@@ -93,7 +94,7 @@ async def prefilling_bucket(limiter: Limiter, sleep_interval: float, item: str):
     assert acquire_ok
 
 
-async def flushing_bucket(bucket: AbstractBucket):
+async def flushing_bucket(bucket: BaseAbstractBucket):
     flush = bucket.flush()
 
     if isawaitable(flush):

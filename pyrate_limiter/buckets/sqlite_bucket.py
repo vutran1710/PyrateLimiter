@@ -9,7 +9,9 @@ from threading import RLock
 from time import time
 from typing import List, Optional, Tuple, Union
 
-from ..abstracts import AbstractBucket, Rate, RateItem
+from ..abstracts import Rate, RateItem, SyncAbstractBucket
+from ..clocks import AbstractClock
+from ..utils import dedicated_sqlite_clock_connection
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +57,7 @@ class Queries:
     PEEK = 'SELECT * FROM "{table}" ORDER BY item_timestamp DESC LIMIT 1 OFFSET {count}'
 
 
-class SQLiteBucket(AbstractBucket):
+class SQLiteBucket(SyncAbstractBucket):
     """For sqlite bucket, we are using the sql time function as the clock
     item's timestamp wont matter here
     """
@@ -164,6 +166,15 @@ class SQLiteBucket(AbstractBucket):
 
             return RateItem(item[0], item[1])
 
+    def close(self):
+        with self.lock:
+            if self.conn is not None:
+                try:
+                    self.conn.close()
+                    self.conn = None
+                except Exception as e:
+                    logger.debug("Exception %s closing sql connection", e)
+
     @classmethod
     def init_from_file(
         cls, rates: List[Rate], table: str = "rate_bucket", db_path: Optional[str] = None, create_new_table: bool = True, use_file_lock: bool = False
@@ -222,3 +233,34 @@ class SQLiteBucket(AbstractBucket):
             sqlite_connection.commit()
 
             return cls(rates, sqlite_connection, table=table, lock=file_lock)
+
+
+class SQLiteClock(AbstractClock):
+    """Get timestamp using SQLite as remote clock backend"""
+
+    time_query = "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
+
+    def __init__(self, conn: Union[sqlite3.Connection, SQLiteBucket]):
+        """
+        In multiprocessing cases, use the bucket, so that a shared lock is used.
+        """
+
+        self.lock: Optional[RLock] = None
+
+        if isinstance(conn, SQLiteBucket):
+            self.conn = conn.conn
+            self.lock = conn.lock
+        else:
+            self.conn = conn
+
+    @classmethod
+    def default(cls):
+        conn = dedicated_sqlite_clock_connection()
+        return cls(conn)
+
+    def now(self) -> int:
+        with self.lock if self.lock else nullcontext():
+            cur = self.conn.execute(self.time_query)
+            now = cur.fetchone()[0]
+            cur.close()
+            return int(now)

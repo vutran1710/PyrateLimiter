@@ -2,11 +2,12 @@
 
 from typing import List, Optional
 
-from ..abstracts import AbstractBucket, Rate, RateItem
+from ..abstracts.bucket import SyncAbstractBucket
+from ..abstracts.rate import Rate, RateItem
 from ..utils import binary_search
 
 
-class InMemoryBucket(AbstractBucket):
+class InMemoryBucket(SyncAbstractBucket):
     """Simple In-memory Bucket using native list
     Clock can be either `time.time` or `time.monotonic`
     When leak, clock is required
@@ -82,7 +83,7 @@ class InMemoryBucket(AbstractBucket):
     def count(self) -> int:
         return len(self.items)
 
-    def peek(self, index: int) -> Optional[RateItem]:
+    def peek(self, index: int) -> RateItem | None:
         if not self.items:
             return None
 

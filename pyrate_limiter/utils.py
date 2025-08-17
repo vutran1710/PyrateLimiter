@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import gettempdir
 from typing import List
 
-from .abstracts import Rate, RateItem
+from .abstracts.rate import Rate, RateItem
 
 
 def binary_search(items: List[RateItem], value: int) -> int:

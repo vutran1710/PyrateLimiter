@@ -7,7 +7,7 @@ from typing import List
 import pytest
 import redis
 
-from pyrate_limiter import Duration, Limiter, Rate, RedisBucket
+from pyrate_limiter import AsyncRedisBucket, Duration, Limiter, Rate, RedisBucket
 
 
 async def ticker():
@@ -26,7 +26,7 @@ def create_redis_bucket(rates: List[Rate]):
 
 async def create_async_redis_bucket(rates: List[Rate]):
     redis_db = redis.asyncio.Redis(host="localhost")
-    bucket = await RedisBucket.init(rates, redis_db, "test3")
+    bucket = await AsyncRedisBucket.init(rates, redis_db, "test3")
     await bucket.flush()
     assert await bucket.count() == 0
     return bucket
@@ -37,7 +37,7 @@ async def test_redis_async():
     rates = [Rate(3, Duration.SECOND)]
 
     redis_bucket = await create_async_redis_bucket(rates)
-    limiter = Limiter(redis_bucket, raise_when_fail=False, max_delay=Duration.DAY)
+    limiter = Limiter(redis_bucket)
 
     async def task(name, weight):
         acquired = await limiter.try_acquire_async(name, weight)
@@ -56,7 +56,7 @@ def test_redis_sync():
         print(f"{datetime.now()} {name}: {weight}, {acquired=}")
 
     redis_bucket = create_redis_bucket(rates)
-    limiter = Limiter(redis_bucket, raise_when_fail=False, max_delay=Duration.DAY)
+    limiter = Limiter(redis_bucket)
     for i in range(10):
         task(str(i), 1)
 

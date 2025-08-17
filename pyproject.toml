@@ -61,6 +61,8 @@ dev = [
     "pytest-xdist>=3.8.0",
     "schedule>=1.1.0,<2",
     "pytest-retry>=1.7.0",
+    "httpx",
+    "psycopg[binary]>=3.2.9; sys_platform == 'win32'"
 ]
 
 
@@ -102,7 +104,7 @@ include = ["pyrate_limiter"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 retries = 2
-retry_delay = 4
+retry_delay = 1
 cumulative_timing = false
 retry_outcome = "rerun"
 
