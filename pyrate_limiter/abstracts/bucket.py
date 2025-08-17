@@ -193,7 +193,11 @@ class AsyncAbstractBucket(BaseAbstractBucket):
         """
 
     async def waiting(self, item: RateItem) -> int:
-        return await super().waiting(item)  # type: ignore[misc]
+        i = super().waiting(item)
+        if isawaitable(i):
+            return await i
+        else:
+            return i
 
 
 class Leaker(Thread):
@@ -205,7 +209,7 @@ class Leaker(Thread):
     name = "PyrateLimiter's Leaker"
     sync_buckets: Dict[int, SyncAbstractBucket]
     async_buckets: Dict[int, AsyncAbstractBucket]
-    leak_interval: int = 1_000
+    leak_interval: int = 10_000
     aio_leak_task: Optional[asyncio.Task] = None
     _stop_event: Any
 

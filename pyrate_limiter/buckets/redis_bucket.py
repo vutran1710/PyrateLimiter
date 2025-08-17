@@ -204,7 +204,7 @@ class AsyncRedisBucket(AsyncAbstractBucket):
         if idx < 0:
             return None
 
-        return idx
+        return self.rates[idx]
 
     async def put(self, item: RateItem) -> bool:
         """Add item to key"""

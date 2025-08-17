@@ -1,26 +1,23 @@
 """Complete Limiter test suite
 """
-import time
 from inspect import isawaitable
 
 import pytest
+from .conftest import wrap_bucket
 
 from .conftest import DEFAULT_RATES
 from .conftest import logger
 from .demo_bucket_factory import DemoAsyncGetBucketFactory
 from .demo_bucket_factory import DemoBucketFactory
 from .helpers import async_acquire
-from .helpers import concurrent_acquire
-from .helpers import flushing_bucket
+from .helpers import concurrent_acquire, concurrent_acquire_async
 from .helpers import inspect_bucket_items
 from .helpers import prefilling_bucket
-from pyrate_limiter import BaseAbstractBucket
-from pyrate_limiter import BucketAsyncWrapper
+from pyrate_limiter import AsyncAbstractBucket
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import Duration
 from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
-from pyrate_limiter import RedisBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
 
@@ -55,11 +52,13 @@ async def test_limiter_constructor_02(
 
     assert isinstance(limiter.bucket_factory, BucketFactory)
 
+    if isinstance(bucket, AsyncAbstractBucket):
+        with pytest.raises(RuntimeError):
+            acquire_ok = limiter.try_acquire("example")
+        acquire_ok = await limiter.try_acquire_async("example")
 
-    acquire_ok = limiter.try_acquire("example")
-
-    if isawaitable(acquire_ok):
-        acquire_ok = await acquire_ok
+    else:
+        acquire_ok = limiter.try_acquire("example")
 
     assert acquire_ok
 
@@ -86,7 +85,7 @@ async def test_limiter_01(
         factory,
         buffer_ms=10
     )
-    bucket = BucketAsyncWrapper(bucket)
+    bucket = wrap_bucket(bucket)
 
     item = "demo"
 
@@ -97,14 +96,14 @@ async def test_limiter_01(
     assert await bucket.count() == 0
 
     logger.info("Limiter Test #1")
-    await prefilling_bucket(limiter, 0.3, item)
+    await prefilling_bucket(limiter, 0.1, item)
+
+    acquired, cost = await async_acquire(limiter, item, blocking=False)
+    assert not acquired, f"{await bucket.count()=}, {acquired=}"
 
     acquired, cost = await async_acquire(limiter, item, weight=0, blocking=False)
     assert acquired
 
-    acquired, cost = await async_acquire(limiter, item, blocking=False)
-
-    assert not acquired
 
     acquired, cost = await async_acquire(limiter, item, blocking=False)
 
@@ -201,19 +200,53 @@ async def test_limiter_concurrency(
 
     logger.info("Test Limiter Concurrency: inserting 4 items")
     items = ["demo" for _ in range(4)]
+    
+    if isinstance(bucket, AsyncAbstractBucket):
+        with pytest.raises(RuntimeError):
+            result = await concurrent_acquire(limiter, items)
+    else:
+        result = await concurrent_acquire(limiter, items)
 
-    result = await concurrent_acquire(limiter, items)
+        item_names = await inspect_bucket_items(bucket, 3)
+
+        result = await concurrent_acquire(limiter, items)
+        item_names = await inspect_bucket_items(bucket, 3)
+        logger.info(
+            "(No raise, delay is None or delay > max_delay) Result = %s, Item = %s",
+            result,
+            item_names,
+        )
+    
+@pytest.mark.asyncio
+async def test_limiter_concurrency_async(create_bucket):
+    bucket = await create_bucket(DEFAULT_RATES)
+    limiter = Limiter(DemoBucketFactory(demo=bucket))
+    
+    items = ["demo"] * 4
+
+    # use async variant
+    result = await concurrent_acquire_async(limiter, items)
     item_names = await inspect_bucket_items(bucket, 3)
 
-    result = await concurrent_acquire(limiter, items)
+    result = await concurrent_acquire_async(limiter, items)
     item_names = await inspect_bucket_items(bucket, 3)
-    logger.info(
-        "(No raise, delay is None or delay > max_delay) Result = %s, Item = %s",
-        result,
-        item_names,
-    )
-    
-    
+    logger.info("Result=%s, Items=%s", result, item_names)
+
+
+@pytest.mark.asyncio
+async def test_limiter_concurrency_async_wrap(create_bucket):
+    bucket = await create_bucket(DEFAULT_RATES)
+    limiter = Limiter(DemoBucketFactory(demo=bucket))
+    bucket = wrap_bucket(bucket)
+    items = ["demo"] * 4
+
+    # use async variant
+    result = await concurrent_acquire_async(limiter, items)
+    item_names = await inspect_bucket_items(bucket, 3)
+
+    result = await concurrent_acquire_async(limiter, items)
+    item_names = await inspect_bucket_items(bucket, 3)
+    logger.info("Result=%s, Items=%s", result, item_names)
 
 @pytest.mark.asyncio
 async def test_limiter_decorator(
@@ -235,7 +268,7 @@ async def test_limiter_decorator(
         nonlocal counter
         counter += num
 
-    if isawaitable(bucket.count()):
+    if isinstance(bucket, AsyncAbstractBucket):
         with pytest.raises(RuntimeError):
             @limiter_wrapper
             def inc_counter(num: int):

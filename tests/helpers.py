@@ -11,6 +11,7 @@ from .conftest import logger
 from pyrate_limiter import BaseAbstractBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import RateItem
+import asyncio
 
 
 async def inspect_bucket_items(bucket: BaseAbstractBucket, expected_item_count: int):
@@ -38,14 +39,14 @@ async def inspect_bucket_items(bucket: BaseAbstractBucket, expected_item_count: 
 
     return item_names
 
+async def concurrent_acquire_async(limiter: Limiter, items: list[str], blocking: bool = True) -> list[bool]:
+    return await asyncio.gather(*(limiter.try_acquire_async(i, blocking=blocking) for i in items))
 
 async def concurrent_acquire(limiter: Limiter, items: List[str], blocking: bool = True):
     with ThreadPoolExecutor() as executor:
         result = list(executor.map(limiter.try_acquire, items))
         for idx, coro in enumerate(result):
-            while isawaitable(coro):
-                coro = await coro
-                result[idx] = coro
+            result[idx] = coro
 
         return result
 

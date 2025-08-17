@@ -140,7 +140,28 @@ class Limiter:
 
         return argument
 
-    async def _handle_bucket_put_async(self, bucket: AsyncAbstractBucket, item: RateItem, blocking: bool) -> bool:
+    def _get_async_lock(self):
+        """Returns thread_local, loop-specific lock"""
+        loop = asyncio.get_running_loop()
+        try:
+            # The async loop *can* change in a given thread
+            lock = self._thread_local.async_lock
+            if self._thread_local.async_lock_loop is loop:
+                return lock
+        except AttributeError:
+            pass
+        lock = asyncio.Lock()
+        self._thread_local.async_lock = lock
+        self._thread_local.async_lock_loop = loop
+        return lock
+
+    async def _handle_async_result(self, result: T | Awaitable[T]) -> T:
+        """Helper to resolve awaitables"""
+        while isawaitable(result):
+            result = await result  # type: ignore[union-attr]
+        return result
+
+    async def _handle_bucket_put_async(self, bucket: SyncAbstractBucket | AsyncAbstractBucket, item: RateItem, blocking: bool) -> bool:
         """
         Attempt to insert an item into an asynchronous bucket, retrying with delays when needed.
 
@@ -160,19 +181,21 @@ class Limiter:
             True if the item was successfully inserted into the bucket,
             False if acquisition failed in non-blocking mode.
         """
-        acquire = await bucket.put(item)
-        if acquire:
+        acquire = bucket.put(item) if isinstance(bucket, SyncAbstractBucket) else await bucket.put(item)
+        if acquire is True:
             return True
         elif not blocking:
             return False
         else:
             while acquire is False:
-                delay = await bucket.waiting(item)
+                delay: int = (
+                    bucket.waiting(item) if isinstance(bucket, SyncAbstractBucket) else await bucket.waiting(item)
+                )  # mypy: ignore[assignment]
 
                 delay += self.buffer_ms
                 await asyncio.sleep(delay / 1000)
                 item.timestamp += delay
-                acquire = await bucket.put(item)
+                acquire = bucket.put(item) if isinstance(bucket, SyncAbstractBucket) else await bucket.put(item)
 
             return True
 
@@ -197,38 +220,19 @@ class Limiter:
             False if acquisition failed in non-blocking mode.
         """
         acquire = bucket.put(item)
-        if acquire:
+        if acquire is True:
             return True
+        elif not blocking:
+            return False
         else:
-            acquire = bucket.put(item)
-            if acquire:
-                return True
-            elif not blocking:
-                return False
-            else:
-                while acquire is False:
-                    delay = bucket.waiting(item)
+            while acquire is False:
+                delay = bucket.waiting(item)
 
-                    delay += self.buffer_ms
-                    sleep(delay / 1000)
-                    item.timestamp += delay
-                    acquire = bucket.put(item)
-                return True
-
-    def _get_async_lock(self):
-        """Returns thread_local, loop-specific lock"""
-        loop = asyncio.get_running_loop()
-        try:
-            # The async loop *can* change in a given thread
-            lock = self._thread_local.async_lock
-            if self._thread_local.async_lock_loop is loop:
-                return lock
-        except AttributeError:
-            pass
-        lock = asyncio.Lock()
-        self._thread_local.async_lock = lock
-        self._thread_local.async_lock_loop = loop
-        return lock
+                delay += self.buffer_ms
+                sleep(delay / 1000)
+                item.timestamp += delay
+                acquire = bucket.put(item)
+            return True
 
     def try_acquire(self, name: str = __name__, weight: int = 1, timeout: int = -1, blocking: bool = True) -> Union[bool, Awaitable[bool]]:
         try:
@@ -240,11 +244,15 @@ class Limiter:
 
             with combined_lock(self.lock, blocking=blocking):
                 item = self.bucket_factory.wrap_item(name, weight)
+
+                if isawaitable(item):
+                    raise RuntimeError("Use try_acquire_async() with async buckets")
+
                 assert isinstance(item, RateItem), "Use try_acquire_async with async buckets"
                 bucket = self.bucket_factory.get(item)
 
                 if not isinstance(bucket, SyncAbstractBucket):
-                    raise ValueError("Use try_acquire_async() with async buckets")
+                    raise RuntimeError("Use try_acquire_async() with async buckets")
 
                 result = self._handle_bucket_put_sync(bucket, item, blocking=blocking)
 
@@ -255,47 +263,35 @@ class Limiter:
 
     async def try_acquire_async(self, name: str = __name__, weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool:
         """
-        async version of try_acquire. This uses a top level, thread-local async lock to ensure that the async loop doesn't block
+        async version of try_acquire. This uses a top level, thread-local async lock to ensure that the async loop doesn't block.
+
+        It is possible for the event loop to get blocked due to cross-process or cross-thread contention.
 
         """
 
-        if weight == 0:
+        if weight <= 0:
             return True
 
         if not blocking and timeout != -1:
             raise RuntimeError("Can't set timeout with non-blocking")
 
-        async def run():
-            lock = self._get_async_lock()
-            async with lock:
-                return await self._try_acquire_async_inner(name, weight, blocking=blocking)
-
         if timeout == -1:
-            return await run()
+            return await self._try_acquire_async_inner(name, weight, blocking=blocking)
         try:
-            return await asyncio.wait_for(run(), timeout=timeout)
+            return await asyncio.wait_for(self._try_acquire_async_inner(name, weight, blocking=blocking), timeout=timeout)
         except asyncio.TimeoutError:
             return False
 
-    async def _handle_async_result(self, result: T | Awaitable[T]) -> T:
-        while isawaitable(result):
-            result = await result  # type: ignore[union-attr]
-        return result
-
-    async def _try_acquire_async_inner(self, name: str, weight: int, blocking: bool, timeout: int = -1) -> bool:
+    async def _try_acquire_async_inner(self, name: str, weight: int, blocking: bool) -> bool:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
-        if weight <= 0:
-            return True
+        lock = self._get_async_lock()
+        async with lock:
+            with combined_lock(self.lock, blocking=blocking):
+                item = await self._handle_async_result(self.bucket_factory.wrap_item(name, weight))
+                bucket: AsyncAbstractBucket | SyncAbstractBucket = await self._handle_async_result(self.bucket_factory.get(item))
 
-        with combined_lock(self.lock, blocking=blocking):
-            item = await self._handle_async_result(self.bucket_factory.wrap_item(name, weight))
-            bucket = await self._handle_async_result(self.bucket_factory.get(item))
-            if isinstance(bucket, SyncAbstractBucket):
-                return self._handle_bucket_put_sync(bucket, item, blocking=blocking)
-            else:
-                assert isinstance(bucket, AsyncAbstractBucket), f"{type(bucket)=} is not AsyncAbstractBucket"
                 return await self._handle_bucket_put_async(bucket, item, blocking=blocking)
 
     def as_decorator(self, *, name="ratelimiter", weight=1):

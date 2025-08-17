@@ -16,7 +16,7 @@ from pyrate_limiter import limiter_factory
 from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
-from pyrate_limiter import RedisBucket, AsyncRedisBucket
+from pyrate_limiter import RedisBucket, AsyncRedisBucket, AsyncAbstractBucket, SyncAbstractBucket, BaseAbstractBucket, BucketAsyncWrapper
 
 
 # Make log messages visible on test failure (or with pytest -s)
@@ -107,3 +107,9 @@ async def create_postgres_bucket(rates: List[Rate]):
 def create_bucket(request):
     """Parametrization for different bucket."""
     return request.param
+
+def wrap_bucket(bucket: SyncAbstractBucket | AsyncAbstractBucket) -> AsyncAbstractBucket:
+    if isinstance(bucket, AsyncAbstractBucket):
+        return bucket
+    else:
+        return BucketAsyncWrapper(bucket)
