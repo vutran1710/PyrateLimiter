@@ -75,13 +75,7 @@ jobs:
     - name: Test and Coverage
       run: |
         uv run nox -e notlinux
-    - name: Cancel run if this job fails
-      if: ${{ failure() && !cancelled() }}
-      uses: actions/github-script@v7
-      with:
-        script: |
-          await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/cancel', { owner: context.repo.owner, repo: context.repo.repo, run_id: context.runId })
-    
+
   check-linux:
     needs: smoke
     runs-on: ${{ matrix.os }}
@@ -150,13 +144,7 @@ jobs:
       with:
         name: dist
         path: dist
-    - name: Cancel run if this job fails
-      if: ${{ failure() && !cancelled() }}
-      uses: actions/github-script@v7
-      with:
-        script: |
-          await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/cancel', { owner: context.repo.owner, repo: context.repo.repo, run_id: context.runId })
-    
+
   publish:
     needs: [check-linux, check-others]
     runs-on: ubuntu-latest
