@@ -210,7 +210,6 @@ class Leaker(Thread):
 
     def close(self):
         self._stop_event.set()
-        self.clocks.clear()
         self.sync_buckets.clear()
         self.async_buckets.clear()
 
