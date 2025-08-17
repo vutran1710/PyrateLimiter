@@ -1,6 +1,6 @@
 # ruff: noqa: T201, G004
 """
-Example of using pyrate_limiter with aiohttp.
+Example of using pyrate_limiter with requests.
 """
 
 import logging
