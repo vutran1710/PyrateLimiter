@@ -230,6 +230,28 @@ class Limiter:
         return lock
 
     def try_acquire(self, name: str = "pyrate", weight: int = 1, timeout: int = -1, blocking: bool = True) -> Union[bool, Awaitable[bool]]:
+        """
+        Attempt to acquire a permit from the limiter.
+
+        Parameters
+        ----------
+        name : str, default "pyrate"
+            The bucket key to acquire from.
+        weight : int, default 1
+            Number of permits to consume.
+        timeout : int, default -1
+            Maximum time (in seconds) to wait; -1 means wait indefinitely.
+            ** Timeout is not yet implemented for sync path. Use try_acquire_async **
+        blocking : bool, default True
+            If True, block until a permit is available (subject to timeout);
+            if False, return immediately.
+
+        Returns
+        -------
+        bool or Awaitable[bool]
+            True if the permit was acquired, False otherwise. Async limiters
+            return an awaitable resolving to the same.
+        """
         try:
             return self._try_acquire(name=name, weight=weight, timeout=timeout, blocking=blocking)
         except TimeoutError:
@@ -241,8 +263,29 @@ class Limiter:
 
     async def try_acquire_async(self, name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool:
         """
-        async version of try_acquire. This uses a top level, thread-local async lock to ensure that the async loop doesn't block
+        Attempt to asynchronously acquire a permit from the limiter.
 
+        Parameters
+        ----------
+        name : str, default "pyrate"
+            The bucket key to acquire from.
+        weight : int, default 1
+            Number of permits to consume.
+        blocking : bool, default True
+            If True, wait until a permit is available (subject to timeout);
+            if False, return immediately.
+        timeout : int, default -1
+            Maximum time (in seconds) to wait; -1 means wait indefinitely.
+
+        Returns
+        -------
+        bool
+            True if the permit was acquired, False otherwise.
+
+        Notes
+        -----
+        This is the async variant of ``try_acquire``. A top-level, thread-local
+        async lock is used to prevent blocking the event loop.
         """
 
         if weight == 0:
