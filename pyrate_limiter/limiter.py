@@ -7,7 +7,7 @@ from functools import wraps
 from inspect import isawaitable, iscoroutinefunction
 from threading import RLock, local
 from time import sleep
-from typing import Any, Awaitable, Callable, Iterable, List, Tuple, Union
+from typing import Any, Awaitable, Callable, Iterable, List, Protocol, Tuple, Union
 
 from .abstracts import AbstractBucket, BucketFactory, Rate, RateItem
 from .buckets import InMemoryBucket
@@ -16,6 +16,11 @@ logger = logging.getLogger("pyrate_limiter")
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
 DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
+
+
+class LockLike(Protocol):
+    def acquire(self, blocking: bool = ..., timeout: float | int | None = ...) -> bool: ...
+    def release(self) -> None: ...
 
 
 class SingleBucketFactory(BucketFactory):
@@ -43,7 +48,7 @@ class SingleBucketFactory(BucketFactory):
 
 
 @contextmanager
-def combined_lock(locks: Iterable | RLock, blocking: bool, timeout: int | float = -1):
+def combined_lock(locks: Iterable[LockLike] | RLock, blocking: bool, timeout: int | float = -1):
     if not isinstance(locks, Iterable):
         acquired_ok = locks.acquire(blocking=blocking, timeout=timeout)
         if not acquired_ok:
