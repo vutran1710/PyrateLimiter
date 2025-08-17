@@ -3,17 +3,16 @@
 from inspect import isawaitable
 from typing import Optional
 
-from .bucket import AbstractBucket
+from .bucket import AsyncAbstractBucket, SyncAbstractBucket
 from .rate import RateItem
 
 
-class BucketAsyncWrapper(AbstractBucket):
+class BucketAsyncWrapper(AsyncAbstractBucket):
     """BucketAsyncWrapper is a wrapping over any bucket
     that turns a async/synchronous bucket into an async one
     """
 
-    def __init__(self, bucket: AbstractBucket):
-        assert isinstance(bucket, AbstractBucket)
+    def __init__(self, bucket: SyncAbstractBucket):
         self.bucket = bucket
 
     async def put(self, item: RateItem):
@@ -60,7 +59,7 @@ class BucketAsyncWrapper(AbstractBucket):
         return item
 
     async def waiting(self, item: RateItem) -> int:
-        wait = super().waiting(item)
+        wait = await super().waiting(item)
 
         if isawaitable(wait):
             wait = await wait

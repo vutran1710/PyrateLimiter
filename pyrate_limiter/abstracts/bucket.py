@@ -116,6 +116,76 @@ class AbstractBucket(ABC):
         self.close()
 
 
+class SyncAbstractBucket(AbstractBucket):
+    @abstractmethod
+    def put(self, item: RateItem) -> bool:
+        """Put an item (typically the current time) in the bucket
+        return true if successful, otherwise false
+        """
+
+    @abstractmethod
+    def leak(
+        self,
+        current_timestamp: Optional[int] = None,
+    ) -> Union[int, Awaitable[int]]:
+        """leaking bucket - removing items that are outdated"""
+
+    @abstractmethod
+    def flush(self) -> None:
+        """Flush the whole bucket
+        - Must remove `failing-rate` after flushing
+        """
+
+    @abstractmethod
+    def count(self) -> int:
+        """Count number of items in the bucket"""
+
+    @abstractmethod
+    def peek(self, index: int) -> Optional[RateItem]:
+        """Peek at the rate-item at a specific index in latest-to-earliest order
+        NOTE: The reason we cannot peek from the start of the queue(earliest-to-latest) is
+        we can't really tell how many outdated items are still in the queue
+        """
+
+    def waiting(self, item: RateItem) -> int:
+        return super().waiting(item)  # type: ignore[return-value]
+
+
+class AsyncAbstractBucket(AbstractBucket):
+    @abstractmethod
+    async def put(self, item: RateItem) -> bool:
+        """Put an item (typically the current time) in the bucket
+        return true if successful, otherwise false
+        """
+
+    @abstractmethod
+    async def leak(
+        self,
+        current_timestamp: Optional[int] = None,
+    ) -> int:
+        """leaking bucket - removing items that are outdated"""
+
+    @abstractmethod
+    async def flush(self) -> None:
+        """Flush the whole bucket
+        - Must remove `failing-rate` after flushing
+        """
+
+    @abstractmethod
+    async def count(self) -> int:
+        """Count number of items in the bucket"""
+
+    @abstractmethod
+    async def peek(self, index: int) -> Optional[RateItem]:
+        """Peek at the rate-item at a specific index in latest-to-earliest order
+        NOTE: The reason we cannot peek from the start of the queue(earliest-to-latest) is
+        we can't really tell how many outdated items are still in the queue
+        """
+
+    async def waiting(self, item: RateItem) -> int:
+        return await super().waiting(item)  # type: ignore[misc]
+
+
 class Leaker(Thread):
     """Responsible for scheduling buckets' leaking at the background either
     through a daemon task(for sync buckets) or a task using asyncio.Task
