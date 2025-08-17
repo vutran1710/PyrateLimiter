@@ -157,7 +157,7 @@ session = RateLimitedRequestsSession(limiter)
 ....
 ```
 
-Example: [requests_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/extras/requests_ratelimiter.py)
+Example: [requests_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/requests_ratelimiter.py)
 
 
 
