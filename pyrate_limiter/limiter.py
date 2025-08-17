@@ -311,7 +311,7 @@ class Limiter:
         if timeout != -1:
             raise NotImplementedError("timeout not implemented for sync try_acquire yet")
 
-        with combined_lock(self.lock, blocking=blocking):
+        with combined_lock(self.lock, blocking=blocking, timeout=timeout):
             assert weight >= 0, "item's weight must be >= 0"
 
             if weight == 0:
