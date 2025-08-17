@@ -136,11 +136,11 @@ from pyrate_limiter.extras.httpx_limiter import AsyncRateLimiterTransport, RateL
 
 limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR)
 
-with httpx.Client(transport=RateLimiterTransport(limiter=limiter_factory.LIMITER)) as client:
+with httpx.Client(transport=RateLimiterTransport(limiter=limiter)) as client:
     client.get(url)
 
 # or async
-async with httpx.AsyncClient(transport=AsyncRateLimiterTransport(limiter=limiter_factory.LIMITER)) as client:
+async with httpx.AsyncClient(transport=AsyncRateLimiterTransport(limiter=limiter)) as client:
     client.get(url)
 
 ...
