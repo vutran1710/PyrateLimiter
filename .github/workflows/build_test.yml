@@ -66,11 +66,11 @@ jobs:
       run: uv sync --all-groups
     # Run linting (latest python version only)
     - name: Lint
-      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && runner.os == 'Linux' }}
+      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
       run: |
         uv run nox -e lint
     - name: Build and install package
-      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && runner.os == 'Linux' }}
+      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
       run: |
         uv build
         uv pip install dist/*.whl
@@ -80,11 +80,11 @@ jobs:
         uv run nox -e cover
     # Latest python version: send coverage report to codecov
     - name: "Upload coverage report to Codecov"
-      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && runner.os == 'Linux' }}
+      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
       uses: codecov/codecov-action@v2
 
     - name: Upload dist, if this is latest
-      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && runner.os == 'Linux' }}
+      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
       uses: actions/upload-artifact@v4
       with:
         name: dist
