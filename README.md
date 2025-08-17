@@ -662,7 +662,7 @@ Multiprocessing: If using MultiprocessBucket, two locks are used in Limiter: a t
 Time source can be anything from anywhere: be it python's built-in time, or monotonic clock, sqliteclock, or crawling from world time server(well we don't have that, but you can!).
 
 ```python
-from pyrate_limiter import MonotonicClock      # use python' time.time()
+from pyrate_limiter import MonotonicClock      # use python time.monotonic()
 from pyrate_limiter import MonotonicClock # use python time.monotonic()
 ```
 
