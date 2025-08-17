@@ -125,7 +125,7 @@ class Leaker(Thread):
     name = "PyrateLimiter's Leaker"
     sync_buckets: Dict[int, AbstractBucket]
     async_buckets: Dict[int, AbstractBucket]
-    leak_interval: int = 10_000
+    leak_interval: int = 1_000
     aio_leak_task: Optional[asyncio.Task] = None
     _stop_event: Any
 
