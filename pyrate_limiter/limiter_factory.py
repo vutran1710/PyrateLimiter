@@ -5,7 +5,7 @@ A collection of common use cases and patterns for pyrate_limiter
 import logging
 from typing import List, Optional, Union
 
-from pyrate_limiter import AbstractBucket, Duration, InMemoryBucket, Limiter, Rate, SQLiteBucket
+from pyrate_limiter import Duration, InMemoryBucket, Limiter, Rate, SQLiteBucket, SyncAbstractBucket
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def create_sqlite_limiter(
     rate = Rate(rate_per_duration, duration)
     rate_limits = [rate]
 
-    bucket: AbstractBucket = SQLiteBucket.init_from_file(
+    bucket: SQLiteBucket = SQLiteBucket.init_from_file(
         rate_limits,
         db_path=str(db_path),
         table=table_name,
@@ -105,7 +105,7 @@ def create_inmemory_limiter(
     """
     rate = Rate(rate_per_duration, duration)
     rate_limits = [rate]
-    bucket: AbstractBucket = InMemoryBucket(rate_limits)
+    bucket: InMemoryBucket = InMemoryBucket(rate_limits)
 
     limiter = Limiter(bucket, buffer_ms=buffer_ms)
 
@@ -113,7 +113,7 @@ def create_inmemory_limiter(
 
 
 def init_global_limiter(
-    bucket: AbstractBucket,
+    bucket: SyncAbstractBucket,
     buffer_ms: int = 50,
 ):
     """

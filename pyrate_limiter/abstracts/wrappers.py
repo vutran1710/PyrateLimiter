@@ -1,6 +1,5 @@
 """Wrappers over different abstract types"""
 
-from inspect import isawaitable
 from typing import Optional
 
 from .bucket import AsyncAbstractBucket, SyncAbstractBucket
@@ -12,57 +11,37 @@ class BucketAsyncWrapper(AsyncAbstractBucket):
     that turns a async/synchronous bucket into an async one
     """
 
+    bucket: SyncAbstractBucket
+
     def __init__(self, bucket: SyncAbstractBucket):
+        assert isinstance(bucket, SyncAbstractBucket)
         self.bucket = bucket
 
     async def put(self, item: RateItem):
         result = self.bucket.put(item)
-
-        while isawaitable(result):
-            result = await result
-
         return result
 
     async def count(self):
         result = self.bucket.count()
-
-        while isawaitable(result):
-            result = await result
 
         return result
 
     async def leak(self, current_timestamp: Optional[int] = None) -> int:
         result = self.bucket.leak(current_timestamp)
 
-        while isawaitable(result):
-            result = await result
-
         assert isinstance(result, int)
         return result
 
     async def flush(self) -> None:
-        result = self.bucket.flush()
-
-        while isawaitable(result):
-            # TODO: AbstractBucket.flush() may not have correct type annotation?
-            result = await result  # type: ignore
-
-        return None
+        self.bucket.flush()
 
     async def peek(self, index: int) -> Optional[RateItem]:
         item = self.bucket.peek(index)
 
-        while isawaitable(item):
-            item = await item
-
-        assert item is None or isinstance(item, RateItem)
         return item
 
     async def waiting(self, item: RateItem) -> int:
-        wait = await super().waiting(item)
-
-        if isawaitable(wait):
-            wait = await wait
+        wait = self.bucket.waiting(item)
 
         assert isinstance(wait, int)
         return wait

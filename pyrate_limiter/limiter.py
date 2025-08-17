@@ -7,10 +7,12 @@ from functools import wraps
 from inspect import isawaitable, iscoroutinefunction
 from threading import RLock, local
 from time import sleep
-from typing import Any, Awaitable, Callable, Iterable, List, Tuple, Union
+from typing import Any, Awaitable, Callable, Iterable, List, Tuple, TypeVar, Union
 
-from .abstracts import AbstractBucket, BucketFactory, Rate, RateItem
+from .abstracts import AsyncAbstractBucket, BaseAbstractBucket, BucketFactory, Rate, RateItem, SyncAbstractBucket
 from .buckets import InMemoryBucket
+
+T = TypeVar("T")
 
 logger = logging.getLogger("pyrate_limiter")
 
@@ -21,9 +23,9 @@ DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
 class SingleBucketFactory(BucketFactory):
     """Single-bucket factory for quick use with Limiter"""
 
-    bucket: AbstractBucket
+    bucket: AsyncAbstractBucket | SyncAbstractBucket
 
-    def __init__(self, bucket: AbstractBucket):
+    def __init__(self, bucket: AsyncAbstractBucket | SyncAbstractBucket):
         self.bucket = bucket
         self.schedule_leak(bucket)
 
@@ -38,7 +40,7 @@ class SingleBucketFactory(BucketFactory):
 
         return wrap_async() if isawaitable(now) else wrap_sync()
 
-    def get(self, _: RateItem) -> AbstractBucket:
+    def get(self, _: RateItem) -> AsyncAbstractBucket | SyncAbstractBucket:
         return self.bucket
 
 
@@ -87,7 +89,7 @@ class Limiter:
 
     def __init__(
         self,
-        argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
+        argument: Union[BucketFactory, SyncAbstractBucket, AsyncAbstractBucket, Rate, List[Rate]],
         buffer_ms: int = 50,
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
@@ -102,16 +104,16 @@ class Limiter:
         self.lock = RLock()
         self._thread_local = local()
 
-        if isinstance(argument, AbstractBucket):
+        if isinstance(argument, BaseAbstractBucket):
             limiter_lock = argument.limiter_lock()
             if limiter_lock is not None:
                 self.lock = (limiter_lock, self.lock)
 
-    def buckets(self) -> List[AbstractBucket]:
+    def buckets(self) -> List[SyncAbstractBucket | AsyncAbstractBucket]:
         """Get list of active buckets"""
         return self.bucket_factory.get_buckets()
 
-    def dispose(self, bucket: Union[int, AbstractBucket]) -> bool:
+    def dispose(self, bucket: Union[int, SyncAbstractBucket | AsyncAbstractBucket]) -> bool:
         """Dispose/Remove a specific bucket,
         using bucket-id or bucket object as param
         """
@@ -119,7 +121,7 @@ class Limiter:
 
     def _init_bucket_factory(
         self,
-        argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
+        argument: Union[BucketFactory, SyncAbstractBucket, AsyncAbstractBucket, Rate, List[Rate]],
     ) -> BucketFactory:
         if isinstance(argument, Rate):
             argument = [argument]
@@ -131,83 +133,87 @@ class Limiter:
             logger.info("Initializing default bucket(InMemoryBucket) with rates: %s", rates)
             argument = InMemoryBucket(rates)
 
-        if isinstance(argument, AbstractBucket):
+        if isinstance(argument, BaseAbstractBucket):
             argument = SingleBucketFactory(argument)
 
         assert isinstance(argument, BucketFactory), "Not a valid bucket/bucket-factory"
 
         return argument
 
-    def _delay_waiter(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
-        """On `try_acquire` failed, handle delay"""
-        assert bucket.failing_rate is not None
+    async def _handle_bucket_put_async(self, bucket: AsyncAbstractBucket, item: RateItem, blocking: bool) -> bool:
+        """
+        Attempt to insert an item into an asynchronous bucket, retrying with delays when needed.
 
-        if not blocking:
+        Parameters
+        ----------
+        bucket : AsyncAbstractBucket
+            The async bucket to acquire from.
+        item : RateItem
+            The rate-limited item to insert.
+        blocking : bool
+            If True, keep retrying until the item can be inserted; if False,
+            return immediately when acquisition fails.
+
+        Returns
+        -------
+        bool
+            True if the item was successfully inserted into the bucket,
+            False if acquisition failed in non-blocking mode.
+        """
+        acquire = await bucket.put(item)
+        if acquire:
+            return True
+        elif not blocking:
             return False
-
-        delay = bucket.waiting(item)
-
-        if _force_async or isawaitable(delay):
-
-            async def _handle_async(delay):
-                while True:
-                    d = await delay if isawaitable(delay) else delay
-                    assert isinstance(d, int) and d >= 0
-                    d += self.buffer_ms
-                    await asyncio.sleep(d / 1000)
-                    item.timestamp += d
-                    r = bucket.put(item)
-                    r = await r if isawaitable(r) else r
-                    if r:
-                        return True
-                    delay = bucket.waiting(item)
-
-            return _handle_async(delay)
         else:
-            total_delay = 0
-
-            while True:
-                assert not isawaitable(delay)
-                logger.debug("delay=%d, total_delay=%s", delay, total_delay)
+            while acquire is False:
+                delay = await bucket.waiting(item)
 
                 delay += self.buffer_ms
-                total_delay += delay
-
-                sleep(delay / 1000)
+                await asyncio.sleep(delay / 1000)
                 item.timestamp += delay
-                re_acquire = bucket.put(item)
-                # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
-                assert isinstance(re_acquire, bool)
-
-                if re_acquire:
-                    return True
-                delay = bucket.waiting(item)
-
-    def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
-        """Putting item into bucket"""
-
-        def _handle_result(is_success: bool):
-            if not is_success:
-                return self._delay_waiter(bucket, item, blocking=blocking, _force_async=_force_async)
+                acquire = await bucket.put(item)
 
             return True
 
+    def _handle_bucket_put_sync(self, bucket: SyncAbstractBucket, item: RateItem, blocking: bool) -> bool:
+        """
+        Attempt to insert an item into a synchronous bucket, retrying if necessary.
+
+        Parameters
+        ----------
+        bucket : SyncAbstractBucket
+            The target bucket to acquire from.
+        item : RateItem
+            The rate-limited item to insert.
+        blocking : bool
+            If True, block and retry until the item can be inserted;
+            if False, return immediately if acquisition fails.
+
+        Returns
+        -------
+        bool
+            True if the item was successfully inserted into the bucket,
+            False if acquisition failed in non-blocking mode.
+        """
         acquire = bucket.put(item)
+        if acquire:
+            return True
+        else:
+            acquire = bucket.put(item)
+            if acquire:
+                return True
+            elif not blocking:
+                return False
+            else:
+                while acquire is False:
+                    delay = bucket.waiting(item)
 
-        if isawaitable(acquire):
-
-            async def _put_async(acquire):
-                acquire = await acquire
-                result = _handle_result(acquire)
-
-                while isawaitable(result):
-                    result = await result
-
-                return result
-
-            return _put_async(acquire)
-
-        return _handle_result(acquire)  # type: ignore
+                    delay += self.buffer_ms
+                    sleep(delay / 1000)
+                    item.timestamp += delay
+                    acquire = bucket.put(item)
+                return True
 
     def _get_async_lock(self):
         """Returns thread_local, loop-specific lock"""
@@ -226,13 +232,26 @@ class Limiter:
 
     def try_acquire(self, name: str = __name__, weight: int = 1, timeout: int = -1, blocking: bool = True) -> Union[bool, Awaitable[bool]]:
         try:
-            return self._try_acquire(name=name, weight=weight, timeout=timeout, blocking=blocking)
+            if weight <= 0:
+                return True
+
+            if timeout != -1:
+                raise NotImplementedError("timeout not implemented for sync try_acquire yet")
+
+            with combined_lock(self.lock, blocking=blocking):
+                item = self.bucket_factory.wrap_item(name, weight)
+                assert isinstance(item, RateItem), "Use try_acquire_async with async buckets"
+                bucket = self.bucket_factory.get(item)
+
+                if not isinstance(bucket, SyncAbstractBucket):
+                    raise ValueError("Use try_acquire_async() with async buckets")
+
+                result = self._handle_bucket_put_sync(bucket, item, blocking=blocking)
+
+                return result
         except TimeoutError:
             logger.debug("Acquisition TimeoutError")
             return False
-
-    async def _acquire_async(self, blocking, name, weight):
-        return await self._handle_async_result(self._try_acquire(name, weight, blocking=blocking, _force_async=True))
 
     async def try_acquire_async(self, name: str = __name__, weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool:
         """
@@ -249,7 +268,7 @@ class Limiter:
         async def run():
             lock = self._get_async_lock()
             async with lock:
-                return await self._acquire_async(blocking=blocking, name=name, weight=weight)
+                return await self._try_acquire_async_inner(name, weight, blocking=blocking)
 
         if timeout == -1:
             return await run()
@@ -258,80 +277,26 @@ class Limiter:
         except asyncio.TimeoutError:
             return False
 
-    async def _handle_async_acquire(
-        self,
-        item: Awaitable[RateItem],
-        blocking: bool,
-        _force_async: bool = False,
-    ):
-        this_item = await item
-        bucket = self.bucket_factory.get(this_item)
-        if isawaitable(bucket):
-            bucket = await bucket
-        assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {this_item.name}"
-        result = self.handle_bucket_put(bucket, this_item, blocking=blocking, _force_async=_force_async)
-
+    async def _handle_async_result(self, result: T | Awaitable[T]) -> T:
         while isawaitable(result):
-            result = await result
-
+            result = await result  # type: ignore[union-attr]
         return result
 
-    async def _handle_async_bucket(
-        self,
-        bucket: Awaitable[AbstractBucket],
-        item: RateItem,
-        blocking: bool,
-        _force_async: bool = False,
-    ):
-        this_bucket = await bucket
-        assert isinstance(this_bucket, AbstractBucket), f"Invalid bucket: item: {item.name}"
-        result = self.handle_bucket_put(this_bucket, item, blocking=blocking, _force_async=_force_async)
-
-        while isawaitable(result):
-            result = await result
-
-        return result
-
-    async def _handle_async_result(self, result):
-        while isawaitable(result):
-            result = await result
-
-        return result
-
-    def _try_acquire(self, name: str, weight: int, blocking: bool, timeout: int = -1, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
+    async def _try_acquire_async_inner(self, name: str, weight: int, blocking: bool, timeout: int = -1) -> bool:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
-
-        if timeout != -1:
-            raise NotImplementedError("timeout not implemented for sync try_acquire yet")
+        if weight <= 0:
+            return True
 
         with combined_lock(self.lock, blocking=blocking):
-            assert weight >= 0, "item's weight must be >= 0"
-
-            if weight == 0:
-                # NOTE: if item is weightless, just let it go through
-                # NOTE: this might change in the future
-                return True
-
-            item = self.bucket_factory.wrap_item(name, weight)
-
-            if isawaitable(item):
-                return self._handle_async_acquire(item, blocking=blocking)
-
-            assert isinstance(item, RateItem)
-
-            bucket = self.bucket_factory.get(item)
-            if isawaitable(bucket):
-                return self._handle_async_bucket(bucket=bucket, item=item, blocking=blocking, _force_async=_force_async)
-
-            assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-            result = self.handle_bucket_put(bucket, item, blocking=blocking, _force_async=_force_async)
-
-            if isawaitable(result):
-                return self._handle_async_result(result)
-
-            return result
+            item = await self._handle_async_result(self.bucket_factory.wrap_item(name, weight))
+            bucket = await self._handle_async_result(self.bucket_factory.get(item))
+            if isinstance(bucket, SyncAbstractBucket):
+                return self._handle_bucket_put_sync(bucket, item, blocking=blocking)
+            else:
+                assert isinstance(bucket, AsyncAbstractBucket), f"{type(bucket)=} is not AsyncAbstractBucket"
+                return await self._handle_bucket_put_async(bucket, item, blocking=blocking)
 
     def as_decorator(self, *, name="ratelimiter", weight=1):
         def deco(func: Callable[..., Any]) -> Callable[..., Any]:

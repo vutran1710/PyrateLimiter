@@ -11,7 +11,7 @@ from typing import Optional
 
 import pytest
 
-from pyrate_limiter import AbstractBucket
+from pyrate_limiter import SyncAbstractBucket
 from pyrate_limiter import Duration
 from pyrate_limiter import Limiter
 from pyrate_limiter import Rate
@@ -24,7 +24,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-BUCKET: Optional[AbstractBucket] = None
+BUCKET: Optional[SyncAbstractBucket] = None
 
 
 def my_task():

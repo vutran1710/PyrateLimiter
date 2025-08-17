@@ -16,7 +16,7 @@ from pyrate_limiter import limiter_factory
 from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
-from pyrate_limiter import RedisBucket
+from pyrate_limiter import RedisBucket, AsyncRedisBucket
 
 
 # Make log messages visible on test failure (or with pytest -s)
@@ -54,7 +54,7 @@ async def create_async_redis_bucket(rates: List[Rate]):
     redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)
     bucket_key = f"test-bucket/{id_generator()}"
     await redis_db.delete(bucket_key)
-    bucket = await RedisBucket.init(rates, redis_db, bucket_key)
+    bucket = await AsyncRedisBucket.init(rates, redis_db, bucket_key)
     assert await bucket.count() == 0
     return bucket
 

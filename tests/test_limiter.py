@@ -14,7 +14,7 @@ from .helpers import concurrent_acquire
 from .helpers import flushing_bucket
 from .helpers import inspect_bucket_items
 from .helpers import prefilling_bucket
-from pyrate_limiter import AbstractBucket
+from pyrate_limiter import BaseAbstractBucket
 from pyrate_limiter import BucketAsyncWrapper
 from pyrate_limiter import BucketFactory
 from pyrate_limiter import Duration

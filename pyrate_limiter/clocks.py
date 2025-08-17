@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from time import monotonic
-from typing import TYPE_CHECKING, Awaitable, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool
@@ -14,7 +14,15 @@ class AbstractClock(ABC):
     """Clock that return timestamp for `now`"""
 
     @abstractmethod
-    def now(self) -> Union[int, Awaitable[int]]:
+    def now(self) -> int:
+        """Get time as of now, in miliseconds"""
+
+
+class AsyncAbstractClock(ABC):
+    """Clock that return timestamp for `now`"""
+
+    @abstractmethod
+    async def now(self) -> int:
         """Get time as of now, in miliseconds"""
 
 
@@ -26,7 +34,7 @@ class MonotonicClock(AbstractClock):
         return int(1000 * monotonic())
 
 
-class MonotonicAsyncClock(AbstractClock):
+class AsyncMonotonicClock(AsyncAbstractClock):
     """Monotonic Async Clock, meant for testing only"""
 
     async def now(self) -> int:

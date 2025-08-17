@@ -35,25 +35,25 @@ async def test_bucket_01(create_bucket):
     peek = await bucket.peek(0)
     assert peek is None
 
-    await bucket.put(RateItem("my-item", bucket.now()))
+    await bucket.put(RateItem("my-item", await bucket.now()))
     assert await bucket.count() == 1
 
-    await bucket.put(RateItem("my-item", bucket.now(), weight=10))
+    await bucket.put(RateItem("my-item", await bucket.now(), weight=10))
     assert await bucket.count() == 11
 
-    assert await bucket.put(RateItem("my-item", bucket.now(), weight=20)) is False
+    assert await bucket.put(RateItem("my-item", await bucket.now(), weight=20)) is False
     assert bucket.failing_rate == rates[0]
 
-    assert await bucket.put(RateItem("my-item", bucket.now(), weight=9)) is True
+    assert await bucket.put(RateItem("my-item", await bucket.now(), weight=9)) is True
     assert await bucket.count() == 20
 
-    assert await bucket.put(RateItem("my-item", bucket.now())) is False
+    assert await bucket.put(RateItem("my-item", await bucket.now())) is False
 
     await asyncio.sleep(2)
-    assert await bucket.put(RateItem("my-item", bucket.now())) is True
+    assert await bucket.put(RateItem("my-item", await bucket.now())) is True
 
     await asyncio.sleep(2)
-    assert await bucket.put(RateItem("my-item", bucket.now(), weight=30)) is False
+    assert await bucket.put(RateItem("my-item", await bucket.now(), weight=30)) is False
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_bucket_02(create_bucket):
     start = time()
 
     while await bucket.count() < 150:
-        await bucket.put(RateItem("item", bucket.now()))
+        await bucket.put(RateItem("item", await bucket.now()))
 
         if await bucket.count() == 31:
             cost = time() - start
@@ -94,12 +94,12 @@ async def test_bucket_03(create_bucket):
     peek = await bucket.peek(0)
     assert peek is None
 
-    await bucket.put(RateItem("item1", bucket.now()))
+    await bucket.put(RateItem("item1", await bucket.now()))
     peek = await bucket.peek(0)
     assert isinstance(peek, RateItem)
     assert "item1" in peek.name
 
-    await bucket.put(RateItem("item2", bucket.now()))
+    await bucket.put(RateItem("item2", await bucket.now()))
     peek = await bucket.peek(0)
     assert isinstance(peek, RateItem)
     assert "item2" in peek.name
@@ -108,7 +108,7 @@ async def test_bucket_03(create_bucket):
     assert isinstance(peek, RateItem)
     assert "item1" in peek.name
 
-    await bucket.put(RateItem("item3", bucket.now()))
+    await bucket.put(RateItem("item3", await bucket.now()))
     peek = await bucket.peek(0)
     assert isinstance(peek, RateItem)
     assert "item3" in peek.name
@@ -135,7 +135,7 @@ async def test_bucket_waiting(create_bucket):
     bucket = BucketAsyncWrapper(bucket)
 
     async def create_item(weight: int = 1) -> RateItem:
-        now = bucket.now()
+        now = await bucket.now()
 
         if isawaitable(now):
             now = await now
@@ -143,7 +143,7 @@ async def test_bucket_waiting(create_bucket):
         assert isinstance(now, int)
         return RateItem("item", now, weight)
 
-    start = bucket.now()
+    start = await bucket.now()
     assert start > 0
 
     assert await bucket.waiting(await create_item()) == 0
@@ -153,7 +153,7 @@ async def test_bucket_waiting(create_bucket):
         # NOTE: sleep 100ms between each item
         await asyncio.sleep(0.1)
 
-    end = bucket.now()
+    end = await bucket.now()
     assert end > 0
 
     elapsed = end - start
@@ -198,16 +198,16 @@ async def test_bucket_leak(create_bucket):
     bucket = BucketAsyncWrapper(await create_bucket(rates))
 
     while await bucket.count() < 200:
-        await bucket.put(RateItem("item", bucket.now()))
+        await bucket.put(RateItem("item", await bucket.now()))
 
-    await bucket.leak(bucket.now())
+    await bucket.leak(await bucket.now())
     assert await bucket.count() == 100
-    assert await bucket.leak(bucket.now()) == 0
+    assert await bucket.leak(await bucket.now()) == 0
     assert await bucket.count() == 100
 
     await asyncio.sleep(3.01)
-    assert await bucket.leak(bucket.now()) == 100
-    assert await bucket.leak(bucket.now()) == 0
+    assert await bucket.leak(await bucket.now()) == 100
+    assert await bucket.leak(await bucket.now()) == 0
     assert await bucket.count() == 0
 
 
@@ -218,7 +218,7 @@ async def test_bucket_flush(create_bucket):
     bucket = BucketAsyncWrapper(await create_bucket(rates))
     assert isinstance(bucket.rates[0], Rate)
 
-    while await bucket.put(RateItem("item", bucket.now())):
+    while await bucket.put(RateItem("item", await bucket.now())):
         pass
 
     assert await bucket.count() == 50
@@ -239,7 +239,7 @@ async def test_bucket_performance(create_bucket):
     before = time()
 
     for _ in range(10_000):
-        item = RateItem("item", bucket.now())
+        item = RateItem("item", await bucket.now())
         assert await bucket.put(item) is True
 
     after = time()
