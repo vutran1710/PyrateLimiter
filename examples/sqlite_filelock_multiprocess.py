@@ -13,7 +13,6 @@ import logging
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor, wait
-from functools import partial
 from typing import Optional
 
 from pyrate_limiter import Duration, Limiter, limiter_factory
@@ -48,7 +47,7 @@ def test_sqlite_filelock_multiprocess():
 
     start = time.monotonic()
 
-    with ProcessPoolExecutor(initializer=partial(init_process)) as executor:
+    with ProcessPoolExecutor(initializer=init_process) as executor:
         futures = [executor.submit(my_task) for _ in range(NUM_REQUESTS)]
         wait(futures)
 

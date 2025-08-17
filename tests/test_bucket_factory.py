@@ -15,9 +15,8 @@ from pyrate_limiter import RateItem
 
 
 @pytest.mark.asyncio
-async def test_factory_01(clock, create_bucket):
+async def test_factory_01(create_bucket):
     factory = DemoBucketFactory(
-        clock,
         hello=await create_bucket(DEFAULT_RATES),
     )
 
@@ -35,12 +34,12 @@ async def test_factory_01(clock, create_bucket):
 
 
 @pytest.mark.asyncio
-async def test_factory_leak(clock, create_bucket):
+async def test_factory_leak(create_bucket):
     bucket1 = await create_bucket(DEFAULT_RATES)
     bucket2 = await create_bucket(DEFAULT_RATES)
     assert id(bucket1) != id(bucket2)
 
-    factory = DemoBucketFactory(clock, auto_leak=True, b1=bucket1, b2=bucket2)
+    factory = DemoBucketFactory(auto_leak=True, b1=bucket1, b2=bucket2)
     assert len(factory.buckets) == 2
     logger.info("Factory initiated with %s buckets", len(factory.buckets))
 
