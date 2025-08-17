@@ -209,7 +209,7 @@ When multiple bucket types are needed and items must be routed based on certain 
 First, define your clock (time source). Most use cases work with the built-in clocks:
 
 ```python
-from pyrate_limiter.clock import MonotonicClock, MonotonicClock, SQLiteClock
+from pyrate_limiter.clock import MonotonicClock, SQLiteClock
 
 base_clock = MonotonicClock()
 ```
