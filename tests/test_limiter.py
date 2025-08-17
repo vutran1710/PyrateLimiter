@@ -4,6 +4,7 @@ import time
 from inspect import isawaitable
 
 import pytest
+import sys
 
 from .conftest import DEFAULT_RATES
 from .conftest import logger
@@ -26,6 +27,12 @@ from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
 from pyrate_limiter import TimeClock
 
+buffer_ms = 10
+# Compute a windows specific jitter, due to clock timing 
+# on GHA's Windows runners
+jitter_adjustment = 0
+if sys.platform == "win32":
+    jitter_adjustment = 50
 
 @pytest.mark.asyncio
 async def test_limiter_constructor_01(clock):
@@ -101,21 +108,23 @@ async def test_limiter_01(
 
     bucket = await create_bucket(DEFAULT_RATES)
 
+    buffer_ms = 10
     factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
-        buffer_ms=10
+        buffer_ms=buffer_ms
     )
     bucket = BucketAsyncWrapper(bucket)
+    bucket.flush()
 
     item = "demo"
 
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
     assert acquire_ok
-    assert cost <= 10
+    assert cost <= jitter_adjustment
     assert await bucket.count() == 0
 
     logger.info("Limiter Test #1")
@@ -124,7 +133,7 @@ async def test_limiter_01(
     if not limiter_should_raise:
         acquire_ok, cost = await async_acquire(limiter, item)
         if limiter_delay is None:
-            assert cost <= 50
+            assert cost <= 50 + jitter_adjustment
             assert not acquire_ok
         else:
             assert acquire_ok
@@ -134,7 +143,7 @@ async def test_limiter_01(
                 acquire_ok, cost = await async_acquire(limiter, item)
         else:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 350
+            assert cost > 350 - jitter_adjustment
             assert acquire_ok
 
     # # Flush before testing again
@@ -175,10 +184,11 @@ async def test_limiter_01(
             await async_acquire(limiter, item, 5)
     else:
         acquire_ok, cost = await async_acquire(limiter, item, 5)
-        assert cost <= 50
+        assert cost <= 50 + jitter_adjustment
         assert not acquire_ok
 
 
+@pytest.mark.asyncredis
 @pytest.mark.asyncio
 async def test_limiter_async_factory_get(
     clock,
@@ -205,7 +215,7 @@ async def test_limiter_async_factory_get(
     if not limiter_should_raise:
         acquire_ok, cost = await async_acquire(limiter, item)
         if limiter_delay is None:
-            assert cost <= 50
+            assert cost <= 50 + jitter_adjustment
             assert not acquire_ok
         else:
             assert acquire_ok
@@ -215,7 +225,7 @@ async def test_limiter_async_factory_get(
                 acquire_ok, cost = await async_acquire(limiter, item)
         else:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 350
+            assert cost > 350 + jitter_adjustment
             assert acquire_ok
 
     # # Flush before testing again
@@ -256,7 +266,7 @@ async def test_limiter_async_factory_get(
             await async_acquire(limiter, item, 5)
     else:
         acquire_ok, cost = await async_acquire(limiter, item, 5)
-        assert cost <= 50
+        assert cost <= 50 + jitter_adjustment
         assert not acquire_ok
 
 
