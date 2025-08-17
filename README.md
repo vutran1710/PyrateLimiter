@@ -126,7 +126,7 @@ session = RateLimitedRequestsSession(limiter)
 
 ```
 
-Example: [aiohttp_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/extras/aiohttp_ratelimiter.py)
+Example: [aiohttp_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/aiohttp_ratelimiter.py)
 
 ### HTTPX
 
