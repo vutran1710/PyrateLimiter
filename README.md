@@ -145,7 +145,7 @@ async with httpx.AsyncClient(transport=AsyncRateLimiterTransport(limiter=limiter
 
 ...
 ```
-Example: [httpx_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/pyrate_limiter/extras/httpx_ratelimiter.py)
+Example: [httpx_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/httpx_ratelimiter.py)
 
 ### Requests
 ```py
