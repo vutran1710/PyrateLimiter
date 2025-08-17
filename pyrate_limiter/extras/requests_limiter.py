@@ -22,7 +22,7 @@ class RateLimitedRequestsSession(Session):
         Args:
             limiter: Object exposing ``try_acquire(str) -> None`` that blocks/raises when over limit.
             name: Token/key used by the limiter to bucket this session's requests.
-            **_: Ignored; accepted for API compatibility.
+            ``**_``: Ignored; accepted for API compatibility.
         """
         super().__init__()
         self._limiter = limiter
@@ -35,10 +35,10 @@ class RateLimitedRequestsSession(Session):
         Args:
             method: HTTP method (e.g., "GET", "POST").
             url: Request URL.
-            *args, **kwargs: Passed through to ``requests.Session.request``.
+            ``*args``, ``**kwargs``: Passed through to ``requests.Session.request``.
 
         Returns:
-            requests.Response returned by the underlying session.
+            :class:`requests.Response` returned by the underlying session.
         """
         self._limiter.try_acquire(self._name)
         return super().request(method, url, *args, **kwargs)
