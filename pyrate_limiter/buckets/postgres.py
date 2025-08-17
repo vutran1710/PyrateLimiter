@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool  # type: ignore[import-untyped]
@@ -163,5 +166,5 @@ class PostgresBucket(AbstractBucket):
         if self.pool is not None and not self.pool.closed:
             try:
                 self.pool.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Exception closing pool, %s", e)
