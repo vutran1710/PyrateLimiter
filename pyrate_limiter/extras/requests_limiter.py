@@ -12,7 +12,7 @@ class RateLimitedRequestsSession(Session):
     """
     A requests.Session that enforces a rate limit via a provided Limiter.
 
-    The limiter's `try_acquire(name)` is called before every outbound request.
+    The limiter's ``try_acquire(name)`` is called before every outbound request.
     """
 
     def __init__(self, limiter: "Limiter", name: str = __name__, **_: Any) -> None:
@@ -20,7 +20,7 @@ class RateLimitedRequestsSession(Session):
         Initialize the rate-limited session.
 
         Args:
-            limiter: Object exposing `try_acquire(str) -> None` that blocks/raises when over limit.
+            limiter: Object exposing ``try_acquire(str) -> None`` that blocks/raises when over limit.
             name: Token/key used by the limiter to bucket this session's requests.
             **_: Ignored; accepted for API compatibility.
         """
