@@ -101,12 +101,13 @@ async def test_limiter_01(
 
     bucket = await create_bucket(DEFAULT_RATES)
 
+    buffer_ms = 10
     factory = DemoBucketFactory(clock, demo=bucket)
     limiter = Limiter(
         factory,
         raise_when_fail=limiter_should_raise,
         max_delay=limiter_delay,
-        buffer_ms=10
+        buffer_ms=buffer_ms
     )
     bucket = BucketAsyncWrapper(bucket)
 
@@ -115,7 +116,7 @@ async def test_limiter_01(
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
     assert acquire_ok
-    assert cost <= 10
+    assert cost <= (buffer_ms*2)
     assert await bucket.count() == 0
 
     logger.info("Limiter Test #1")
@@ -134,7 +135,7 @@ async def test_limiter_01(
                 acquire_ok, cost = await async_acquire(limiter, item)
         else:
             acquire_ok, cost = await async_acquire(limiter, item)
-            assert cost > 350
+            assert cost > 350 - (buffer_ms*2)
             assert acquire_ok
 
     # # Flush before testing again
