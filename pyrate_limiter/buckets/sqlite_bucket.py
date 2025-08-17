@@ -167,12 +167,13 @@ class SQLiteBucket(SyncAbstractBucket):
             return RateItem(item[0], item[1])
 
     def close(self):
-        if self.conn is not None:
-            try:
-                self.conn.close()
-                self.conn = None
-            except Exception as e:
-                logger.debug("Exception %s closing sql connection", e)
+        with self.lock:
+            if self.conn is not None:
+                try:
+                    self.conn.close()
+                    self.conn = None
+                except Exception as e:
+                    logger.debug("Exception %s closing sql connection", e)
 
     @classmethod
     def init_from_file(
