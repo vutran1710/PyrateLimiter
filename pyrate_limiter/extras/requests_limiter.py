@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Union
 
 from requests import Response, Session
 
@@ -28,7 +28,7 @@ class RateLimitedRequestsSession(Session):
         self._limiter = limiter
         self._name = name
 
-    def request(self, method: str | bytes, url: str | bytes, *args: Any, **kwargs: Any) -> Response:
+    def request(self, method: Union[str, bytes], url: Union[str, bytes], *args: Any, **kwargs: Any) -> Response:
         """
         Perform an HTTP request after acquiring from the limiter.
 
