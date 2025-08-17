@@ -161,4 +161,7 @@ class PostgresBucket(AbstractBucket):
 
     def close(self):
         if self.pool is not None and not self.pool.closed:
-            self.pool.close()
+            try:
+                self.pool.close()
+            except Exception:
+                pass
