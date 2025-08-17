@@ -35,7 +35,7 @@ class RateLimitedRequestsSession(Session):
         Args:
             method: HTTP method (e.g., "GET", "POST").
             url: Request URL.
-            *args, **kwargs: Passed through to `requests.Session.request`.
+            *args, **kwargs: Passed through to ``requests.Session.request``.
 
         Returns:
             requests.Response returned by the underlying session.
