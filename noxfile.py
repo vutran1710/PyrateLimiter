@@ -23,7 +23,7 @@ PYTEST_NOTLINUX_ARGS = [
     "--maxfail=1",
     "-m",
     "not postgres and not redis and not asyncredis",
-    "--numprocesses=3",
+    "--numprocesses=auto",
     "--ignore=tests/test_multiprocessing.py",
 ]
 
