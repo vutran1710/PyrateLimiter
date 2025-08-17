@@ -179,6 +179,7 @@ async def test_limiter_01(
         assert not acquire_ok
 
 
+@pytest.mark.asyncredis
 @pytest.mark.asyncio
 async def test_limiter_async_factory_get(
     clock,

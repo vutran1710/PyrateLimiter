@@ -15,7 +15,18 @@ COVERAGE_APPEND2_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report="
 
 # Reduce # of cores to 3: one less than GHA runner's cores: timing tests are sensitive to high load
 PYTEST_ARGS = ["--verbose", "--maxfail=1", "-m", "not mpbucket", "--numprocesses=3", "--ignore=tests/test_multiprocessing.py"]
+
 COVERAGE_REPORT_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report=term", "--cov-report=xml", "--cov-report=html"]
+
+PYTESTSMOKE_ARGS = ["--verbose", "--maxfail=1", "-m", "inmemory and monotonic", "--numprocesses=auto", "--ignore=tests/test_multiprocessing.py"]
+PYTEST_NOTLINUX_ARGS = [
+    "--verbose",
+    "--maxfail=1",
+    "-m",
+    "not postgres and not redis and not asyncredis",
+    "--numprocesses=3",
+    "--ignore=tests/test_multiprocessing.py",
+]
 
 
 def get_examples():
@@ -39,6 +50,20 @@ def cover(session) -> None:
 
     # Everything else - concurrent
     session.run("pytest", *PYTEST_ARGS, *COVERAGE_REPORT_ARGS, "tests", *get_examples())
+
+
+@session(python=False)
+def smoke(session) -> None:
+    """Smoke test - tests against in-memory database"""
+
+    session.run("pytest", *PYTESTSMOKE_ARGS, "tests")
+
+
+@session(python=False)
+def notlinux(session) -> None:
+    """Smoke test - tests against in-memory database"""
+
+    session.run("pytest", *PYTEST_NOTLINUX_ARGS, "tests")
 
 
 @session(python=False)
