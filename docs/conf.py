@@ -28,6 +28,8 @@ extensions = [
     "myst_parser",
 ]
 
+suppress_warnings = ["ref.ref"]
+
 myst_enable_extensions = ["html_image"]
 myst_heading_anchors = 6
 

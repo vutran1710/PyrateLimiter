@@ -21,7 +21,6 @@ from pyrate_limiter import LimiterDelayException
 from pyrate_limiter import Rate
 from pyrate_limiter import SQLiteBucket
 from pyrate_limiter import SQLiteClock
-from pyrate_limiter import TimeClock
 from pyrate_limiter.buckets.mp_bucket import MultiprocessBucket
 
 MAX_DELAY = Duration.DAY
@@ -46,7 +45,6 @@ def init_process_mp(
         LIMITER = Limiter(
             bucket,
             raise_when_fail=raise_when_fail,
-            clock=TimeClock(),
             max_delay=max_delay,
             retry_until_max_delay=not raise_when_fail,
         )
@@ -82,12 +80,12 @@ def init_process_sqlite(requests_per_second, db_path):
     global LIMITER
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = SQLiteBucket.init_from_file([rate], db_path=db_path, use_file_lock=True)
+    bucket._clock = SQLiteClock(bucket)
     LIMITER = Limiter(
         bucket,
         raise_when_fail=False,
         max_delay=MAX_DELAY,
         retry_until_max_delay=True,
-        clock=SQLiteClock(bucket),
     )
 
 
@@ -103,7 +101,6 @@ def my_task_async(num_requests):
         limiter = Limiter(
             bucket,
             raise_when_fail=False,
-            clock=SQLiteClock.default(),
             max_delay=MAX_DELAY,
             retry_until_max_delay=True,
         )
@@ -163,12 +160,12 @@ def test_sqlite_filelock_bucket():
         bucket = SQLiteBucket.init_from_file(
             [rate], db_path=db_path, use_file_lock=True
         )
+        bucket._clock = SQLiteClock(bucket)
         limiter = Limiter(
             bucket,
             raise_when_fail=False,
             max_delay=MAX_DELAY,
             retry_until_max_delay=True,
-            clock=SQLiteClock(bucket),
         )
         [limiter.try_acquire("mytest") for i in range(requests_per_second)]
 
@@ -205,14 +202,12 @@ async def test_mp_bucket_async():
 
     rate = Rate(requests_per_second, Duration.SECOND)
     bucket = MultiprocessBucket.init([rate])
-
     async def prime_bucket():
         # prime the bucket
         limiter = Limiter(
-            BucketAsyncWrapper(bucket),
+            bucket,
             retry_until_max_delay=True,
             max_delay=MAX_DELAY,
-            clock=SQLiteClock.default(),
         )
         for i in range(100):
             await limiter.try_acquire_async("mytest")
@@ -286,7 +281,6 @@ def test_limiter_delay():
         limiter = Limiter(
             bucket,
             raise_when_fail=True,
-            clock=TimeClock(),
             max_delay=Duration.SECOND,
             retry_until_max_delay=False,
         )
@@ -318,7 +312,6 @@ def test_bucket_full():
     limiter = Limiter(
         bucket,
         raise_when_fail=True,
-        clock=TimeClock(),
         max_delay=None,
         retry_until_max_delay=False,
     )
