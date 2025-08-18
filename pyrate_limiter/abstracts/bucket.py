@@ -210,7 +210,8 @@ class Leaker(Thread):
         self.sync_buckets.clear()
         self.async_buckets.clear()
 
-
+        self.sync_buckets.clear()
+        self.async_buckets.clear()
 class BucketFactory(ABC):
     """Asbtract BucketFactory class.
     It is reserved for user to implement/override this class with
