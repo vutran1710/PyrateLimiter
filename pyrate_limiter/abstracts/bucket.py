@@ -334,7 +334,7 @@ class BucketFactory(ABC):
 
         for bucket in self.get_buckets():
             try:
-                logger.info("Closing bucket %s", bucket)
+                logger.debug("Closing bucket %s", bucket)
                 bucket.close()
             except Exception as e:
                 logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)
