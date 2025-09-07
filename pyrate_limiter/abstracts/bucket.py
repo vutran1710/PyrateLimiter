@@ -105,7 +105,7 @@ class AbstractBucket(ABC):
     def close(self) -> None:  # noqa: B027
         """Release any resources held by the bucket.
 
-        Subclasses should override this method to perform any necessary cleanup
+        Subclasses may override this method to perform any necessary cleanup
         (e.g., closing files, network connections, or releasing locks) when the
         bucket is no longer needed.
         """
