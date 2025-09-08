@@ -463,3 +463,12 @@ class Limiter:
             return decorator_wrapper
 
         return with_mapping_func
+
+    def close(self) -> None:
+        self.bucket_factory.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
