@@ -103,6 +103,12 @@ class AbstractBucket(ABC):
         return None
 
     def close(self) -> None:  # noqa: B027
+        """Release any resources held by the bucket.
+
+        Subclasses may override this method to perform any necessary cleanup
+        (e.g., closing files, network connections, or releasing locks) when the
+        bucket is no longer needed.
+        """
         pass
 
     def __enter__(self):
@@ -324,11 +330,11 @@ class BucketFactory(ABC):
                 self._leaker.close()
                 self._leaker = None
         except Exception as e:
-            logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, self._leaker)
+            logger.info("Exception %s (%s) closing leaker %r", type(e).__name__, e, self._leaker)
 
         for bucket in self.get_buckets():
             try:
-                logger.info("Closing bucket %s", bucket)
+                logger.debug("Closing bucket %s", bucket)
                 bucket.close()
             except Exception as e:
                 logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)
