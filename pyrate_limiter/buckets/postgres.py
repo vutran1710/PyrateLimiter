@@ -63,7 +63,7 @@ class PostgresBucket(AbstractBucket):
         self._create_table()
 
     def now(self):
-        # Future: Use a Postgres time source via SQL or at insert time
+        # Future: Use a Postgres time source via SQL
         return time.time.now()
 
     @contextmanager
