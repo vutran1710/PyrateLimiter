@@ -18,8 +18,7 @@ from pyrate_limiter import MultiprocessBucket
 from pyrate_limiter import PostgresBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import RedisBucket
-from pyrate_limiter import TimeAsyncClock
-from pyrate_limiter import TimeClock
+from pyrate_limiter import MonotonicAsyncClock
 
 
 # Make log messages visible on test failure (or with pytest -s)
@@ -32,14 +31,12 @@ DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
 
 clocks = [
     pytest.param(MonotonicClock(), marks=pytest.mark.monotonic),
-    pytest.param(TimeClock(), marks=pytest.mark.timeclock),
-    pytest.param(TimeAsyncClock(), marks=pytest.mark.asyncclock),
+    pytest.param(MonotonicAsyncClock(), marks=pytest.mark.asyncclock),
 ]
 
 ClockSet = Union[
     MonotonicClock,
-    TimeClock,
-    TimeAsyncClock,
+    MonotonicAsyncClock,
 ]
 
 

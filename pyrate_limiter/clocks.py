@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import nullcontext
-from time import monotonic, time
+from time import monotonic
 from typing import TYPE_CHECKING, Optional, Union
 
 from .abstracts import AbstractClock
@@ -25,16 +25,11 @@ class MonotonicClock(AbstractClock):
         return int(1000 * monotonic())
 
 
-class TimeClock(AbstractClock):
-    def now(self):
-        return int(1000 * time())
-
-
-class TimeAsyncClock(AbstractClock):
-    """Time Async Clock, meant for testing only"""
+class MonotonicAsyncClock(AbstractClock):
+    """Monotonic Async Clock, meant for testing only"""
 
     async def now(self) -> int:
-        return int(1000 * time())
+        return int(1000 * monotonic())
 
 
 class SQLiteClock(AbstractClock):
