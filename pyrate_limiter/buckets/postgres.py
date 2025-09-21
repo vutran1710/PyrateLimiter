@@ -64,7 +64,7 @@ class PostgresBucket(AbstractBucket):
 
     def now(self):
         # Future: Use a Postgres time source via SQL
-        return time()
+        return int(1000 * time())
 
     @contextmanager
     def _get_conn(self):

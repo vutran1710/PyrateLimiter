@@ -84,7 +84,7 @@ class SQLiteBucket(AbstractBucket):
 
     def now(self):
         # Future: Use Sqlite time source via a Lua script
-        return time()
+        return int(1000 * time())
 
     def limiter_lock(self):
         if self.use_limiter_lock:
