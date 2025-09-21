@@ -71,7 +71,7 @@ class RedisBucket(AbstractBucket):
 
     def now(self):
         # Future: Use a Redis time source via a Lua script
-        return time.time.now()
+        return time()
 
     @classmethod
     def init(
