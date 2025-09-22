@@ -10,8 +10,10 @@ from .conftest import DEFAULT_RATES
 from .conftest import logger
 from .demo_bucket_factory import DemoBucketFactory
 from .helpers import async_count
+
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import RateItem
+from pyrate_limiter import BucketAsyncWrapper
 
 
 @pytest.mark.asyncio
@@ -38,8 +40,8 @@ async def test_factory_leak(create_bucket):
     bucket1 = await create_bucket(DEFAULT_RATES)
     bucket2 = await create_bucket(DEFAULT_RATES)
     assert id(bucket1) != id(bucket2)
-
-    factory = DemoBucketFactory(auto_leak=True, b1=bucket1, b2=bucket2)
+    
+    factory = DemoBucketFactory(auto_leak=True, b1=BucketAsyncWrapper(bucket1), b2=BucketAsyncWrapper(bucket2))
     assert len(factory.buckets) == 2
     logger.info("Factory initiated with %s buckets", len(factory.buckets))
 
