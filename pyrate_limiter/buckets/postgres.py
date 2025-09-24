@@ -63,7 +63,7 @@ class PostgresBucket(AbstractBucket):
         self._create_table()
 
     def now(self):
-        # Future: Use a Postgres time source via SQL
+        # TODO: Use a Postgres time source via SQL
         return int(1000 * time())
 
     @contextmanager
