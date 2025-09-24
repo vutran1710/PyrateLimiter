@@ -24,8 +24,9 @@ class AbstractBucket(ABC):
 
     rates: List[Rate]
     failing_rate: Optional[Rate] = None
-    _clock: AbstractClock = MonotonicClock()
 
+    def __init__(self):
+        self._clock: AbstractClock = MonotonicClock()
     def now(self):
         return self._clock.now()
 
