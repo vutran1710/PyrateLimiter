@@ -35,7 +35,7 @@ class DemoBucketFactory(BucketFactory):
             self.buckets[item_name_pattern] = bucket
 
     def wrap_item(self, name: str, weight: int = 1):
-        assert self.buckets is not None
+        assert self.buckets is not None and len(self.buckets) > 0
         now = next((b for b in self.buckets.values())).now()
 
         async def wrap_async():
