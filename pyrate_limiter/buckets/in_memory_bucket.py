@@ -20,6 +20,8 @@ class InMemoryBucket(AbstractBucket):
     failing_rate: Optional[Rate]
 
     def __init__(self, rates: List[Rate]):
+        super().__init__()
+
         self.rates = sorted(rates, key=lambda r: r.interval)
         self.items = []
 

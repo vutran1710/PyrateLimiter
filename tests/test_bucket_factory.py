@@ -37,13 +37,15 @@ async def test_factory_01(create_bucket):
 
 @pytest.mark.asyncio
 async def test_factory_leak(create_bucket):
-    bucket1 = await create_bucket(DEFAULT_RATES)
-    bucket2 = await create_bucket(DEFAULT_RATES)
+    bucket1 = await create_bucket([DEFAULT_RATES[0]])
+    bucket2 = await create_bucket([DEFAULT_RATES[1]])
     assert id(bucket1) != id(bucket2)
     
-    factory = DemoBucketFactory(auto_leak=True, b1=BucketAsyncWrapper(bucket1), b2=BucketAsyncWrapper(bucket2))
+    factory = DemoBucketFactory(auto_leak=True, b1=bucket1, b2=bucket2)
+    
     assert len(factory.buckets) == 2
     logger.info("Factory initiated with %s buckets", len(factory.buckets))
+
 
     for item_name in ["b1", "b2", "a1"]:
         for _ in range(3):
@@ -73,10 +75,8 @@ async def test_factory_leak(create_bucket):
         if item_name == "a1":
             assert await async_count(factory.buckets[item_name]) == 3
 
-        if is_async:
-            await asyncio.sleep(6)
-        else:
-            sleep(6)
+        await asyncio.sleep(2)
+
 
         assert await async_count(bucket1) == 0
         assert await async_count(bucket2) == 0

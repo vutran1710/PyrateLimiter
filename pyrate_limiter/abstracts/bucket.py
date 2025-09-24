@@ -27,6 +27,7 @@ class AbstractBucket(ABC):
 
     def __init__(self):
         self._clock: AbstractClock = MonotonicClock()
+
     def now(self):
         return self._clock.now()
 
