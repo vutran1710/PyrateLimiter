@@ -95,12 +95,12 @@ async def create_postgres_bucket(rates: List[Rate]):
 
 @pytest.fixture(
     params=[
-        create_in_memory_bucket,
-        create_redis_bucket,
-        create_sqlite_bucket,
-        create_async_redis_bucket,
-        create_postgres_bucket,
-        create_filelocksqlite_bucket,
+        pytest.param(create_in_memory_bucket, marks=pytest.mark.inmemory),
+        pytest.param(create_redis_bucket, marks=pytest.mark.redis),
+        pytest.param(create_async_redis_bucket, marks=pytest.mark.asyncredis),
+        pytest.param(create_sqlite_bucket, marks=pytest.mark.sqlite),
+        pytest.param(create_postgres_bucket, marks=pytest.mark.postgres),
+        pytest.param(create_filelocksqlite_bucket, marks=pytest.mark.filelocksqlite),
         pytest.param(create_mp_bucket, marks=pytest.mark.mpbucket)
     ]
 )
