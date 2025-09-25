@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
+from time import time
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
@@ -60,6 +61,10 @@ class PostgresBucket(AbstractBucket):
         self.rates = rates
         self._full_tbl = f"ratelimit___{self.table}"
         self._create_table()
+
+    def now(self):
+        # TODO: Use a Postgres time source via SQL
+        return int(1000 * time())
 
     @contextmanager
     def _get_conn(self):

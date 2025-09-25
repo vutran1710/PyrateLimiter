@@ -9,9 +9,8 @@ from threading import RLock, local
 from time import sleep
 from typing import Any, Awaitable, Callable, Iterable, List, Optional, Tuple, Union
 
-from .abstracts import AbstractBucket, AbstractClock, BucketFactory, Duration, Rate, RateItem
+from .abstracts import AbstractBucket, BucketFactory, Duration, Rate, RateItem
 from .buckets import InMemoryBucket
-from .clocks import MonotonicClock
 from .exceptions import BucketFullException, LimiterDelayException
 
 logger = logging.getLogger("pyrate_limiter")
@@ -24,15 +23,13 @@ class SingleBucketFactory(BucketFactory):
     """Single-bucket factory for quick use with Limiter"""
 
     bucket: AbstractBucket
-    clock: AbstractClock
 
-    def __init__(self, bucket: AbstractBucket, clock: AbstractClock):
-        self.clock = clock
+    def __init__(self, bucket: AbstractBucket):
         self.bucket = bucket
-        self.schedule_leak(bucket, clock)
+        self.schedule_leak(bucket)
 
     def wrap_item(self, name: str, weight: int = 1):
-        now = self.clock.now()
+        now = self.bucket.now()
 
         async def wrap_async():
             return RateItem(name, await now, weight=weight)
@@ -83,7 +80,6 @@ class Limiter:
     def __init__(
         self,
         argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
-        clock: Optional[AbstractClock] = None,
         raise_when_fail: bool = True,
         max_delay: Optional[Union[int, Duration]] = None,
         retry_until_max_delay: bool = False,
@@ -101,9 +97,8 @@ class Limiter:
             retry_until_max_delay (bool, optional): If True, retry operations until the maximum delay is reached.
                 Useful for ensuring operations eventually succeed within the allowed delay window. Defaults to False.
         """
-        if clock is None:
-            clock = MonotonicClock()
-        self.bucket_factory = self._init_bucket_factory(argument, clock=clock)
+
+        self.bucket_factory = self._init_bucket_factory(argument)
         self.raise_when_fail = raise_when_fail
         self.retry_until_max_delay = retry_until_max_delay
         self.buffer_ms = buffer_ms
@@ -135,7 +130,6 @@ class Limiter:
     def _init_bucket_factory(
         self,
         argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
-        clock: AbstractClock,
     ) -> BucketFactory:
         if isinstance(argument, Rate):
             argument = [argument]
@@ -148,7 +142,7 @@ class Limiter:
             argument = InMemoryBucket(rates)
 
         if isinstance(argument, AbstractBucket):
-            argument = SingleBucketFactory(argument, clock)
+            argument = SingleBucketFactory(argument)
 
         assert isinstance(argument, BucketFactory), "Not a valid bucket/bucket-factory"
 

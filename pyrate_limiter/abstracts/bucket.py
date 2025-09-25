@@ -10,7 +10,7 @@ from inspect import isawaitable, iscoroutine
 from threading import Thread
 from typing import Awaitable, Dict, List, Optional, Type, Union
 
-from .clock import AbstractClock
+from ..clocks import AbstractClock, MonotonicClock
 from .rate import Rate, RateItem
 
 logger = logging.getLogger("pyrate_limiter")
@@ -24,6 +24,12 @@ class AbstractBucket(ABC):
 
     rates: List[Rate]
     failing_rate: Optional[Rate] = None
+
+    def __init__(self):
+        self._clock: AbstractClock = MonotonicClock()
+
+    def now(self):
+        return self._clock.now()
 
     @abstractmethod
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
@@ -127,21 +133,18 @@ class Leaker(Thread):
     name = "PyrateLimiter's Leaker"
     sync_buckets: Dict[int, AbstractBucket]
     async_buckets: Dict[int, AbstractBucket]
-    clocks: Dict[int, AbstractClock]
     leak_interval: int = 10_000
     aio_leak_task: Optional[asyncio.Task] = None
 
     def __init__(self, leak_interval: int):
         self.sync_buckets = defaultdict()
         self.async_buckets = defaultdict()
-        self.clocks = defaultdict()
         self.leak_interval = leak_interval
         super().__init__()
 
-    def register(self, bucket: AbstractBucket, clock: AbstractClock):
+    def register(self, bucket: AbstractBucket):
         """Register a new bucket with its associated clock"""
         assert self.sync_buckets is not None
-        assert self.clocks is not None
         assert self.async_buckets is not None
 
         try_leak = bucket.leak(0)
@@ -153,20 +156,14 @@ class Leaker(Thread):
         else:
             self.sync_buckets[bucket_id] = bucket
 
-        self.clocks[bucket_id] = clock
-
     def deregister(self, bucket_id: int) -> bool:
         """Deregister a bucket"""
         if self.sync_buckets and bucket_id in self.sync_buckets:
             del self.sync_buckets[bucket_id]
-            assert self.clocks
-            del self.clocks[bucket_id]
             return True
 
         if self.async_buckets and bucket_id in self.async_buckets:
             del self.async_buckets[bucket_id]
-            assert self.clocks
-            del self.clocks[bucket_id]
 
             if not self.async_buckets and self.aio_leak_task:
                 self.aio_leak_task.cancel()
@@ -177,14 +174,10 @@ class Leaker(Thread):
         return False
 
     async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
-        if len(self.clocks) == 0:
-            return
-
         while buckets:
             try:
-                for bucket_id, bucket in list(buckets.items()):
-                    clock = self.clocks[bucket_id]
-                    now = clock.now()
+                for _, bucket in list(buckets.items()):
+                    now = bucket.now()
 
                     while isawaitable(now):
                         now = await now
@@ -221,7 +214,6 @@ class Leaker(Thread):
             super().start()
 
     def close(self):
-        self.clocks.clear()
         self.sync_buckets.clear()
         self.async_buckets.clear()
 
@@ -266,24 +258,23 @@ class BucketFactory(ABC):
 
     def create(
         self,
-        clock: AbstractClock,
         bucket_class: Type[AbstractBucket],
         *args,
         **kwargs,
     ) -> AbstractBucket:
         """Creating a bucket dynamically"""
         bucket = bucket_class(*args, **kwargs)
-        self.schedule_leak(bucket, clock)
+        self.schedule_leak(bucket)
         return bucket
 
-    def schedule_leak(self, new_bucket: AbstractBucket, associated_clock: AbstractClock) -> None:
+    def schedule_leak(self, new_bucket: AbstractBucket) -> None:
         """Schedule all the buckets' leak, reset bucket's failing rate"""
         assert new_bucket.rates, "Bucket rates are not set"
 
         if not self._leaker:
             self._leaker = Leaker(self.leak_interval)
 
-        self._leaker.register(new_bucket, associated_clock)
+        self._leaker.register(new_bucket)
         self._leaker.start()
         self._leaker.leak_async()
 

@@ -3,6 +3,7 @@ from os import getenv
 from typing import Dict
 from typing import Optional
 
+from typing import Iterable
 from redis.asyncio import ConnectionPool as AsyncConnectionPool
 from redis.asyncio import Redis as AsyncRedis
 
@@ -21,22 +22,24 @@ class DemoBucketFactory(BucketFactory):
     """Multi-bucket factory used for testing schedule-leaks"""
 
     buckets: Optional[Dict[str, AbstractBucket]] = None
-    clock: AbstractClock
     auto_leak: bool
 
-    def __init__(self, bucket_clock: AbstractClock, auto_leak=False, **buckets: AbstractBucket):
+    def __init__(self, auto_leak=False, **buckets: AbstractBucket):
         self.auto_leak = auto_leak
-        self.clock = bucket_clock
         self.buckets = {}
         self.leak_interval = 300
 
         for item_name_pattern, bucket in buckets.items():
             assert isinstance(bucket, AbstractBucket)
-            self.schedule_leak(bucket, bucket_clock)
+            self.schedule_leak(bucket)
             self.buckets[item_name_pattern] = bucket
 
     def wrap_item(self, name: str, weight: int = 1):
-        now = self.clock.now()
+        assert self.buckets is not None and len(self.buckets) > 0
+
+        bucket = self.get(RateItem(name=name, timestamp=0, weight=weight))
+        now = bucket.now()
+                 
 
         async def wrap_async():
             return RateItem(name, await now, weight=weight)
@@ -54,7 +57,7 @@ class DemoBucketFactory(BucketFactory):
             assert isinstance(bucket, AbstractBucket)
             return bucket
 
-        bucket = self.create(self.clock, InMemoryBucket, DEFAULT_RATES)
+        bucket = self.create(InMemoryBucket, DEFAULT_RATES)
         self.buckets[item.name] = bucket
         return bucket
 
@@ -66,19 +69,20 @@ class DemoBucketFactory(BucketFactory):
 class DemoAsyncGetBucketFactory(BucketFactory):
     """Async multi-bucket factory used for testing schedule-leaks"""
 
-    def __init__(self, bucket_clock: AbstractClock, auto_leak=False, **buckets: AbstractBucket):
+    buckets: dict[str, AbstractBucket] 
+
+    def __init__(self, auto_leak=False, **buckets: AbstractBucket):
         self.auto_leak = auto_leak
-        self.clock = bucket_clock
-        self.buckets = {}
+        self.buckets = {"test": InMemoryBucket(DEFAULT_RATES)}
         self.leak_interval = 300
 
         for item_name_pattern, bucket in buckets.items():
             assert isinstance(bucket, AbstractBucket)
-            self.schedule_leak(bucket, bucket_clock)
+            self.schedule_leak(bucket)
             self.buckets[item_name_pattern] = bucket
 
     def wrap_item(self, name: str, weight: int = 1):
-        now = self.clock.now()
+        now = next((b for b in self.buckets.values())).now()
 
         async def wrap_async():
             return RateItem(name, await now, weight=weight)
@@ -101,7 +105,7 @@ class DemoAsyncGetBucketFactory(BucketFactory):
         key = f"test-bucket/{id_generator()}"
         await redis_db.delete(key)
         bucket = await RedisBucket.init(DEFAULT_RATES, redis_db, key)
-        self.schedule_leak(bucket, self.clock)
+        self.schedule_leak(bucket)
         self.buckets.update({item.name: bucket})
         return bucket
 

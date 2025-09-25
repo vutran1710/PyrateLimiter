@@ -10,6 +10,8 @@ from time import time
 from typing import List, Optional, Tuple, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
+from ..clocks import AbstractClock
+from ..utils import dedicated_sqlite_clock_connection
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,10 @@ class SQLiteBucket(AbstractBucket):
         else:
             self.use_limiter_lock = True
             self.lock = lock
+
+    def now(self):
+        # TODO: Use Sqlite time source via a Lua script
+        return int(1000 * time())
 
     def limiter_lock(self):
         if self.use_limiter_lock:
@@ -230,3 +236,34 @@ class SQLiteBucket(AbstractBucket):
             sqlite_connection.commit()
 
             return cls(rates, sqlite_connection, table=table, lock=file_lock)
+
+
+class SQLiteClock(AbstractClock):
+    """Get timestamp using SQLite as remote clock backend"""
+
+    time_query = "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
+
+    def __init__(self, conn: Union[sqlite3.Connection, SQLiteBucket]):
+        """
+        In multiprocessing cases, use the bucket, so that a shared lock is used.
+        """
+
+        self.lock: Optional[RLock] = None
+
+        if isinstance(conn, SQLiteBucket):
+            self.conn = conn.conn
+            self.lock = conn.lock
+        else:
+            self.conn = conn
+
+    @classmethod
+    def default(cls):
+        conn = dedicated_sqlite_clock_connection()
+        return cls(conn)
+
+    def now(self) -> int:
+        with self.lock if self.lock else nullcontext():
+            cur = self.conn.execute(self.time_query)
+            now = cur.fetchone()[0]
+            cur.close()
+            return int(now)

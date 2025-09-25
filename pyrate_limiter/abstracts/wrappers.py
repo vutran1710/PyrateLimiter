@@ -68,6 +68,9 @@ class BucketAsyncWrapper(AbstractBucket):
         assert isinstance(wait, int)
         return wait
 
+    def now(self) -> int:
+        return self.bucket.now()
+
     @property
     def failing_rate(self):
         return self.bucket.failing_rate

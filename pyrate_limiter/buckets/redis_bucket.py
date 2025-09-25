@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from inspect import isawaitable
+from time import time
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Tuple, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
@@ -67,6 +68,10 @@ class RedisBucket(AbstractBucket):
         self.bucket_key = bucket_key
         self.script_hash = script_hash
         self.failing_rate = None
+
+    def now(self):
+        # TODO: Use a Redis time source via a Lua script
+        return int(1000 * time())
 
     @classmethod
     def init(
