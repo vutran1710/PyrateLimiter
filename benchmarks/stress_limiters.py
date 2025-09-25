@@ -6,7 +6,7 @@ from functools import partial
 from time import perf_counter
 from typing import Callable, Literal, cast
 
-from pyrate_limiter import Duration, Limiter, MonotonicClock, MultiprocessBucket, Rate, limiter_factory
+from pyrate_limiter import Duration, Limiter, MultiprocessBucket, Rate, limiter_factory
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class TestResult:
 
 
 def create_mp_limiter(max_delay: int, bucket: MultiprocessBucket):
-    limiter = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(), retry_until_max_delay=True, max_delay=max_delay, buffer_ms=BUFFER_MS)
+    limiter = Limiter(bucket, raise_when_fail=False, retry_until_max_delay=True, max_delay=max_delay, buffer_ms=BUFFER_MS)
 
     return limiter
 

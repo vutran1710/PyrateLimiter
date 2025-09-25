@@ -10,7 +10,7 @@ nox.options.reuse_existing_virtualenvs = True
 PYTEST_MP_ARGS = ["--verbose", "--maxfail=1", "tests/test_multiprocessing.py"]
 COVERAGE_APPEND_ARGS = ["--cov=pyrate_limiter", "--cov-report="]
 
-PYTEST_MP2_ARGS = ["--verbose", "--maxfail=1", "-m", "mpbucket and monotonic", "--ignore=tests/test_multiprocessing.py"]
+PYTEST_MP2_ARGS = ["--verbose", "--maxfail=1", "-m", "mpbucket", "--ignore=tests/test_multiprocessing.py"]
 COVERAGE_APPEND2_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report="]
 
 PYTEST_ARGS = ["--verbose", "--maxfail=1", "-m", "not mpbucket", "--numprocesses=auto", "--ignore=tests/test_multiprocessing.py"]

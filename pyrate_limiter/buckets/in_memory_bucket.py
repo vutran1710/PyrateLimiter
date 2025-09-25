@@ -2,7 +2,8 @@
 
 from typing import List, Optional
 
-from ..abstracts import AbstractBucket, Rate, RateItem
+from ..abstracts.bucket import AbstractBucket
+from ..abstracts.rate import Rate, RateItem
 from ..utils import binary_search
 
 
@@ -19,6 +20,8 @@ class InMemoryBucket(AbstractBucket):
     failing_rate: Optional[Rate]
 
     def __init__(self, rates: List[Rate]):
+        super().__init__()
+
         self.rates = sorted(rates, key=lambda r: r.interval)
         self.items = []
 
@@ -82,7 +85,7 @@ class InMemoryBucket(AbstractBucket):
     def count(self) -> int:
         return len(self.items)
 
-    def peek(self, index: int) -> Optional[RateItem]:
+    def peek(self, index: int) -> RateItem | None:
         if not self.items:
             return None
 
