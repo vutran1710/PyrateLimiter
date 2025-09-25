@@ -26,6 +26,9 @@ class AbstractBucket(ABC):
     failing_rate: Optional[Rate] = None
     _clock: AbstractClock = MonotonicClock()
 
+    def __init__(self):
+        self._clock: AbstractClock = MonotonicClock()
+
     def now(self):
         return self._clock.now()
 
@@ -107,6 +110,12 @@ class AbstractBucket(ABC):
         return None
 
     def close(self) -> None:  # noqa: B027
+        """Release any resources held by the bucket.
+
+        Subclasses may override this method to perform any necessary cleanup
+        (e.g., closing files, network connections, or releasing locks) when the
+        bucket is no longer needed.
+        """
         pass
 
     def __enter__(self):
@@ -125,7 +134,7 @@ class Leaker(Thread):
     name = "PyrateLimiter's Leaker"
     sync_buckets: Dict[int, AbstractBucket]
     async_buckets: Dict[int, AbstractBucket]
-    leak_interval: int = 1_000
+    leak_interval: int = 10_000
     aio_leak_task: Optional[asyncio.Task] = None
     _stop_event: Any
 
@@ -321,7 +330,7 @@ class BucketFactory(ABC):
 
         for bucket in self.get_buckets():
             try:
-                logger.info("Closing bucket %s", bucket)
+                logger.debug("Closing bucket %s", bucket)
                 bucket.close()
             except Exception as e:
                 logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)

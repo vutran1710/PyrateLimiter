@@ -7,9 +7,9 @@ from multiprocessing.managers import ListProxy
 from multiprocessing.synchronize import RLock as LockType
 from typing import List, Optional
 
-from pyrate_limiter.buckets import InMemoryBucket
-
 from ..abstracts import Rate, RateItem
+from ..buckets import InMemoryBucket
+from ..clocks import MonotonicClock
 
 
 class MultiprocessBucket(InMemoryBucket):
@@ -19,6 +19,8 @@ class MultiprocessBucket(InMemoryBucket):
     def __init__(self, rates: List[Rate], items: List[RateItem], mp_lock: LockType):
         if not isinstance(items, ListProxy):  # pragma: no cover - guard only
             raise ValueError("items must be a ListProxy")
+
+        self._clock = MonotonicClock()
 
         self.rates = sorted(rates, key=lambda r: r.interval)
         self.items = items

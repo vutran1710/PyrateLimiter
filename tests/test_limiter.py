@@ -272,3 +272,15 @@ def test_wait_too_long():
             break
 
     assert not success  # retried and then failed
+
+    time.sleep(1)
+
+    # raise_when_fail = True
+    limiter = Limiter(bucket, raise_when_fail=True, 
+                      max_delay=Duration.SECOND, retry_until_max_delay=True)
+
+    with pytest.raises(LimiterDelayException):
+        for i in range(500):
+            success = limiter.try_acquire("mytest", 1)
+            if not success:
+                break

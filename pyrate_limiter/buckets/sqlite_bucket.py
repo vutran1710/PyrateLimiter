@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from tempfile import gettempdir
 from threading import RLock
-from time import time
+from time import time, time_ns
 from typing import List, Optional, Tuple, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
@@ -81,6 +81,10 @@ class SQLiteBucket(AbstractBucket):
         else:
             self.use_limiter_lock = True
             self.lock = lock
+
+    def now(self):
+        # TODO: Use Sqlite time source via a Lua script
+        return time_ns() // 1000000
 
     def limiter_lock(self):
         if self.use_limiter_lock:
@@ -183,6 +187,7 @@ class SQLiteBucket(AbstractBucket):
 
         if db_path is None:
             temp_dir = Path(gettempdir())
+
             db_path = str(temp_dir / f"pyrate_limiter_{time()}.sqlite")
 
         # TBD: FileLock switched to a thread-local FileLock in 3.11.0.

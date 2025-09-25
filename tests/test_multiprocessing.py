@@ -32,7 +32,6 @@ def my_task():
 
     acquired = limiter_factory.LIMITER.try_acquire("my_task")
 
-    
     result = time.time()
     time.sleep(0.01)
 
@@ -188,7 +187,7 @@ async def test_mp_bucket_async():
         ]
         wait(futures)
 
-        time.sleep(2)
+        await asyncio.sleep(2)
 
         futures = [
             executor.submit(my_task_async, num_requests // num_workers)
