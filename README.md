@@ -663,7 +663,6 @@ Time source can be anything from anywhere: be it python's built-in time, or mono
 
 ```python
 from pyrate_limiter import MonotonicClock      # use python time.monotonic()
-from pyrate_limiter import MonotonicClock # use python time.monotonic()
 ```
 
 Clock's abstract interface only requires implementing a method `now() -> int`. And it can be both sync or async.
