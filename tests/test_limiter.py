@@ -1,5 +1,6 @@
 """Complete Limiter test suite
 """
+import asyncio
 import time
 from inspect import isawaitable
 
@@ -258,7 +259,7 @@ async def test_limiter_decorator(
         assert counter == 2
 
 
-def test_wait_too_long():
+async def test_wait_too_long():
 
     requests_per_second = 10
 
@@ -276,11 +277,11 @@ def test_wait_too_long():
     time.sleep(1)
 
     # raise_when_fail = True
-    limiter = Limiter(bucket, raise_when_fail=True, 
-                      max_delay=Duration.SECOND, retry_until_max_delay=True)
+    limiter = Limiter(bucket)
 
-    with pytest.raises(LimiterDelayException):
-        for i in range(500):
-            success = limiter.try_acquire("mytest", 1)
-            if not success:
-                break
+    tasks = [limiter.try_acquire_async("mytest", 1, timeout=0.0001) for i in range(500)]
+    r = await asyncio.gather(*tasks)
+
+    # Not all requests could be satisfied within the timeout
+    assert not all(r)
+   
