@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from time import monotonic
+from time import monotonic_ns
 from typing import TYPE_CHECKING, Awaitable, Union
 
 if TYPE_CHECKING:
@@ -20,17 +20,17 @@ class AbstractClock(ABC):
 
 class MonotonicClock(AbstractClock):
     def __init__(self):
-        monotonic()
+        monotonic_ns()
 
     def now(self):
-        return int(1000 * monotonic())
+        return int(monotonic_ns() / 1000000)
 
 
 class MonotonicAsyncClock(AbstractClock):
     """Monotonic Async Clock, meant for testing only"""
 
     async def now(self) -> int:
-        return int(1000 * monotonic())
+        return int(1000 * monotonic_ns())
 
 
 class PostgresClock(AbstractClock):
