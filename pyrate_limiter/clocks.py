@@ -23,14 +23,14 @@ class MonotonicClock(AbstractClock):
         monotonic_ns()
 
     def now(self):
-        return int(monotonic_ns() / 1000000)
+        return monotonic_ns() // 1000000
 
 
 class MonotonicAsyncClock(AbstractClock):
     """Monotonic Async Clock, meant for testing only"""
 
     async def now(self) -> int:
-        return int(monotonic_ns() / 1000000)
+        return monotonic_ns() // 1000000
 
 
 class PostgresClock(AbstractClock):
