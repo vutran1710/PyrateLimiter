@@ -138,7 +138,7 @@ def test_sqlite_filelock_bucket():
     # Start the ProcessPoolExecutor
     start = time.time()
 
-    with ProcessPoolExecutor(initializer=init_process_sqlite, initargs=(requests_per_second,db_path)) as executor:
+    with ProcessPoolExecutor(initializer=init_process_sqlite, initargs=(requests_per_second, db_path)) as executor:
         prime_bucket()
         futures = [executor.submit(my_task) for _ in range(num_requests)]
         wait(futures)
