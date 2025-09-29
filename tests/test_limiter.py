@@ -5,6 +5,7 @@ import time
 from inspect import isawaitable
 
 import pytest
+import asyncio 
 
 from .conftest import DEFAULT_RATES
 from .conftest import logger
@@ -285,3 +286,17 @@ async def test_wait_too_long():
     # Not all requests could be satisfied within the timeout
     assert not all(r)
    
+
+async def test_bucket_no_schedule_leak():
+    rates = [Rate(100, 1000)]
+
+    bucket = InMemoryBucket(rates)
+    bucket_factory = SingleBucketFactory(bucket, schedule_leak=False)
+    limiter = Limiter(bucket_factory)
+
+    acquired = limiter.try_acquire("test", 1)
+    acquired = limiter.try_acquire("test", 1)
+    assert acquired
+
+    await asyncio.sleep(1.2)
+    assert bucket.count() == 2
