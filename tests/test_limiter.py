@@ -295,6 +295,15 @@ async def test_bucket_no_schedule_leak():
     limiter = Limiter(bucket_factory, raise_when_fail=False,
                       max_delay=Duration.SECOND, retry_until_max_delay=True)
 
+
+async def test_bucket_no_schedule_leak():
+    rates = [Rate(100, 1000)]
+
+    bucket = InMemoryBucket(rates)
+    bucket_factory = SingleBucketFactory(bucket, schedule_leak=False)
+    limiter = Limiter(bucket_factory, raise_when_fail=False,
+                      max_delay=Duration.SECOND, retry_until_max_delay=True)
+
     acquired = limiter.try_acquire("test", 1)
     acquired = limiter.try_acquire("test", 1)
     assert acquired
