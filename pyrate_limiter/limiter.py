@@ -229,7 +229,7 @@ class Limiter:
         self._thread_local.async_lock_loop = loop
         return lock
 
-    def try_acquire(self, name: str = "pyrate", weight: int = 1, timeout: int = -1, blocking: bool = True) -> Union[bool, Awaitable[bool]]:
+    def try_acquire(self, name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> Union[bool, Awaitable[bool]]:
         """
         Attempt to acquire a permit from the limiter.
 
