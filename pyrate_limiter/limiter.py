@@ -48,7 +48,7 @@ class SingleBucketFactory(BucketFactory):
 
 
 @contextmanager
-def combined_lock(locks: Iterable[LockLike] | RLock, blocking: bool, timeout: int | float = -1):
+def combined_lock(locks: Union[Iterable[LockLike], RLock], blocking: bool, timeout: int | float = -1):
     if not isinstance(locks, Iterable):
         acquired_ok = locks.acquire(blocking=blocking, timeout=timeout)
         if not acquired_ok:
