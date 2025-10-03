@@ -4,6 +4,7 @@ import time
 from inspect import isawaitable
 
 import pytest
+import asyncio 
 
 from .conftest import DEFAULT_RATES
 from .conftest import logger
@@ -368,3 +369,20 @@ def test_wait_too_long():
             success = limiter.try_acquire("mytest", 1)
             if not success:
                 break
+
+
+
+async def test_bucket_no_schedule_leak():
+    rates = [Rate(100, 1000)]
+
+    bucket = InMemoryBucket(rates)
+    bucket_factory = SingleBucketFactory(bucket, schedule_leak=False)
+    limiter = Limiter(bucket_factory, raise_when_fail=False,
+                      max_delay=Duration.SECOND, retry_until_max_delay=True)
+
+    acquired = limiter.try_acquire("test", 1)
+    acquired = limiter.try_acquire("test", 1)
+    assert acquired
+
+    await asyncio.sleep(1.2)
+    assert bucket.count() == 2
