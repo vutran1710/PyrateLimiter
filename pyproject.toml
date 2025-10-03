@@ -14,6 +14,12 @@ keywords = [
     "leaky-bucket",
     "ratelimit",
     "ratelimiting",
+    "httpx",
+    "aiohttp",
+    "limiter",
+    "rate",
+    "requests",
+    "throttle"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -61,6 +67,9 @@ dev = [
     "pytest-xdist>=3.8.0",
     "schedule>=1.1.0,<2",
     "pytest-retry>=1.7.0",
+    "httpx",
+    "aiohttp",
+    "requests",
 ]
 
 
