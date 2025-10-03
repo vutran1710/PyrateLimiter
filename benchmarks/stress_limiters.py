@@ -25,29 +25,25 @@ class TestResult:
     percent_from_expected_duration: float
 
 
-def create_mp_limiter(max_delay: int, bucket: MultiprocessBucket):
-    limiter = Limiter(bucket, raise_when_fail=False, retry_until_max_delay=True, max_delay=max_delay, buffer_ms=BUFFER_MS)
+def create_mp_limiter(bucket: MultiprocessBucket):
+    limiter = Limiter(bucket, buffer_ms=BUFFER_MS)
 
     return limiter
 
 
 def create_rate_limiter_factory(
     requests_per_second: int,
-    max_delay_seconds: int,
     backend: Literal["default", "sqlite", "sqlite_filelock", "mp_limiter"],
 ) -> Callable[[], Limiter]:
     """Returns a callable, so it can be used with multiprocessing"""
-    max_delay = max_delay_seconds * 1000  # should never wait for more than 60 seconds
     rate = Rate(requests_per_second, Duration.SECOND)
 
     if backend == "default":
-        limiter = limiter_factory.create_inmemory_limiter(
-            rate_per_duration=requests_per_second, duration=Duration.SECOND, max_delay=max_delay, buffer_ms=BUFFER_MS
-        )
+        limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=requests_per_second, duration=Duration.SECOND, buffer_ms=BUFFER_MS)
         return lambda: limiter
     elif backend == "sqlite":
         limiter = limiter_factory.create_sqlite_limiter(
-            rate_per_duration=requests_per_second, use_file_lock=False, max_delay=max_delay, buffer_ms=BUFFER_MS, db_path="pyrate_limiter.sqlite"
+            rate_per_duration=requests_per_second, use_file_lock=False, buffer_ms=BUFFER_MS, db_path="pyrate_limiter.sqlite"
         )
         return lambda: limiter
     elif backend == "sqlite_filelock":
@@ -56,13 +52,12 @@ def create_rate_limiter_factory(
             rate_per_duration=requests_per_second,
             duration=Duration.SECOND,
             use_file_lock=True,
-            max_delay=max_delay,
             buffer_ms=BUFFER_MS,
             db_path="pyrate_limiter.sqlite",
         )
     elif backend == "mp_limiter":
         bucket = MultiprocessBucket.init([rate])
-        return partial(create_mp_limiter, max_delay=max_delay, bucket=bucket)
+        return partial(create_mp_limiter, bucket=bucket)
     else:
         raise ValueError(f"Unexpected backend option: {backend}")
 
@@ -166,7 +161,7 @@ if __name__ == "__main__":
         backend = cast(Literal["default", "sqlite", "sqlite_filelock", "mp_limiter"], backend)
         for requests_per_second in requests_per_second_list:
             logger.info(f"Testing with {backend=}, {requests_per_second=}")
-            limiter_creator = create_rate_limiter_factory(requests_per_second, max_delay_seconds=60, backend=backend)
+            limiter_creator = create_rate_limiter_factory(requests_per_second, backend=backend)
 
             result = run_test_limiter(
                 limiter_creator=limiter_creator,
@@ -183,7 +178,7 @@ if __name__ == "__main__":
         for requests_per_second in requests_per_second_list:
             logger.info(f"Testing with {backend=}, {requests_per_second=}")
 
-            limiter_creator = create_rate_limiter_factory(requests_per_second, max_delay_seconds=60, backend=backend)
+            limiter_creator = create_rate_limiter_factory(requests_per_second, backend=backend)
             result = run_test_limiter(
                 limiter_creator=limiter_creator,
                 label="Processes: " + backend,

@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from tempfile import gettempdir
 from threading import RLock
-from time import time
+from time import time, time_ns
 from typing import List, Optional, Tuple, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
@@ -84,7 +84,7 @@ class SQLiteBucket(AbstractBucket):
 
     def now(self):
         # TODO: Use Sqlite time source via a Lua script
-        return int(1000 * time())
+        return time_ns() // 1000000
 
     def limiter_lock(self):
         if self.use_limiter_lock:
@@ -171,12 +171,13 @@ class SQLiteBucket(AbstractBucket):
             return RateItem(item[0], item[1])
 
     def close(self):
-        if self.conn is not None:
-            try:
-                self.conn.close()
-                self.conn = None
-            except Exception as e:
-                logger.debug("Exception %s closing sql connection", e)
+        with self.lock:
+            if self.conn is not None:
+                try:
+                    self.conn.close()
+                    self.conn = None
+                except Exception as e:
+                    logger.debug("Exception %s closing sql connection", e)
 
     @classmethod
     def init_from_file(
@@ -187,6 +188,7 @@ class SQLiteBucket(AbstractBucket):
 
         if db_path is None:
             temp_dir = Path(gettempdir())
+
             db_path = str(temp_dir / f"pyrate_limiter_{time()}.sqlite")
 
         # TBD: FileLock switched to a thread-local FileLock in 3.11.0.

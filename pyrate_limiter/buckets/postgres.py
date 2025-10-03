@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from time import time
+from time import time_ns
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
@@ -64,7 +64,7 @@ class PostgresBucket(AbstractBucket):
 
     def now(self):
         # TODO: Use a Postgres time source via SQL
-        return int(1000 * time())
+        return time_ns() // 1000000
 
     @contextmanager
     def _get_conn(self):
