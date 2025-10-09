@@ -7,8 +7,8 @@ import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from inspect import isawaitable, iscoroutine
-from threading import Thread
-from typing import Awaitable, Dict, List, Optional, Type, Union
+from threading import Event, Thread
+from typing import Any, Awaitable, Dict, List, Optional, Type, Union
 
 from ..clocks import AbstractClock, MonotonicClock
 from .rate import Rate, RateItem
@@ -24,6 +24,7 @@ class AbstractBucket(ABC):
 
     rates: List[Rate]
     failing_rate: Optional[Rate] = None
+    _clock: AbstractClock = MonotonicClock()
 
     def __init__(self):
         self._clock: AbstractClock = MonotonicClock()
@@ -135,11 +136,14 @@ class Leaker(Thread):
     async_buckets: Dict[int, AbstractBucket]
     leak_interval: int = 10_000
     aio_leak_task: Optional[asyncio.Task] = None
+    _stop_event: Any
 
     def __init__(self, leak_interval: int):
         self.sync_buckets = defaultdict()
         self.async_buckets = defaultdict()
         self.leak_interval = leak_interval
+        self._stop_event = Event()  # <--- add here
+
         super().__init__()
 
     def register(self, bucket: AbstractBucket):
@@ -174,9 +178,9 @@ class Leaker(Thread):
         return False
 
     async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
-        while buckets:
+        while not self._stop_event.is_set() and buckets:
             try:
-                for _, bucket in list(buckets.items()):
+                for _, bucket in tuple(buckets.items()):
                     now = bucket.now()
 
                     while isawaitable(now):
@@ -192,7 +196,7 @@ class Leaker(Thread):
 
                 await asyncio.sleep(self.leak_interval / 1000)
             except RuntimeError as e:
-                logger.info("Leak task stopped due to event loop shutdown. %s", e)
+                logger.debug("Leak task stopped due to event loop shutdown. %s", e)
                 return
 
     def leak_async(self):
@@ -214,6 +218,7 @@ class Leaker(Thread):
             super().start()
 
     def close(self):
+        self._stop_event.set()
         self.sync_buckets.clear()
         self.async_buckets.clear()
 
@@ -321,7 +326,7 @@ class BucketFactory(ABC):
                 self._leaker.close()
                 self._leaker = None
         except Exception as e:
-            logger.info("Exception %s (%s) closing leaker %r", type(e).__name__, e, self._leaker)
+            logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, self._leaker)
 
         for bucket in self.get_buckets():
             try:
