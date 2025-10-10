@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LATEST_PY_VERSION: &latest '3.13'
+  LATEST_PY_VERSION: &latest '3.14'
   REDIS: 'redis://localhost:6379'
 
 jobs:
@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.10", "3.13", "3.14", "3.14t"]
+        python-version: ["3.10", "3.14", "3.14t"]
         os: [ubuntu-latest]
     services:
       pyrate_redis:
@@ -104,10 +104,6 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s --health-timeout 5s --health-retries 5
-    strategy:
-      fail-fast: true
-      matrix:
-        python-version: ["3.10", "3.13", "3.14", "3.14t"]
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -118,7 +114,6 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-        allow-prereleases: true
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
