@@ -62,6 +62,8 @@ dev = [
     "schedule>=1.1.0,<2",
     "pytest-retry>=1.7.0",
     "pytest-randomly>=3.16.0",
+    "httpx",
+    "psycopg[binary]>=3.2.9; sys_platform == 'win32'"
 ]
 
 

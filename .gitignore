@@ -17,3 +17,4 @@ test-reports/
 .venv
 xdg_cache
 *\.sqlite*
+coverage.xml

@@ -107,13 +107,3 @@ async def create_postgres_bucket(rates: List[Rate]):
 def create_bucket(request):
     """Parametrization for different bucket."""
     return request.param
-
-
-@pytest.fixture(params=[True, False])
-def limiter_should_raise(request):
-    return request.param
-
-
-@pytest.fixture(params=[None, 500, Duration.SECOND * 2, Duration.MINUTE])
-def limiter_delay(request):
-    return request.param

@@ -86,9 +86,7 @@ jobs:
         os: [ubuntu-latest]
     services:
       pyrate_redis:
-        image: bitnami/redis:latest
-        env:
-          ALLOW_EMPTY_PASSWORD: yes
+        image: redis:7
         ports:
           - 6379:6379
         # Set health checks to wait until redis has started
@@ -98,13 +96,18 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       pyrate_postgres:
-        image: bitnami/postgresql
+        image: postgres:18
         env:
-          ALLOW_EMPTY_PASSWORD: yes
-          POSTGRESQL_PASSWORD: postgres
-          POSTGRESQL_MAX_CONNECTIONS: 1000
+          POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.10", "3.13", "3.14", "3.14t"]
     steps:
     - name: Check out code
       uses: actions/checkout@v4

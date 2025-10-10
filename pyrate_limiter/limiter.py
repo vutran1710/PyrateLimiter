@@ -4,19 +4,23 @@ import asyncio
 import logging
 from contextlib import contextmanager
 from functools import wraps
-from inspect import isawaitable
+from inspect import isawaitable, iscoroutinefunction
 from threading import RLock, local
 from time import sleep
-from typing import Any, Awaitable, Callable, Iterable, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Iterable, List, Protocol, Tuple, Union
 
-from .abstracts import AbstractBucket, BucketFactory, Duration, Rate, RateItem
+from .abstracts import AbstractBucket, BucketFactory, Rate, RateItem
 from .buckets import InMemoryBucket
-from .exceptions import BucketFullException, LimiterDelayException
 
-logger = logging.getLogger("pyrate_limiter")
+logger = logging.getLogger(__name__)
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
 DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
+
+
+class LockLike(Protocol):
+    def acquire(self, blocking: bool = ..., timeout: Union[float, int, None] = ...) -> bool: ...
+    def release(self) -> None: ...
 
 
 class SingleBucketFactory(BucketFactory):
@@ -44,22 +48,34 @@ class SingleBucketFactory(BucketFactory):
 
 
 @contextmanager
-def combined_lock(locks: Iterable, timeout_sec: Optional[float] = None):
-    """Acquires and releases multiple locks. Intended to be used in multiprocessing for a cross-process
-    lock combined with in process thread RLocks"""
-    acquired = []
-    try:
-        for lock in locks:
-            if timeout_sec is not None:
-                if not lock.acquire(timeout=timeout_sec):
+def combined_lock(locks: Union[Iterable[LockLike], RLock], blocking: bool, timeout: int | float = -1):
+    if not isinstance(locks, Iterable):
+        acquired_ok = locks.acquire(blocking=blocking, timeout=timeout)
+        if not acquired_ok:
+            raise TimeoutError("acquire failed")
+        try:
+            yield
+        finally:
+            locks.release()
+
+    else:
+        acquired_locks = []
+        try:
+            for lock in locks:
+                if not blocking:
+                    ok = lock.acquire(False)
+                elif timeout == -1:
+                    ok = lock.acquire()
+                else:
+                    ok = lock.acquire(timeout=timeout)
+
+                if not ok:
                     raise TimeoutError("Timeout while acquiring combined lock.")
-            else:
-                lock.acquire()
-            acquired.append(lock)
-        yield
-    finally:
-        for lock in reversed(acquired):
-            lock.release()
+                acquired_locks.append(lock)
+            yield
+        finally:
+            for lock in reversed(acquired_locks):
+                lock.release()
 
 
 class Limiter:
@@ -68,9 +84,6 @@ class Limiter:
     """
 
     bucket_factory: BucketFactory
-    raise_when_fail: bool
-    retry_until_max_delay: bool
-    max_delay: Optional[int] = None
     lock: Union[RLock, Iterable]
     buffer_ms: int
 
@@ -80,9 +93,6 @@ class Limiter:
     def __init__(
         self,
         argument: Union[BucketFactory, AbstractBucket, Rate, List[Rate]],
-        raise_when_fail: bool = True,
-        max_delay: Optional[Union[int, Duration]] = None,
-        retry_until_max_delay: bool = False,
         buffer_ms: int = 50,
     ):
         """Init Limiter using either a single bucket / multiple-bucket factory
@@ -90,25 +100,10 @@ class Limiter:
 
         Parameters:
             argument (Union[BucketFactory, AbstractBucket, Rate, List[Rate]]): The bucket or rate configuration.
-            clock (AbstractClock, optional): The clock instance to use for rate limiting. Defaults to MonotonicClock().
-            raise_when_fail (bool, optional): Whether to raise an exception when rate limiting fails. Defaults to True.
-            max_delay (Optional[Union[int, Duration]], optional): The maximum delay allowed for rate limiting.
-            Defaults to None.
-            retry_until_max_delay (bool, optional): If True, retry operations until the maximum delay is reached.
-                Useful for ensuring operations eventually succeed within the allowed delay window. Defaults to False.
         """
 
-        self.bucket_factory = self._init_bucket_factory(argument)
-        self.raise_when_fail = raise_when_fail
-        self.retry_until_max_delay = retry_until_max_delay
         self.buffer_ms = buffer_ms
-        if max_delay is not None:
-            if isinstance(max_delay, Duration):
-                max_delay = int(max_delay)
-
-            assert max_delay >= 0, "Max-delay must not be negative"
-
-        self.max_delay = max_delay
+        self.bucket_factory = self._init_bucket_factory(argument)
         self.lock = RLock()
         self._thread_local = local()
 
@@ -148,147 +143,57 @@ class Limiter:
 
         return argument
 
-    def _raise_bucket_full_if_necessary(
-        self,
-        bucket: AbstractBucket,
-        item: RateItem,
-    ):
-        if self.raise_when_fail:
-            assert bucket.failing_rate is not None  # NOTE: silence mypy
-            raise BucketFullException(item, bucket.failing_rate)
-
-    def _raise_delay_exception_if_necessary(
-        self,
-        bucket: AbstractBucket,
-        item: RateItem,
-        delay: int,
-    ):
-        if self.raise_when_fail:
-            assert bucket.failing_rate is not None  # NOTE: silence mypy
-            assert isinstance(self.max_delay, int)
-            raise LimiterDelayException(
-                item,
-                bucket.failing_rate,
-                delay,
-                self.max_delay,
-            )
-
-    def delay_or_raise(self, bucket: AbstractBucket, item: RateItem, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
-        """On `try_acquire` failed, handle delay or raise error immediately"""
+    def _delay_waiter(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
+        """On `try_acquire` failed, handle delay"""
         assert bucket.failing_rate is not None
 
-        if self.max_delay is None:
-            self._raise_bucket_full_if_necessary(bucket, item)
+        if not blocking:
             return False
 
         delay = bucket.waiting(item)
 
-        def _handle_reacquire(re_acquire: bool) -> bool:
-            if not re_acquire:
-                logger.error("""Failed to re-acquire after the expected delay. If it failed,
-                either clock or bucket is unstable.
-                If asyncio, use try_acquire_async(). If multiprocessing,
-                use retry_until_max_delay=True.""")
-                self._raise_bucket_full_if_necessary(bucket, item)
-
-            return re_acquire
-
         if _force_async or isawaitable(delay):
 
-            async def _handle_async():
-                nonlocal delay
-                if isawaitable(delay):
-                    delay = await delay
-                assert isinstance(delay, int), "Delay not integer"
-
-                total_delay = 0
-                delay += self.buffer_ms
-
+            async def _handle_async(delay):
                 while True:
-                    total_delay += delay
-
-                    if self.retry_until_max_delay:
-                        if self.max_delay is not None and total_delay > self.max_delay:
-                            logger.error("Total delay exceeded max_delay: total_delay=%s, max_delay=%s", total_delay, self.max_delay)
-                            self._raise_delay_exception_if_necessary(bucket, item, total_delay)
-                            return False
-                    else:
-                        if self.max_delay is not None and delay > self.max_delay:
-                            logger.error(
-                                "Required delay too large: actual=%s, expected=%s",
-                                delay,
-                                self.max_delay,
-                            )
-                            self._raise_delay_exception_if_necessary(bucket, item, delay)
-                            return False
-
-                    await asyncio.sleep(delay / 1000)
-                    item.timestamp += delay
-                    re_acquire = bucket.put(item)
-
-                    if isawaitable(re_acquire):
-                        re_acquire = await re_acquire
-
-                    if not self.retry_until_max_delay:
-                        return _handle_reacquire(re_acquire)
-                    elif re_acquire:
+                    d = await delay if isawaitable(delay) else delay
+                    assert isinstance(d, int) and d >= 0
+                    d += self.buffer_ms
+                    await asyncio.sleep(d / 1000)
+                    item.timestamp += d
+                    r = bucket.put(item)
+                    r = await r if isawaitable(r) else r
+                    if r:
                         return True
+                    delay = bucket.waiting(item)
 
-            return _handle_async()
+            return _handle_async(delay)
+        else:
+            total_delay = 0
 
-        assert isinstance(delay, int)
+            while True:
+                assert not isawaitable(delay)
+                logger.debug("delay=%d, total_delay=%s", delay, total_delay)
 
-        if delay < 0:
-            logger.error(
-                "Cannot fit item into bucket: item=%s, rate=%s, bucket=%s",
-                item,
-                bucket.failing_rate,
-                bucket,
-            )
-            self._raise_bucket_full_if_necessary(bucket, item)
-            return False
+                delay += self.buffer_ms
+                total_delay += delay
 
-        total_delay = 0
+                sleep(delay / 1000)
+                item.timestamp += delay
+                re_acquire = bucket.put(item)
+                # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
+                assert isinstance(re_acquire, bool)
 
-        while True:
-            logger.debug("delay=%d, total_delay=%s", delay, total_delay)
-            delay = bucket.waiting(item)
-            assert isinstance(delay, int)
+                if re_acquire:
+                    return True
+                delay = bucket.waiting(item)
 
-            delay += self.buffer_ms
-            total_delay += delay
-
-            if self.max_delay is not None and total_delay > self.max_delay:
-                logger.error(
-                    "Required delay too large: actual=%s, expected=%s",
-                    delay,
-                    self.max_delay,
-                )
-
-                if self.retry_until_max_delay:
-                    self._raise_delay_exception_if_necessary(bucket, item, total_delay)
-                else:
-                    self._raise_delay_exception_if_necessary(bucket, item, delay)
-
-                return False
-
-            sleep(delay / 1000)
-            item.timestamp += delay
-            re_acquire = bucket.put(item)
-            # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
-            assert isinstance(re_acquire, bool)
-
-            if not self.retry_until_max_delay:
-                return _handle_reacquire(re_acquire)
-            elif re_acquire:
-                return True
-
-    def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
+    def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
 
         def _handle_result(is_success: bool):
             if not is_success:
-                return self.delay_or_raise(bucket, item, _force_async=_force_async)
+                return self._delay_waiter(bucket, item, blocking=blocking, _force_async=_force_async)
 
             return True
 
@@ -296,8 +201,7 @@ class Limiter:
 
         if isawaitable(acquire):
 
-            async def _put_async():
-                nonlocal acquire
+            async def _put_async(acquire):
                 acquire = await acquire
                 result = _handle_result(acquire)
 
@@ -306,43 +210,151 @@ class Limiter:
 
                 return result
 
-            return _put_async()
+            return _put_async(acquire)
 
         return _handle_result(acquire)  # type: ignore
 
     def _get_async_lock(self):
-        """Must be called before first try_acquire_async for each thread"""
+        """Returns thread_local, loop-specific lock"""
+        loop = asyncio.get_running_loop()
         try:
-            return self._thread_local.async_lock
+            # The async loop *can* change in a given thread
+            lock = self._thread_local.async_lock
+            if self._thread_local.async_lock_loop is loop:
+                return lock
         except AttributeError:
-            lock = asyncio.Lock()
-            self._thread_local.async_lock = lock
-            return lock
+            pass
+        lock = asyncio.Lock()
+        self._thread_local.async_lock = lock
+        self._thread_local.async_lock_loop = loop
+        return lock
 
-    def try_acquire(self, name: str, weight: int = 1) -> Union[bool, Awaitable[bool]]:
-        return self._try_acquire(name=name, weight=weight)
-
-    async def try_acquire_async(self, name: str, weight: int = 1) -> bool:
+    def try_acquire(self, name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> Union[bool, Awaitable[bool]]:
         """
-        async version of try_acquire.
+        Attempt to acquire a permit from the limiter.
 
-        This uses a top level, thread-local async lock to ensure that the async loop doesn't block
+        Parameters
+        ----------
+        name : str, default "pyrate"
+            The bucket key to acquire from.
+        weight : int, default 1
+            Number of permits to consume.
+        timeout : int, default -1
+            Maximum time (in seconds) to wait; -1 means wait indefinitely.
+            ** Timeout is not yet implemented for sync path. Use try_acquire_async **
+        blocking : bool, default True
+            If True, block until a permit is available (subject to timeout);
+            if False, return immediately.
 
-        This does not make the entire code async: use an async bucket for that.
+        Returns
+        -------
+        bool or Awaitable[bool]
+            True if the permit was acquired, False otherwise. Async limiters
+            return an awaitable resolving to the same.
         """
-        async with self._get_async_lock():
-            acquired = self._try_acquire(name=name, weight=weight, _force_async=True)
+        try:
+            return self._try_acquire(name=name, weight=weight, timeout=timeout, blocking=blocking)
+        except TimeoutError:
+            logger.debug("Acquisition TimeoutError")
+            return False
 
-            if isawaitable(acquired):
-                return await acquired
-            else:
-                return acquired
+    async def _acquire_async(self, blocking, name, weight):
+        return await self._handle_async_result(self._try_acquire(name, weight, blocking=blocking, _force_async=True))
 
-    def _try_acquire(self, name: str, weight: int = 1, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
+    async def try_acquire_async(self, name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool:
+        """
+        Attempt to asynchronously acquire a permit from the limiter.
+
+        Parameters
+        ----------
+        name : str, default "pyrate"
+            The bucket key to acquire from.
+        weight : int, default 1
+            Number of permits to consume.
+        blocking : bool, default True
+            If True, wait until a permit is available (subject to timeout);
+            if False, return immediately.
+        timeout : int, default -1
+            Maximum time (in seconds) to wait; -1 means wait indefinitely.
+
+        Returns
+        -------
+        bool
+            True if the permit was acquired, False otherwise.
+
+        Notes
+        -----
+        This is the async variant of ``try_acquire``. A top-level, thread-local
+        async lock is used to prevent blocking the event loop.
+        """
+
+        if weight == 0:
+            return True
+
+        if not blocking and timeout != -1:
+            raise RuntimeError("Can't set timeout with non-blocking")
+
+        async def run():
+            lock = self._get_async_lock()
+            async with lock:
+                return await self._acquire_async(blocking=blocking, name=name, weight=weight)
+
+        if timeout == -1:
+            return await run()
+        try:
+            return await asyncio.wait_for(run(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return False
+
+    async def _handle_async_acquire(
+        self,
+        item: Awaitable[RateItem],
+        blocking: bool,
+        _force_async: bool = False,
+    ):
+        this_item = await item
+        bucket = self.bucket_factory.get(this_item)
+        if isawaitable(bucket):
+            bucket = await bucket
+        assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {this_item.name}"
+        result = self.handle_bucket_put(bucket, this_item, blocking=blocking, _force_async=_force_async)
+
+        while isawaitable(result):
+            result = await result
+
+        return result
+
+    async def _handle_async_bucket(
+        self,
+        bucket: Awaitable[AbstractBucket],
+        item: RateItem,
+        blocking: bool,
+        _force_async: bool = False,
+    ):
+        this_bucket = await bucket
+        assert isinstance(this_bucket, AbstractBucket), f"Invalid bucket: item: {item.name}"
+        result = self.handle_bucket_put(this_bucket, item, blocking=blocking, _force_async=_force_async)
+
+        while isawaitable(result):
+            result = await result
+
+        return result
+
+    async def _handle_async_result(self, result):
+        while isawaitable(result):
+            result = await result
+
+        return result
+
+    def _try_acquire(self, name: str, weight: int, blocking: bool, timeout: int = -1, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
-        with self.lock if not isinstance(self.lock, Iterable) else combined_lock(self.lock):
+
+        if timeout != -1:
+            raise NotImplementedError("timeout not implemented for sync try_acquire yet")
+
+        with combined_lock(self.lock, blocking=blocking, timeout=timeout):
             assert weight >= 0, "item's weight must be >= 0"
 
             if weight == 0:
@@ -353,110 +365,46 @@ class Limiter:
             item = self.bucket_factory.wrap_item(name, weight)
 
             if isawaitable(item):
+                return self._handle_async_acquire(item, blocking=blocking)
 
-                async def _handle_async():
-                    nonlocal item
-                    item = await item
-                    bucket = self.bucket_factory.get(item)
-                    if isawaitable(bucket):
-                        bucket = await bucket
-                    assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-                    result = self.handle_bucket_put(bucket, item, _force_async=_force_async)
+            assert isinstance(item, RateItem)
 
-                    while isawaitable(result):
-                        result = await result
-
-                    return result
-
-                return _handle_async()
-
-            assert isinstance(item, RateItem)  # NOTE: this is to silence mypy warning
             bucket = self.bucket_factory.get(item)
             if isawaitable(bucket):
-
-                async def _handle_async_bucket():
-                    nonlocal bucket
-                    bucket = await bucket
-                    assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-                    result = self.handle_bucket_put(bucket, item, _force_async=_force_async)
-
-                    while isawaitable(result):
-                        result = await result
-
-                    return result
-
-                return _handle_async_bucket()
+                return self._handle_async_bucket(bucket=bucket, item=item, blocking=blocking, _force_async=_force_async)
 
             assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-            result = self.handle_bucket_put(bucket, item, _force_async=_force_async)
+            result = self.handle_bucket_put(bucket, item, blocking=blocking, _force_async=_force_async)
 
             if isawaitable(result):
-
-                async def _handle_async_result():
-                    nonlocal result
-                    while isawaitable(result):
-                        result = await result
-
-                    return result
-
-                return _handle_async_result()
+                return self._handle_async_result(result)
 
             return result
 
-    def as_decorator(self) -> Callable[[ItemMapping], DecoratorWrapper]:
-        """Use limiter decorator
-        Use with both sync & async function
-        """
+    def as_decorator(self, *, name="ratelimiter", weight=1):
+        def deco(func: Callable[..., Any]) -> Callable[..., Any]:
+            if iscoroutinefunction(func):
 
-        def with_mapping_func(mapping: ItemMapping) -> DecoratorWrapper:
-            def decorator_wrapper(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
-                """Actual function wrapper"""
+                @wraps(func)
+                async def wrapper(*args, **kwargs):
+                    r = await self.try_acquire_async(name=name, weight=weight)
+                    while isawaitable(r):
+                        r = await r
+                    return await func(*args, **kwargs)
 
-                if asyncio.iscoroutinefunction(func):
+                return wrapper
+            else:
 
-                    @wraps(func)
-                    async def wrapper_async(*args, **kwargs):
-                        (name, weight) = mapping(*args, **kwargs)
-                        assert isinstance(name, str), "Mapping name is expected but not found"
-                        assert isinstance(weight, int), "Mapping weight is expected but not found"
-                        accquire_ok = self.try_acquire_async(name, weight)
+                @wraps(func)
+                def wrapper(*args, **kwargs):
+                    r = self.try_acquire(name=name, weight=weight)
+                    if isawaitable(r):
+                        raise RuntimeError("Can't use async bucket with sync decorator")
+                    return func(*args, **kwargs)
 
-                        if isawaitable(accquire_ok):
-                            await accquire_ok
+                return wrapper
 
-                        return await func(*args, **kwargs)
-
-                    return wrapper_async
-                else:
-
-                    @wraps(func)
-                    def wrapper(*args, **kwargs):
-                        (name, weight) = mapping(*args, **kwargs)
-                        assert isinstance(name, str), "Mapping name is expected but not found"
-                        assert isinstance(weight, int), "Mapping weight is expected but not found"
-                        accquire_ok = self.try_acquire(name, weight)
-
-                        if not isawaitable(accquire_ok):
-                            return func(*args, **kwargs)
-
-                        async def _handle_accquire_async():
-                            nonlocal accquire_ok
-                            accquire_ok = await accquire_ok
-
-                            result = func(*args, **kwargs)
-
-                            if isawaitable(result):
-                                return await result
-
-                            return result
-
-                        return _handle_accquire_async()
-
-                    return wrapper
-
-            return decorator_wrapper
-
-        return with_mapping_func
+        return deco
 
     def close(self) -> None:
         self.bucket_factory.close()

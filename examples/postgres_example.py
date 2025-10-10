@@ -31,7 +31,7 @@ def test_postgres():
         print(f"{datetime.now()} {name}: {weight}, {acquired=}")
 
     redis_bucket = create_postgres_bucket(rates)
-    limiter = Limiter(redis_bucket, raise_when_fail=False, max_delay=Duration.DAY)
+    limiter = Limiter(redis_bucket)
     for i in range(10):
         task(str(i), 1)
 
