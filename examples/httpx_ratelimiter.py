@@ -40,7 +40,7 @@ def singleprocess_example():
     start_time = time.time()
 
     url = "https://httpbin.org/get"
-    limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR)
+    limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND)
     transport = RateLimiterTransport(limiter=limiter)
     with httpx.Client(transport=transport) as client:
         for _ in range(10):
@@ -68,7 +68,7 @@ def asyncio_example():
         await client.get(url)
 
     async def example():
-        limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR, async_wrapper=True)
+        limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND)
         transport = AsyncRateLimiterTransport(limiter=limiter)
         client = httpx.AsyncClient(transport=transport)
 
@@ -86,7 +86,6 @@ def asyncio_example():
 def multiprocess_example():
     import time
     from concurrent.futures import ProcessPoolExecutor, wait
-    from functools import partial
 
     from pyrate_limiter import Duration, MultiprocessBucket, Rate
 
@@ -94,7 +93,7 @@ def multiprocess_example():
     bucket = MultiprocessBucket.init([rate])
 
     start_time = time.time()
-    with ProcessPoolExecutor(initializer=partial(limiter_factory.init_global_limiter, bucket)) as executor:
+    with ProcessPoolExecutor(initializer=limiter_factory.init_global_limiter, initargs=(bucket,)) as executor:
         futures = [executor.submit(fetch, start_time) for _ in range(10)]
         wait(futures)
 

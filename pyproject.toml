@@ -3,7 +3,7 @@ name = "pyrate-limiter"
 dynamic = ["version"]
 description = "Python Rate-Limiter using Leaky-Bucket Algorithm"
 authors = [{ name = "vutr", email = "me@vutr.io" }]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 keywords = [
@@ -27,12 +27,11 @@ classifiers = [
     "Topic :: Software Development :: Documentation",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    # "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.14",
 ]
 
 
@@ -71,6 +70,7 @@ dev = [
     "httpx",
     "aiohttp",
     "requests",
+    "psycopg[binary]>=3.2.9; sys_platform == 'win32'"
 ]
 
 
@@ -112,7 +112,7 @@ include = ["pyrate_limiter"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 retries = 2
-retry_delay = 4
+retry_delay = 1
 cumulative_timing = false
 retry_outcome = "rerun"
 

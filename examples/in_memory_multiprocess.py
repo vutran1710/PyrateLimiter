@@ -13,13 +13,11 @@ import logging
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor, wait
-from functools import partial
 from typing import Optional
 
-from pyrate_limiter import Duration, Limiter, MonotonicClock, MultiprocessBucket, Rate
+from pyrate_limiter import Duration, Limiter, MultiprocessBucket, Rate
 
 LIMITER: Optional[Limiter] = None
-MAX_DELAY = Duration.DAY
 REQUESTS_PER_SECOND = 100
 NUM_REQUESTS = REQUESTS_PER_SECOND * 5  # Run for ~5 seconds
 
@@ -29,7 +27,7 @@ logger = logging.getLogger(__name__)
 def init_process(bucket: MultiprocessBucket):
     global LIMITER
 
-    LIMITER = Limiter(bucket, raise_when_fail=False, clock=MonotonicClock(), max_delay=MAX_DELAY, retry_until_max_delay=True)
+    LIMITER = Limiter(bucket)
 
 
 def my_task():
@@ -52,7 +50,7 @@ def test_in_memory_multiprocess():
 
     start = time.monotonic()
 
-    with ProcessPoolExecutor(initializer=partial(init_process, bucket)) as executor:
+    with ProcessPoolExecutor(initializer=init_process, initargs=(bucket,)) as executor:
         futures = [executor.submit(my_task) for _ in range(NUM_REQUESTS)]
         wait(futures)
 

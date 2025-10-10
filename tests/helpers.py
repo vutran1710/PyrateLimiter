@@ -39,7 +39,7 @@ async def inspect_bucket_items(bucket: AbstractBucket, expected_item_count: int)
     return item_names
 
 
-async def concurrent_acquire(limiter: Limiter, items: List[str]):
+async def concurrent_acquire(limiter: Limiter, items: List[str], blocking: bool = True):
     with ThreadPoolExecutor() as executor:
         result = list(executor.map(limiter.try_acquire, items))
         for idx, coro in enumerate(result):
@@ -50,9 +50,9 @@ async def concurrent_acquire(limiter: Limiter, items: List[str]):
         return result
 
 
-async def async_acquire(limiter: Limiter, item: str, weight: int = 1) -> Tuple[bool, int]:
+async def async_acquire(limiter: Limiter, item: str, weight: int = 1, blocking: bool = True) -> Tuple[bool, int]:
     start = time()
-    acquire = await limiter.try_acquire_async(item, weight=weight)
+    acquire = await limiter.try_acquire_async(item, weight=weight, blocking = blocking)
 
     time_cost_in_ms = int((time() - start) * 1000)
     assert isinstance(acquire, bool)
