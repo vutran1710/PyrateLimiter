@@ -97,7 +97,7 @@ async def test_limiter_01(
         buffer_ms=10
     )
     bucket = BucketAsyncWrapper(bucket)
-    bucket.flush()
+    await bucket.flush()
 
     item = "demo"
 
