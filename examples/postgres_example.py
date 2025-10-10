@@ -16,7 +16,7 @@ from pyrate_limiter import Duration, Limiter, PostgresBucket, Rate
 
 
 def create_postgres_bucket(rates: List[Rate]):
-    pool = PgConnectionPool("postgresql://postgres:postgres@localhost:5432")
+    pool = PgConnectionPool("postgresql://postgres:postgres@localhost:5432", open=True)
     table = f"test_bucket_{int(time.time())}"
     bucket = PostgresBucket(pool, table, rates)
     assert bucket.count() == 0
