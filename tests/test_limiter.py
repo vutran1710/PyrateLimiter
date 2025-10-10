@@ -154,6 +154,7 @@ async def test_limiter_async_factory_get_weight0(
     assert acquire_ok
     assert cost <= 10
 
+@pytest.mark.asyncredis
 @pytest.mark.asyncio
 async def test_limiter_async_factory_get(
 ):
