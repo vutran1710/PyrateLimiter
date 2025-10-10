@@ -21,12 +21,12 @@ COVERAGE_APPEND2_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report="
 PYTEST_ARGS = ["--verbose", "--maxfail=1", "-m", "not mpbucket", f"--numprocesses={half_cores}", "--ignore=tests/test_multiprocessing.py"]
 COVERAGE_REPORT_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report=term-missing", "--cov-report=xml", "--cov-report=html"]
 
-PYTESTSMOKE_ARGS = ["--verbose", "--maxfail=1", "-m", "inmemory and monotonic", "--numprocesses=auto", "--ignore=tests/test_multiprocessing.py"]
+PYTESTSMOKE_ARGS = ["--verbose", "--maxfail=1", "-m", "inmemory", "--numprocesses=auto", "--ignore=tests/test_multiprocessing.py"]
 PYTEST_NOTLINUX_ARGS = [
     "--verbose",
     "--maxfail=1",
     "-m",
-    "not postgres and not redis and not asyncredis",
+    "not postgres and not redis",
     "--numprocesses=auto",
     "--ignore=tests/test_multiprocessing.py",
 ]
