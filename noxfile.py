@@ -26,7 +26,7 @@ PYTEST_NOTLINUX_ARGS = [
     "--verbose",
     "--maxfail=1",
     "-m",
-    "not postgres and not redis",
+    "not postgres and not redis and not asyncredis",
     "--numprocesses=auto",
     "--ignore=tests/test_multiprocessing.py",
 ]
