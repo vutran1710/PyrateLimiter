@@ -17,4 +17,6 @@ test-reports/
 .venv
 xdg_cache
 *\.sqlite*
+
+_build_html
 coverage.xml

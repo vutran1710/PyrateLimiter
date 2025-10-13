@@ -14,6 +14,12 @@ keywords = [
     "leaky-bucket",
     "ratelimit",
     "ratelimiting",
+    "httpx",
+    "aiohttp",
+    "limiter",
+    "rate",
+    "requests",
+    "throttle"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -62,6 +68,8 @@ dev = [
     "schedule>=1.1.0,<2",
     "pytest-retry>=1.7.0",
     "httpx",
+    "aiohttp",
+    "requests",
     "psycopg[binary]>=3.2.9; sys_platform == 'win32'"
 ]
 
