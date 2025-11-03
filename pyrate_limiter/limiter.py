@@ -28,9 +28,16 @@ class SingleBucketFactory(BucketFactory):
 
     bucket: AbstractBucket
 
-    def __init__(self, bucket: AbstractBucket):
+    def __init__(self, bucket: AbstractBucket, schedule_leak: bool = True):
+        """
+        Initialize the SingleBucketFactory with a bucket and an optional leak scheduling flag.
+
+        schedule_leak (bool): If True, the factory will schedule periodic leaks for the bucket. Default is True. Disable only if you plan to handle leaking manually.
+        """
         self.bucket = bucket
-        self.schedule_leak(bucket)
+
+        if schedule_leak:
+            self.schedule_leak(bucket)
 
     def wrap_item(self, name: str, weight: int = 1):
         now = self.bucket.now()
