@@ -122,7 +122,7 @@ from pyrate_limiter import limiter_factory
 from pyrate_limiter.extras.aiohttp_limiter import RateLimitedSession
 
 limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=2, duration=Duration.SECOND)
-session = RateLimitedRequestsSession(limiter)
+session = RateLimitedSession(limiter)
 
 ```
 
