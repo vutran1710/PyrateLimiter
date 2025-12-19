@@ -5,7 +5,7 @@ import time
 from inspect import isawaitable
 
 import pytest
-import asyncio 
+import sys
 
 from .conftest import DEFAULT_RATES
 from .conftest import logger
@@ -26,6 +26,12 @@ from pyrate_limiter import RedisBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
 
+buffer_ms = 10
+# Compute a windows specific jitter, due to clock timing
+# on GHA's Windows runners
+jitter_adjustment = 0
+if sys.platform == "win32":
+    jitter_adjustment = 50
 
 @pytest.mark.asyncio
 async def test_limiter_constructor_01():
@@ -84,18 +90,20 @@ async def test_limiter_01(
     bucket = await create_bucket(DEFAULT_RATES)
 
     factory = DemoBucketFactory(demo=bucket)
+
     limiter = Limiter(
         factory,
         buffer_ms=10
     )
     bucket = BucketAsyncWrapper(bucket)
+    await bucket.flush()
 
     item = "demo"
 
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
     assert acquire_ok
-    assert cost <= 10
+    assert cost <= (10+jitter_adjustment)
     assert await bucket.count() == 0
 
     logger.info("Limiter Test #1")
@@ -114,6 +122,7 @@ async def test_limiter_01(
 
 
 
+@pytest.mark.asyncredis
 @pytest.mark.asyncio
 async def test_limiter_async_factory_get_weight0(
 ):
@@ -144,6 +153,7 @@ async def test_limiter_async_factory_get_weight0(
     assert acquire_ok
     assert cost <= 10
 
+@pytest.mark.asyncredis
 @pytest.mark.asyncio
 async def test_limiter_async_factory_get(
 ):

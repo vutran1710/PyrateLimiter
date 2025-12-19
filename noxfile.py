@@ -21,6 +21,16 @@ COVERAGE_APPEND2_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report="
 PYTEST_ARGS = ["--verbose", "--maxfail=1", "-m", "not mpbucket", f"--numprocesses={half_cores}", "--ignore=tests/test_multiprocessing.py"]
 COVERAGE_REPORT_ARGS = ["--cov=pyrate_limiter", "--cov-append", "--cov-report=term-missing", "--cov-report=xml", "--cov-report=html"]
 
+PYTESTSMOKE_ARGS = ["--verbose", "--maxfail=1", "-m", "inmemory", "--numprocesses=auto", "--ignore=tests/test_multiprocessing.py"]
+PYTEST_NOTLINUX_ARGS = [
+    "--verbose",
+    "--maxfail=1",
+    "-m",
+    "not postgres and not redis and not asyncredis",
+    "--numprocesses=auto",
+    "--ignore=tests/test_multiprocessing.py",
+]
+
 
 def get_examples():
     return [f for f in glob("examples/*.py")]
@@ -43,6 +53,20 @@ def cover(session) -> None:
 
     # Everything else - concurrent
     session.run("pytest", *PYTEST_ARGS, *COVERAGE_REPORT_ARGS, "tests", *get_examples())
+
+
+@session(python=False)
+def smoke(session) -> None:
+    """Tests excluding postgres, redis, and asyncredis backends for non-Linux platforms"""
+
+    session.run("pytest", *PYTESTSMOKE_ARGS, "tests")
+
+
+@session(python=False)
+def notlinux(session) -> None:
+    """Tests excluding postgres, redis, and asyncredis backends for non-Linux platforms"""
+
+    session.run("pytest", *PYTEST_NOTLINUX_ARGS, "tests")
 
 
 @session(python=False)

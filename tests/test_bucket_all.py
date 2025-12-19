@@ -92,6 +92,7 @@ async def test_bucket_03(create_bucket):
     bucket = BucketAsyncWrapper(await create_bucket(rates))
 
     peek = await bucket.peek(0)
+    await bucket.flush()
     assert peek is None
 
     await bucket.put(RateItem("item1", bucket.now()))
