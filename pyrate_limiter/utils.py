@@ -1,5 +1,4 @@
 import sqlite3
-import string
 import uuid
 from pathlib import Path
 from tempfile import gettempdir
@@ -65,7 +64,6 @@ def validate_rate_list(rates: List[Rate]) -> bool:
 
 def id_generator(
     size=10,
-    chars=string.ascii_uppercase + string.digits + string.ascii_lowercase,
 ) -> str:
     return uuid.uuid4().hex[:size]
 
