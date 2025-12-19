@@ -90,7 +90,6 @@ async def test_limiter_01(
 
     bucket = await create_bucket(DEFAULT_RATES)
 
-    buffer_ms = 10
     factory = DemoBucketFactory(demo=bucket)
 
     limiter = Limiter(
