@@ -57,14 +57,14 @@ def cover(session) -> None:
 
 @session(python=False)
 def smoke(session) -> None:
-    """Smoke test - tests against in-memory database"""
+    """Tests excluding postgres, redis, and asyncredis backends for non-Linux platforms"""
 
     session.run("pytest", *PYTESTSMOKE_ARGS, "tests")
 
 
 @session(python=False)
 def notlinux(session) -> None:
-    """Smoke test - tests against in-memory database"""
+    """Tests excluding postgres, redis, and asyncredis backends for non-Linux platforms"""
 
     session.run("pytest", *PYTEST_NOTLINUX_ARGS, "tests")
 
