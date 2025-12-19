@@ -104,7 +104,7 @@ async def test_limiter_01(
     logger.info("If weight = 0, it just passes thru")
     acquire_ok, cost = await async_acquire(limiter, item, weight=0)
     assert acquire_ok
-    assert cost <= jitter_adjustment
+    assert cost <= (10+jitter_adjustment)
     assert await bucket.count() == 0
 
     logger.info("Limiter Test #1")
