@@ -64,10 +64,10 @@ Fourth major release with significant API simplification and breaking changes.
 - Better asyncio support with thread-local async locks
 
 ## [3.9.0]
-* Introduce MultiProcessBucket
-* Update documentation to include MultiProcessBucket
+* Introduce MultiprocessBucket
+* Update documentation to include MultiprocessBucket
 * Add delay configure
-* Simplify lock interface for SQLFileLock & MultiProcessBucket
+* Simplify lock interface for SQLFileLock & MultiprocessBucket
 
 ## [3.8.1]
 * Keep Retrying until Max Delay Has Expired
