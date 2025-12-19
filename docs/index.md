@@ -13,6 +13,7 @@
 ```{toctree}
 :maxdepth: 2
 reference
+migrating
 changelog
 contributing
 modules/index
