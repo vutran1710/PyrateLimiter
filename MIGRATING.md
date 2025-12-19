@@ -30,7 +30,7 @@ except BucketFullException as e:
 **v4.0:**
 ```python
 # Blocking (default) - waits until permit is available
-limiter.try_acquire("item")  # blocks until success, always returns True
+limiter.try_acquire("item")  # blocks until success when called without a timeout
 
 # Non-blocking - returns immediately with False if bucket is full
 success = limiter.try_acquire("item", blocking=False)
