@@ -50,8 +50,7 @@ class RateLimiterTransport(HTTPTransport):
         :class:`httpx.Response`
             The HTTP response.
         """
-        while not self.limiter.try_acquire(__name__):
-            logger.debug("Lock acquisition timed out, retrying")
+        self.limiter.try_acquire(__name__)
 
         logger.debug("Acquired lock")
         return super().handle_request(request, **kwargs)
@@ -100,8 +99,7 @@ class AsyncRateLimiterTransport(AsyncHTTPTransport):
         :class:`httpx.Response`
             The HTTP response.
         """
-        while not await self.limiter.try_acquire_async(__name__):
-            logger.debug("Lock acquisition timed out, retrying")
+        await self.limiter.try_acquire_async(__name__)
 
         logger.debug("Acquired lock")
         response = await super().handle_async_request(request, **kwargs)
