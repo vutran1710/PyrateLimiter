@@ -47,10 +47,10 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        include: 
-        - os: macos-latest 
+        include:
+        - os: macos-latest
           python-version: '3.14'
-        #- os: windows-latest 
+        #- os: windows-latest
         #  python-version: '3.14'
         - os: ubuntu-latest
           python-version: 'pypy3.11'
