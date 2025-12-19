@@ -140,6 +140,7 @@ Example: [aiohttp_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/bl
 ```py
 from pyrate_limiter import limiter_factory
 from pyrate_limiter.extras.httpx_limiter import AsyncRateLimiterTransport, RateLimiterTransport
+import httpx
 
 limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR)
 
