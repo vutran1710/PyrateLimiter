@@ -44,7 +44,7 @@ def try_acquire(
     name: str = "pyrate",
     weight: int = 1,
     blocking: bool = True,    # NEW: wait for permit
-    timeout: int = -1         # NEW: max wait time (async only)
+    timeout: int = -1         # NEW: max wait time (used only by try_acquire_async)
 ) -> bool
 ```
 
