@@ -392,9 +392,9 @@ limiter = Limiter(Rate(5, Duration.SECOND))
 def handle_something(*args, **kwargs):
     """function logic"""
 
-@limiter.as_decorator(name="api_call", weight=1)
+@limiter.as_decorator(name="background_job", weight=2)
 async def handle_something_async(*args, **kwargs):
-    """function logic"""
+    """async function logic"""
 ```
 
 For full example see [asyncio_decorator.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_decorator.py)
