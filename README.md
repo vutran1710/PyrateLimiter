@@ -436,6 +436,13 @@ If there is no more buckets in the limiter's bucket-factory, all the leaking tas
 Limiter supports the context manager protocol for automatic cleanup:
 
 ```python
+from pyrate_limiter import Limiter, RequestRate, Duration, InMemoryBucket
+
+# Define a simple rate and create a bucket
+rate = RequestRate(5, Duration.SECOND)
+bucket = InMemoryBucket(rate)
+
+# Use Limiter as a context manager
 with Limiter(bucket) as limiter:
     limiter.try_acquire("item")
 # Resources automatically released
