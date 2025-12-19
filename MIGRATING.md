@@ -38,13 +38,13 @@ if not success:
     print("Rate limited")
 ```
 
-New `try_acquire` signature:
+Base acquire signature (used by both sync `try_acquire` and async `try_acquire_async`):
 ```python
 def try_acquire(
     name: str = "pyrate",
     weight: int = 1,
     blocking: bool = True,    # NEW: wait for permit
-    timeout: int = -1         # NEW: max wait time (used only by try_acquire_async)
+    timeout: int = -1         # NEW: max wait time (primarily used by try_acquire_async)
 ) -> bool
 ```
 
