@@ -4,11 +4,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [4.0.0]
+
+Fourth major release with significant API simplification and breaking changes.
+
+### Breaking Changes
+
+#### Exceptions Removed
+- `BucketFullException` and `LimiterDelayException` have been removed
+- Rate limiting now uses blocking behavior instead of exception-based flow control
+
+#### Limiter Constructor Simplified
+- Removed `clock` parameter - each bucket now manages its own clock via `bucket.now()`
+- Removed `raise_when_fail` parameter - no exceptions are raised
+- Removed `max_delay` parameter - blocking is now controlled per-call
+- Removed `retry_until_max_delay` parameter
+- Added `buffer_ms` parameter (default 50ms) for clock drift tolerance
+
+#### Clock Changes
+- `TimeClock` removed - use `MonotonicClock` instead
+- `SQLiteClock` removed - buckets now manage their own time
+- `TimeAsyncClock` renamed to `MonotonicAsyncClock`
+- Clock is no longer passed to Limiter; buckets have built-in `now()` method
+
+#### try_acquire API Changes
+- New signature: `try_acquire(name="pyrate", weight=1, blocking=True, timeout=-1)`
+- `blocking=True` (default): blocks until permit is acquired
+- `blocking=False`: returns `False` immediately if bucket is full
+- Added `try_acquire_async()` for proper async acquisition with asyncio.Lock
+
+#### Decorator API Changes
+- Old: `limiter.as_decorator()(mapping_func)(target_func)` where mapping returns `(name, weight)`
+- New: `limiter.as_decorator(name="...", weight=...)(target_func)` with direct parameters
+
+#### BucketFactory Changes
+- `schedule_leak(bucket, clock)` now `schedule_leak(bucket)` - no clock parameter
+- `create(clock, bucket_class, ...)` now `create(bucket_class, ...)` - no clock parameter
+
+### New Features
+- Context manager support: `with Limiter(...) as limiter:` and `with bucket:`
+- `limiter.close()` method for resource cleanup
+- `limiter_factory` module with convenience functions:
+  - `create_sqlite_limiter()`
+  - `create_inmemory_limiter()`
+  - `init_global_limiter()`
+- `MultiprocessBucket` for multiprocessing environments
+- Web request helpers in `pyrate_limiter.extras`:
+  - `aiohttp_limiter.RateLimitedSession`
+  - `httpx_limiter.RateLimiterTransport` / `AsyncRateLimiterTransport`
+  - `requests_limiter.RateLimitedRequestsSession`
+- Time is now monotonic by default (`monotonic_ns()`)
+- `buffer_ms` configurable per-Limiter (default 50ms)
+
+### Improvements
+- Migrated from Poetry to UV for builds
+- Switched from Bitnami to official Redis/Postgres Docker images
+- Pre-commit switched to Ruff
+- Improved multiprocessing support with proper locking
+- Better asyncio support with thread-local async locks
+
 ## [3.9.0]
-* Introduce MultiProcessBucket
-* Updte documentation to include MultiProcessBucket
+* Introduce MultiprocessBucket
+* Update documentation to include MultiprocessBucket
 * Add delay configure
-* Simplify lock interface for SQLFileLock & MultiProcessBucket
+* Simplify lock interface for SQLFileLock & MultiprocessBucket
 
 ## [3.8.1]
 * Keep Retrying until Max Delay Has Expired

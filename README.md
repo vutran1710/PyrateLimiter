@@ -12,6 +12,8 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/vutran1710/PyrateLimiter/graphs/commit-activity)
 [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/pyrate-limiter/)
 
+> **Upgrading from v3.x?** See the [Migration Guide](migrating.md) for breaking changes.
+
 <br>
 
 ## Contents
@@ -33,11 +35,11 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
     - [asyncio and event loops](#asyncio-and-event-loops)
     - [`as_decorator()`: use limiter as decorator](#as_decorator-use-limiter-as-decorator)
     - [Limiter API](#limiter-api)
+      - [Context Manager](#context-manager)
     - [Weight](#weight)
     - [Handling exceeded limits](#handling-exceeded-limits)
       - [Bucket analogy](#bucket-analogy)
-      - [Rate limit exceptions](#rate-limit-exceptions)
-      - [Rate limit delays](#rate-limit-delays)
+      - [Blocking vs Non-blocking](#blocking-vs-non-blocking)
     - [Backends](#backends)
       - [InMemoryBucket](#inmemorybucket)
       - [MultiprocessBucket](#multiprocessbucket)
@@ -57,7 +59,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
 
 - Supports unlimited rate limits and custom intervals.
 - Separately tracks limits for different services or resources.
-- Manages limit breaches by raising exceptions or applying delays.
+- Manages limit breaches with configurable blocking or non-blocking behavior.
 - Offers multiple usage modes: direct calls or decorators.
 - Fully compatible with both synchronous and asynchronous workflows.
 - Provides SQLite and Redis backends for persistent limit tracking across threads or restarts.
@@ -81,18 +83,23 @@ conda install --channel conda-forge pyrate-limiter
 
 ## Quickstart
 
-To limit 5 requests within 2 seconds and raise an exception when the limit is exceeded:
+To limit 5 requests within 2 seconds:
 
 ```python
-from pyrate_limiter import Duration, Rate, Limiter, BucketFullException
+from pyrate_limiter import Duration, Rate, Limiter
 
 limiter = Limiter(Rate(5, Duration.SECOND * 2))
 
+# Blocking mode (default) - waits until permit available
 for i in range(6):
-    try:
-        limiter.try_acquire(i)
-    except BucketFullException as err:
-        print(err, err.meta_info)
+    limiter.try_acquire(str(i))
+    print(f"Acquired permit {i}")
+
+# Non-blocking mode - returns False if bucket full
+for i in range(6):
+    success = limiter.try_acquire(str(i), blocking=False)
+    if not success:
+        print(f"Rate limited at {i}")
 ```
 
 ## limiter_factory
@@ -133,8 +140,10 @@ Example: [aiohttp_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/bl
 ```py
 from pyrate_limiter import limiter_factory
 from pyrate_limiter.extras.httpx_limiter import AsyncRateLimiterTransport, RateLimiterTransport
+import httpx
 
 limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR)
+url = "https://example.com"
 
 with httpx.Client(transport=RateLimiterTransport(limiter=limiter)) as client:
     client.get(url)
@@ -373,41 +382,21 @@ Example: [asyncio_ratelimit.py](https://github.com/vutran1710/PyrateLimiter/blob
 
 #### `as_decorator()`: use limiter as decorator
 
-`Limiter` can be used as a decorator, but you must provide a `mapping` function that maps the wrapped function's arguments to `limiter.try_acquire` arguments (either a `str` or a `(str, int)` tuple).
-
+`Limiter` can be used as a decorator with `name` and `weight` parameters.
 The decorator works with both synchronous and asynchronous functions:
 
 ```python
-decorator = limiter.as_decorator()
+from pyrate_limiter import Rate, Duration, Limiter
 
-def mapping(*args, **kwargs):
-    return "demo", 1
+limiter = Limiter(Rate(5, Duration.SECOND))
 
-@decorator(mapping)
+@limiter.as_decorator(name="api_call", weight=1)
 def handle_something(*args, **kwargs):
     """function logic"""
 
-@decorator(mapping)
+@limiter.as_decorator(name="background_job", weight=2)
 async def handle_something_async(*args, **kwargs):
-    """function logic"""
-```
-
-
-Async Example:
-```python
-my_beautiful_decorator = limiter.as_decorator()
-
-def mapping(some_number: int):
-    return str(some_number)
-
-@my_beautiful_decorator(mapping)
-def request_function(some_number: int):
-    requests.get('https://example.com')
-
-# Async would work too!
-@my_beautiful_decorator(mapping)
-async def async_request_function(some_number: int):
-    requests.get('https://example.com')
+    """async function logic"""
 ```
 
 For full example see [asyncio_decorator.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_decorator.py)
@@ -442,6 +431,31 @@ If a bucket is found and get deleted, calling this method will return **True**, 
 If there is no more buckets in the limiter's bucket-factory, all the leaking tasks will be stopped.
 
 
+#### Context Manager
+
+Limiter supports the context manager protocol for automatic cleanup:
+
+```python
+from pyrate_limiter import Limiter, RequestRate, Duration, InMemoryBucket
+
+# Define a simple rate and create a bucket
+rate = RequestRate(5, Duration.SECOND)
+bucket = InMemoryBucket(rate)
+
+# Use Limiter as a context manager
+with Limiter(bucket) as limiter:
+    limiter.try_acquire("item")
+# Resources automatically released
+
+# Or manually close
+limiter = Limiter(bucket)
+try:
+    limiter.try_acquire("item")
+finally:
+    limiter.close()
+```
+
+
 ### Weight
 
 Item can have weight. By default item's weight = 1, but you can modify the weight before passing to `limiter.try_acquire`.
@@ -466,7 +480,7 @@ See [Advanced Usage](#advanced-usage) below for more details.
 
 ### Handling exceeded limits
 
-When a rate limit is exceeded, you have two options: raise an exception, or add delays.
+When a rate limit is exceeded, you can choose between blocking and non-blocking behavior.
 
 #### Bucket analogy
 
@@ -482,84 +496,50 @@ quick summary:
 - When the bucket is "full", it will overflow, representing **canceled or delayed requests**.
 - Item can have weight. Consuming a single item with weight W > 1 is the same as consuming W smaller, unit items - each with weight=1, with the same timestamp and maybe same name (depending on however user choose to implement it)
 
-#### Rate limit exceptions
+#### Blocking vs Non-blocking
 
-By default, a `BucketFullException` will be raised when a rate limit is exceeded.
-The error contains a `meta_info` attribute with the following information:
-
-- `name`: The name of item it received
-- `weight`: The weight of item it received
-- `rate`: The specific rate that has been exceeded
-
-Here's an example that will raise an exception on the 4th request:
+By default, `try_acquire` blocks until a permit becomes available:
 
 ```python
+from pyrate_limiter import Rate, Limiter, Duration
+
 rate = Rate(3, Duration.SECOND)
-bucket = InMemoryBucket([rate])
-clock = MonotonicClock()
+limiter = Limiter(rate)
 
-
-class MyBucketFactory(BucketFactory):
-
-    def wrap_item(self, name: str, weight: int = 1) -> RateItem:
-        """Time-stamping item, return a RateItem"""
-        now = clock.now()
-        return RateItem(name, now, weight=weight)
-
-    def get(self, _item: RateItem) -> AbstractBucket:
-        """For simplicity's sake, all items route to the same, single bucket"""
-        return bucket
-
-
-limiter = Limiter(MyBucketFactory())
-
-for _ in range(4):
-    try:
-        limiter.try_acquire('item', weight=2)
-    except BucketFullException as err:
-        print(err)
-        # Output: Bucket with Rate 3/1.0s is already full
-        print(err.meta_info)
-        # Output: {'name': 'item', 'weight': 2, 'rate': '3/1.0s', 'error': 'Bucket with Rate 3/1.0s is already full'}
+# Blocking (default) - waits until permit is available
+for i in range(5):
+    limiter.try_acquire("item")  # blocks if bucket is full
+    print(f"Acquired {i}")
 ```
 
-The rate part of the output is constructed as: `limit / interval`. On the above example, the limit
-is 3 and the interval is 1, hence the `Rate 3/1`.
-
-#### Rate limit delays
-
-You may want to simply slow down your requests to stay within the rate limits instead of canceling
-them. In that case you pass the `max_delay` argument the maximum value of delay (typically in _ms_ when use human-clock).
+For non-blocking behavior, set `blocking=False` to return immediately:
 
 ```python
-limiter = Limiter(factory, max_delay=500) # Allow to delay up to 500ms
+# Non-blocking - returns False immediately if bucket is full
+for i in range(5):
+    success = limiter.try_acquire("item", blocking=False)
+    if not success:
+        print(f"Rate limited at request {i}")
+        break
 ```
 
-Limiter has a default buffer_ms of 50ms. This means that when waiting, an additional 50ms will be added per step.
-
-As `max_delay` has been passed as a numeric value, when ingesting item, limiter will:
-
-- First, try to ingest such item using the routed bucket
-- If it fails to put item into the bucket, it will call `wait(item)` on the bucket to see how much time remains until the bucket can consume the item again?
-- Comparing the `wait` value to the `max_delay`.
-- if `max_delay` >= `wait`: delay (wait + buffer_ms as latency-tolerance) using either `asyncio.sleep` or `time.sleep` until the bucket can consume again
-- if `max_delay` < `wait`: it raises `LimiterDelayException` if Limiter's `raise_when_fail=True`, otherwise silently fail and return False
-
-Example:
+For async code, use `try_acquire_async` with optional timeout:
 
 ```python
-from pyrate_limiter import LimiterDelayException
+# Async with timeout (in seconds)
+success = await limiter.try_acquire_async("item", timeout=5)
+if not success:
+    print("Timed out waiting for permit")
+```
 
-for _ in range(4):
-    try:
-        limiter.try_acquire('item', weight=2, max_delay=200)
-    except LimiterDelayException as err:
-        print(err)
-        # Output:
-        # Actual delay exceeded allowance: actual=500, allowed=200
-        # Bucket for 'item' with Rate 3/1.0s is already full
-        print(err.meta_info)
-        # Output: {'name': 'item', 'weight': 2, 'rate': '3/1.0s', 'max_delay': 200, 'actual_delay': 500}
+The `buffer_ms` parameter (default 50ms) adds a small delay buffer to account for timing variations:
+
+```python
+from pyrate_limiter import Duration, InMemoryBucket, Limiter, RequestRate
+
+rate = RequestRate(5, Duration.SECOND)
+bucket = InMemoryBucket(rate)
+limiter = Limiter(bucket, buffer_ms=100)  # 100ms buffer
 ```
 
 ### Backends
