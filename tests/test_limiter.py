@@ -5,7 +5,8 @@ import time
 from inspect import isawaitable
 
 import pytest
-import asyncio 
+import asyncio
+import sys
 
 from .conftest import DEFAULT_RATES
 from .conftest import logger
