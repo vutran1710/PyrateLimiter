@@ -65,7 +65,7 @@ Fourth major release with significant API simplification and breaking changes.
 
 ## [3.9.0]
 * Introduce MultiProcessBucket
-* Updte documentation to include MultiProcessBucket
+* Update documentation to include MultiProcessBucket
 * Add delay configure
 * Simplify lock interface for SQLFileLock & MultiProcessBucket
 
