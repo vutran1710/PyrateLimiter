@@ -535,6 +535,10 @@ if not success:
 The `buffer_ms` parameter (default 50ms) adds a small delay buffer to account for timing variations:
 
 ```python
+from pyrate_limiter import Duration, InMemoryBucket, Limiter, RequestRate
+
+rate = RequestRate(5, Duration.SECOND)
+bucket = InMemoryBucket(rate)
 limiter = Limiter(bucket, buffer_ms=100)  # 100ms buffer
 ```
 
