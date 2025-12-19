@@ -14,6 +14,12 @@ keywords = [
     "leaky-bucket",
     "ratelimit",
     "ratelimiting",
+    "httpx",
+    "aiohttp",
+    "limiter",
+    "rate",
+    "requests",
+    "throttle"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -61,7 +67,10 @@ dev = [
     "pytest-xdist>=3.8.0",
     "schedule>=1.1.0,<2",
     "pytest-retry>=1.7.0",
+    "pytest-randomly>=3.16.0",
     "httpx",
+    "aiohttp",
+    "requests",
     "psycopg[binary]>=3.2.9; sys_platform == 'win32'"
 ]
 
@@ -107,6 +116,18 @@ retries = 2
 retry_delay = 1
 cumulative_timing = false
 retry_outcome = "rerun"
+markers = [
+    "inmemory: tests using InMemoryBucket",
+    "redis: tests using RedisBucket",
+    "asyncredis: tests using AsyncRedisBucket",
+    "sqlite: tests using SQLiteBucket",
+    "filelocksqlite: tests using SQLite + file lock",
+    "postgres: tests using PostgresBucket",
+    "mpbucket: tests using MultiprocessBucket",
+    "monotonic: tests using MonotonicClock",
+    "timeclock: tests using TimeClock",
+    "asyncclock: tests using TimeAsyncClock",
+]
 
 [tool.ruff]
 line-length = 150

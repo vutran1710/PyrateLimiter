@@ -66,9 +66,7 @@ def task():
     assert limiter_factory.LIMITER is not None, "Limiter not initialized"
 
     try:
-        while not limiter_factory.LIMITER.try_acquire("task"):
-            # Keep trying
-            pass
+        limiter_factory.LIMITER.try_acquire("task")
     except Exception as e:
         logger.exception(e)
 
