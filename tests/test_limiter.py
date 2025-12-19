@@ -27,7 +27,7 @@ from pyrate_limiter import Rate
 from pyrate_limiter import SingleBucketFactory
 
 buffer_ms = 10
-# Compute a windows specific jitter, due to clock timing 
+# Compute a windows specific jitter, due to clock timing
 # on GHA's Windows runners
 jitter_adjustment = 0
 if sys.platform == "win32":
