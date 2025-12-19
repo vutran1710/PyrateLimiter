@@ -65,8 +65,7 @@ def init_process_sqlite(requests_per_second, db_path):
 
 def my_task_async(num_requests):
     async def task_async(limiter: Limiter, name="mytask", weight=1):
-        while not await limiter.try_acquire_async(name, weight):
-            pass
+        await limiter.try_acquire_async(name, weight)
         return time.monotonic()
 
     async def run_many_async_tasks():
