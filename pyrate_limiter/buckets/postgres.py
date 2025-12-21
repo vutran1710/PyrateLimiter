@@ -97,7 +97,17 @@ class PostgresBucket(AbstractBucket):
         item_ts_seconds = item.timestamp / 1000
 
         with self._get_conn() as conn:
-            # Lock table exclusively - if busy, fail fast
+            # Acquire an EXCLUSIVE MODE lock on the bucket table using NOWAIT.
+            # This ensures the "check current count" + "insert new items" sequence
+            # is atomic with respect to other writers, so rate limits cannot be
+            # exceeded due to concurrent requests interleaving.
+            #
+            # Because we use NOWAIT, if the table is already locked by another
+            # transaction, PostgreSQL raises LockNotAvailable and we immediately
+            # reject this request (return False) instead of blocking or retrying.
+            # This provides predictable, fail-fast behavior but may limit
+            # throughput under high contention since only one writer can perform
+            # the check-and-put at a time.
             try:
                 conn.execute(Queries.LOCK_TABLE.format(table=self._full_tbl))
             except LockNotAvailable:
