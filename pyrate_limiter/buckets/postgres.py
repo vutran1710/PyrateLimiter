@@ -26,6 +26,9 @@ class Queries:
     CREATE_INDEX_ON_TIMESTAMP = """
     CREATE INDEX IF NOT EXISTS {index} ON {table} (item_timestamp)
     """
+    LOCK_TABLE = """
+    LOCK TABLE {table} IN EXCLUSIVE MODE NOWAIT
+    """
     COUNT = """
     SELECT COUNT(*) FROM {table}
     """
@@ -72,23 +75,51 @@ class PostgresBucket(AbstractBucket):
             yield conn
 
     def _create_table(self):
+        from psycopg.errors import UniqueViolation
+
         with self._get_conn() as conn:
-            conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
-            index_name = f"timestampIndex_{self.table}"
-            conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
+            try:
+                conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
+                index_name = f"timestampIndex_{self.table}"
+                conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
+            except UniqueViolation:
+                logger.info("Table %s already exists", self._full_tbl)
 
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Put an item (typically the current time) in the bucket
         return true if successful, otherwise false
         """
+        from psycopg.errors import LockNotAvailable
+
         if item.weight == 0:
             return True
 
+        item_ts_seconds = item.timestamp / 1000
+
         with self._get_conn() as conn:
+            # Acquire an EXCLUSIVE MODE lock on the bucket table using NOWAIT.
+            # This ensures the "check current count" + "insert new items" sequence
+            # is atomic with respect to other writers, so rate limits cannot be
+            # exceeded due to concurrent requests interleaving.
+            #
+            # Because we use NOWAIT, if the table is already locked by another
+            # transaction, PostgreSQL raises LockNotAvailable and we immediately
+            # reject this request (return False) instead of blocking or retrying.
+            # This provides predictable, fail-fast behavior but may limit
+            # throughput under high contention since only one writer can perform
+            # the check-and-put at a time.
+            try:
+                conn.execute(Queries.LOCK_TABLE.format(table=self._full_tbl))
+            except LockNotAvailable:
+                self.failing_rate = self.rates[0]
+                return False
+
             for rate in self.rates:
-                bound = f"SELECT TO_TIMESTAMP({item.timestamp / 1000}) - INTERVAL '{rate.interval} milliseconds'"
-                query = f"SELECT COUNT(*) FROM {self._full_tbl} WHERE item_timestamp >= ({bound})"  # noqa: S608  # FIXME: SQL Parameterization and table name sanitization
-                cur = conn.execute(query)
+                cur = conn.execute(
+                    f"SELECT COUNT(*) FROM {self._full_tbl} "  # noqa: S608
+                    f"WHERE item_timestamp >= TO_TIMESTAMP(%s) - INTERVAL '{rate.interval} milliseconds'",
+                    (item_ts_seconds,),
+                )
                 count = int(cur.fetchone()[0])
                 cur.close()
 
@@ -97,13 +128,9 @@ class PostgresBucket(AbstractBucket):
                     return False
 
             self.failing_rate = None
-
             query = Queries.PUT.format(table=self._full_tbl)
-
-            # https://www.psycopg.org/docs/extras.html#fast-exec
-
             for _ in range(item.weight):
-                conn.execute(query, (item.name, item.weight, item.timestamp / 1000))
+                conn.execute(query, (item.name, item.weight, item_ts_seconds))
 
         return True
 
