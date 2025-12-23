@@ -1,8 +1,10 @@
 # PyrateLimiter
 ```{include} ../README.md
 :start-line: 3
-:end-before: '## Contents'
+:end-before: '> **Upgrading'
 ```
+
+> **Upgrading from v3.x?** See the [Migration Guide](migrating.md) for breaking changes.
 <!-- Exclude markdown ToC and use Sphinx sidebar ToC instead -->
 ## Features
 ```{include} ../README.md
