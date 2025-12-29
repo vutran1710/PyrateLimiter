@@ -75,16 +75,13 @@ class PostgresBucket(AbstractBucket):
             yield conn
 
     def _create_table(self):
-        from psycopg.errors import UniqueViolation
-
         with self._get_conn() as conn:
-            try:
-                conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
-                index_name = f"timestampIndex_{self.table}"
-                conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
-            except UniqueViolation:
-                logger.info("Table %s already exists", self._full_tbl)
-
+            lock_id = hash(self._full_tbl) & 0x7FFFFFFF
+            conn.execute("SELECT pg_advisory_xact_lock(%s)", (lock_id,))
+            conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
+            index_name = f"timestampIndex_{self.table}"
+            conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
+            
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Put an item (typically the current time) in the bucket
         return true if successful, otherwise false
@@ -117,8 +114,8 @@ class PostgresBucket(AbstractBucket):
             for rate in self.rates:
                 cur = conn.execute(
                     f"SELECT COUNT(*) FROM {self._full_tbl} "  # noqa: S608
-                    f"WHERE item_timestamp >= TO_TIMESTAMP(%s) - INTERVAL '{rate.interval} milliseconds'",
-                    (item_ts_seconds,),
+                    f"WHERE item_timestamp >= TO_TIMESTAMP(%s) - (%s * INTERVAL '1 milliseconds')",
+                    (item_ts_seconds, rate.interval),
                 )
                 count = int(cur.fetchone()[0])
                 cur.close()
