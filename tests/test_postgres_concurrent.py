@@ -1,5 +1,4 @@
 import threading
-from collections import Counter
 
 import pytest
 
@@ -79,7 +78,7 @@ class TestPostgresConcurrent:
 
         for ts in db_timestamps:
             window_start = ts - 1  # 1 second window
-            count_in_window = sum(1 for t in db_timestamps if t >= window_start and t <= ts)
+            count_in_window = sum(1 for t in db_timestamps if t > window_start and t <= ts)
             assert count_in_window <= rate_limit, (
                 f"Rate limit exceeded in DB: {count_in_window} items in 1-second window ending at {ts}"
             )
@@ -130,17 +129,17 @@ class TestPostgresConcurrent:
         for t in threads:
             t.join()
 
-        successful_timestamps = [ts for ts, success in results if success]
+        successful_timestamps = sorted([ts for ts, success in results if success])
 
-        # Check 1-second windows
-        second_buckets = Counter(ts // 1000 for ts in successful_timestamps)
-        for _, count in second_buckets.items():
-            assert count <= 5, f"1-second rate exceeded: {count} > 5"
+        # Check sliding windows for both rates
+        for ts in successful_timestamps:
+            # 1-second sliding window
+            count_1s = sum(1 for t in successful_timestamps if ts - 1000 <= t <= ts)
+            assert count_1s <= 5, f"1-second rate exceeded: {count_1s} items in window ending at {ts}"
 
-        # Check 500ms windows
-        half_second_buckets = Counter(ts // 500 for ts in successful_timestamps)
-        for _, count in half_second_buckets.items():
-            assert count <= 3, f"500ms rate exceeded: {count} > 3"
+            # 500ms sliding window
+            count_500ms = sum(1 for t in successful_timestamps if ts - 500 <= t <= ts)
+            assert count_500ms <= 3, f"500ms rate exceeded: {count_500ms} items in window ending at {ts}"
 
     def test_concurrent_put_weighted(self, pg_pool, clean_table):
         rate_limit = 10
@@ -173,12 +172,11 @@ class TestPostgresConcurrent:
         for t in threads:
             t.join()
 
-        weight_per_second = Counter()
-        for ts, success, w in results:
-            if success:
-                weight_per_second[ts // 1000] += w
+        successful_results = sorted([(ts, w) for ts, success, w in results if success])
 
-        for second, total_weight in weight_per_second.items():
-            assert total_weight <= rate_limit, (
-                f"Rate limit exceeded: total weight {total_weight} in second {second}"
+        # Check sliding windows for weighted items
+        for ts, _ in successful_results:
+            weight_in_window = sum(w for t, w in successful_results if ts - 1000 <= t <= ts)
+            assert weight_in_window <= rate_limit, (
+                f"Rate limit exceeded: weight {weight_in_window} in 1-second window ending at {ts}"
             )
