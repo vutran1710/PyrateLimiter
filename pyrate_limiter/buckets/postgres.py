@@ -108,6 +108,7 @@ class PostgresBucket(AbstractBucket):
             try:
                 conn.execute(Queries.LOCK_TABLE.format(table=self._full_tbl))
             except LockNotAvailable:
+                logger.debug("LockNotAvailable")
                 self.failing_rate = self.rates[0]
                 return False
 
