@@ -81,7 +81,7 @@ class PostgresBucket(AbstractBucket):
             conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
             index_name = f"timestampIndex_{self.table}"
             conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
-            
+
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Put an item (typically the current time) in the bucket
         return true if successful, otherwise false
