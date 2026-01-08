@@ -209,7 +209,6 @@ class SQLiteBucket(AbstractBucket):
 
         with file_lock_ctx:
             assert db_path is not None
-            assert db_path.endswith(".sqlite"), "Please provide a valid sqlite file path"
 
             sqlite_connection = sqlite3.connect(
                 db_path,
