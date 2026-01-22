@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - "v*"
   pull_request:
     branches:
       - master
@@ -14,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LATEST_PY_VERSION: '3.14'
-  REDIS: 'redis://localhost:6379'
+  LATEST_PY_VERSION: "3.14"
+  REDIS: "redis://localhost:6379"
 
 jobs:
   smoke:
@@ -48,33 +50,33 @@ jobs:
       fail-fast: true
       matrix:
         include:
-        - os: macos-latest
-          python-version: '3.14'
-        #- os: windows-latest
-        #  python-version: '3.14'
-        - os: ubuntu-latest
-          python-version: 'pypy3.11'
+          - os: macos-latest
+            python-version: "3.14"
+          #- os: windows-latest
+          #  python-version: '3.14'
+          - os: ubuntu-latest
+            python-version: "pypy3.11"
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        fetch-tags: true
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-        allow-prereleases: true
-    - name: Install uv
-      uses: astral-sh/setup-uv@v6
-      with:
-        enable-cache: true
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: uv sync --all-groups
-    - name: Test and Coverage
-      run: |
-        uv run nox -e notlinux
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: uv sync --all-groups
+      - name: Test and Coverage
+        run: |
+          uv run nox -e notlinux
 
   check-linux:
     needs: smoke
@@ -105,53 +107,56 @@ jobs:
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        fetch-tags: true
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install uv
-      uses: astral-sh/setup-uv@v6
-      with:
-        enable-cache: true
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: uv sync --all-groups
-    # Run linting (latest python version only)
-    - name: Build and install package
-      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
-      run: |
-        uv build
-        uv pip install dist/*.whl
-    # Run tests and coverage report (all python versions)
-    - name: Test and Coverage
-      run: |
-        uv run nox -e cover
-    # Latest python version: send coverage report to codecov
-    - name: "Upload coverage report to Codecov"
-      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
-      uses: codecov/codecov-action@v2
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: uv sync --all-groups
+      # Run linting (latest python version only)
+      - name: Build and install package
+        if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
+        run: |
+          uv build
+          uv pip install dist/*.whl
+      # Run tests and coverage report (all python versions)
+      - name: Test and Coverage
+        run: |
+          uv run nox -e cover
+      # Latest python version: send coverage report to codecov
+      - name: "Upload coverage report to Codecov"
+        if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
+        uses: codecov/codecov-action@v2
 
-    - name: Upload dist, if this is latest
-      if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: dist
-        path: dist
+      - name: Upload dist, if this is latest
+        if: ${{ matrix.python-version == env.LATEST_PY_VERSION && matrix.os == 'ubuntu-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
 
   publish:
     needs: [check-linux, check-others]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      id-token: write
     steps:
-    - name: Download dist
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist
-    - name: Upload package to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Upload package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
