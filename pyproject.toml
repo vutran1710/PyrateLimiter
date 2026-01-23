@@ -101,7 +101,20 @@ build-backend = "hatchling.build"
 source = "uv-dynamic-versioning"
 
 [tool.hatch.build.targets.sdist]
-include = ["pyrate_limiter"]
+include = [
+    "pyrate_limiter",
+    "docs",
+    "tests",
+    "examples",
+    "benchmarks",
+    "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "pyproject.toml",
+    "setup.cfg",
+    "noxfile.py",
+]
 
 [tool.hatch.build.targets.wheel]
 include = ["pyrate_limiter"]
