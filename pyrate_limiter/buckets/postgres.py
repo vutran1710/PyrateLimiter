@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from time import time_ns
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
+from psycopg.errors import Error
+
 from ..abstracts import AbstractBucket, Rate, RateItem
 
 logger = logging.getLogger(__name__)
@@ -66,7 +68,21 @@ class PostgresBucket(AbstractBucket):
         self._create_table()
 
     def now(self):
-        # TODO: Use a Postgres time source via SQL
+        """Return current time in milliseconds using Postgres.
+
+        Falls back to local time if the DB query fails for any reason.
+        """
+        try:
+            with self._get_conn() as conn:
+                qry = "SELECT (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint"
+                cur = conn.execute(qry)
+                row = cur.fetchone()
+                if row and row[0] is not None:
+                    return int(row[0])
+        except Error:
+            logger.warning("Postgres time query failed, falling back to local clock")
+
+        # fallback to local monotonic time in milliseconds
         return time_ns() // 1000000
 
     @contextmanager

@@ -30,6 +30,7 @@ class AbstractBucket(ABC):
         self._clock: AbstractClock = MonotonicClock()
 
     def now(self):
+        """Retrieve current timestamp from the clock backend."""
         return self._clock.now()
 
     @abstractmethod
