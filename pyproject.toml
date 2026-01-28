@@ -71,7 +71,7 @@ dev = [
     "httpx",
     "aiohttp",
     "requests",
-    "psycopg[binary]>=3.2.9; sys_platform == 'win32'"
+    "psycopg[binary]>=3.2.10; sys_platform == 'win32' or sys_platform == 'darwin'"
 ]
 
 
