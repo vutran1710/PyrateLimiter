@@ -26,6 +26,8 @@ logger = getLogger("pyrate_limiter")
 logger.setLevel(getenv("LOG_LEVEL", "INFO"))
 
 DEFAULT_RATES = [Rate(3, 1000), Rate(4, 1500)]
+DEFAULT_POSTGRES_DSN = "postgresql://postgres:postgres@localhost:5432"
+
 
 async def create_in_memory_bucket(rates: List[Rate]):
     return InMemoryBucket(rates)
@@ -107,3 +109,12 @@ async def create_postgres_bucket(rates: List[Rate]):
 def create_bucket(request):
     """Parametrization for different bucket."""
     return request.param
+
+
+@pytest.fixture(scope="session")
+def postgres_pool():
+    """Create a psycopg_pool ConnectionPool for tests."""
+    psycopg_pool = pytest.importorskip("psycopg_pool")
+    dsn = getenv("POSTGRES_DSN", DEFAULT_POSTGRES_DSN)
+    with psycopg_pool.ConnectionPool(dsn) as pool:
+        yield pool
