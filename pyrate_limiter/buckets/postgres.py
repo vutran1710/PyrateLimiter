@@ -7,8 +7,6 @@ from contextlib import contextmanager
 from time import time_ns
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
-from psycopg.errors import Error
-
 from ..abstracts import AbstractBucket, Rate, RateItem
 
 logger = logging.getLogger(__name__)
@@ -77,10 +75,9 @@ class PostgresBucket(AbstractBucket):
                 qry = "SELECT (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint"
                 cur = conn.execute(qry)
                 row = cur.fetchone()
-                if row and row[0] is not None:
-                    return int(row[0])
-        except Error:
-            logger.warning("Postgres time query failed, falling back to local clock")
+                return int(row[0])
+        except Exception:
+            logger.exception("Postgres time query failed, falling back to local clock")
 
         # fallback to local monotonic time in milliseconds
         return time_ns() // 1000000
