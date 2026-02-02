@@ -1,6 +1,6 @@
-from pyrate_limiter.buckets import postgres
-from pyrate_limiter.buckets.postgres import PostgresBucket
+from pyrate_limiter import clocks
 import pytest
+from inspect import isawaitable
 
 
 class DummyCursor:
@@ -21,8 +21,8 @@ class DummyCursor:
             self._parent.last_query = query
             self._parent.last_args = args
 
-        # populate _row for time query
-        if "EXTRACT(EPOCH" in (query or "") and self._parent is not None:
+        # populate _row for time query (case-insensitive)
+        if "extract(epoch" in (query or "").lower() and self._parent is not None:
             self._row = (self._parent.now_row,)
         else:
             self._row = None
@@ -85,8 +85,14 @@ class FailingConn:
 
     def execute(self, query, args=None):
         # raise an exception so that the fallback code path in
-        # PostgresBucket.now() is exercised.
+        # PostgresClock.now() is exercised.
         raise RuntimeError("execute failed")
+
+    def cursor(self):
+        # return a cursor-like object whose execute() raises as well
+        # so code using `with conn.cursor() as cur:` exercises the
+        # same failure path as conn.execute()
+        return self
 
 
 class BadPool:
@@ -101,49 +107,79 @@ def make_rate_list():
     return [type("R", (), {"limit": 1, "interval": 1000})()]
 
 
-def test_now_uses_db_time():
+def test_postgres_clock_now_uses_db_time():
     expected_ms = 1_600_000_000_000
     conn = DummyConn(now_row=expected_ms)
     pool = DummyPool(conn)
 
-    bucket = PostgresBucket(pool=pool, table="testbucket", rates=make_rate_list())
+    clock = clocks.PostgresClock(pool=pool)
 
-    got = bucket.now()
+    got = clock.now()
     assert got == expected_ms
     assert conn.last_query is not None
-    assert "EXTRACT(EPOCH" in conn.last_query
+    # check for lowercase extract to match codebase convention
+    assert "extract(epoch" in conn.last_query.lower()
 
 
-def test_now_falls_back_to_local_on_exception(monkeypatch):
+def test_postgres_clock_fallback_to_local_on_exception(monkeypatch):
     conn = DummyConn(now_row=0)
     pool = DummyPool(conn)
-    bucket = PostgresBucket(pool=pool, table="tb", rates=make_rate_list())
+    clock = clocks.PostgresClock(pool=pool)
 
-    bucket.pool = BadPool()
+    clock.pool = BadPool()
 
     mocked_ns = 1234567890000
     expected_ms = mocked_ns // 1000000
-    monkeypatch.setattr(postgres, "time_ns", lambda: mocked_ns)
+    # patch the clocks._get_monotonic_ms used in PostgresClock fallback
+    monkeypatch.setattr(
+        "pyrate_limiter.clocks.AbstractClock._get_monotonic_ms",
+        staticmethod(lambda: expected_ms),
+        raising=False,
+    )
 
-    got = bucket.now()
+    got = clock.now()
     assert got == expected_ms
 
 
 @pytest.mark.postgres
-def test_now_with_real_postgres(postgres_pool):
+def test_postgres_clock_with_real_postgres(postgres_pool):
     """Integration test against a real Postgres instance."""
-    bucket = PostgresBucket(
+    clock = clocks.PostgresClock(
         pool=postgres_pool,
-        table="integration_test_bucket",
-        rates=make_rate_list(),
     )
 
-    now_first = bucket.now()
+    now_first = clock.now()
     assert isinstance(now_first, int)
     assert now_first > 0
 
-    now_second = bucket.now()
+    now_second = clock.now()
     assert isinstance(now_second, int)
     assert now_second > 0
 
     assert now_second >= now_first
+
+
+def test_monotonic_clock_now_non_decreasing():
+    clock = clocks.MonotonicClock()
+    t1 = clock.now()
+    t2 = clock.now()
+
+    assert isinstance(t1, int)
+    assert isinstance(t2, int)
+    assert t2 >= t1
+
+
+@pytest.mark.asyncio
+async def test_monotonic_async_clock_now_non_decreasing():
+    clock = clocks.MonotonicAsyncClock()
+
+    # ensure now() returns awaitable
+    maybe_awaitable = clock.now()
+    assert isawaitable(maybe_awaitable)
+
+    t1 = await maybe_awaitable
+    t2 = await clock.now()
+
+    assert isinstance(t1, int)
+    assert isinstance(t2, int)
+    assert t2 >= t1

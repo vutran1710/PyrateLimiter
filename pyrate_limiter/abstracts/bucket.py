@@ -26,9 +26,6 @@ class AbstractBucket(ABC):
     failing_rate: Optional[Rate] = None
     _clock: AbstractClock = MonotonicClock()
 
-    def __init__(self):
-        self._clock: AbstractClock = MonotonicClock()
-
     def now(self):
         """Retrieve current timestamp from the clock backend."""
         return self._clock.now()

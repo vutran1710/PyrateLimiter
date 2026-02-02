@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from time import time_ns
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
+from ..clocks import PostgresClock
 
 logger = logging.getLogger(__name__)
 
@@ -58,30 +58,13 @@ class PostgresBucket(AbstractBucket):
     pool: ConnectionPool
 
     def __init__(self, pool: ConnectionPool, table: str, rates: List[Rate]):
+        self._clock = PostgresClock(pool)
         self.table = table.lower()
         self.pool = pool
         assert rates
         self.rates = rates
         self._full_tbl = f"ratelimit___{self.table}"
         self._create_table()
-
-    def now(self):
-        """Return current time in milliseconds using Postgres.
-
-        Falls back to local time if the DB query fails for any reason.
-        """
-        try:
-            with self._get_conn() as conn:
-                qry = "SELECT (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint"
-                with conn.cursor() as cur:
-                    cur.execute(qry)
-                    row = cur.fetchone()
-                    return row[0]
-        except Exception:
-            logger.exception("Postgres time query failed, falling back to local clock")
-
-        # fallback to local monotonic time in milliseconds
-        return time_ns() // 1000000
 
     @contextmanager
     def _get_conn(self):
