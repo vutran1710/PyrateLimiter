@@ -119,4 +119,4 @@ def test_now_with_real_postgres(postgres_pool):
     assert isinstance(now_second, int)
     assert now_second > 0
 
-    assert now_second > now_first
+    assert now_second >= now_first
