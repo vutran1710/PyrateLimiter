@@ -7,12 +7,31 @@ class DummyCursor:
     def __init__(self, row=None):
         self._row = row
         self.closed = False
+        self._parent = None
 
     def fetchone(self):
         return self._row
 
     def close(self):
         self.closed = True
+
+    def execute(self, query, args=None):
+        # if bound to a parent connection, update its last_query/last_args
+        if self._parent is not None:
+            self._parent.last_query = query
+            self._parent.last_args = args
+
+        # populate _row for time query
+        if "EXTRACT(EPOCH" in (query or "") and self._parent is not None:
+            self._row = (self._parent.now_row,)
+        else:
+            self._row = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
 
 
 class DummyConn:
@@ -26,11 +45,19 @@ class DummyConn:
         self.last_args = args
 
         # if the query is the time query, return a cursor with the now_row
-        if "EXTRACT(EPOCH" in (query or ""):
-            return DummyCursor((self.now_row,))
+        # return a DummyCursor bound to this connection so cursor.execute()
+        # calls update the connection's last_query/last_args as expected.
+        cur = DummyCursor(None)
+        cur._parent = self
+        # allow execute on the returned cursor to populate its _row
+        cur.execute(query, args)
+        return cur
 
-        # for other queries return a cursor that yields None for fetchone
-        return DummyCursor(None)
+    def cursor(self):
+        # return a context-manager-compatible cursor bound to this conn
+        cur = DummyCursor(None)
+        cur._parent = self
+        return cur
 
     def __enter__(self):
         return self
