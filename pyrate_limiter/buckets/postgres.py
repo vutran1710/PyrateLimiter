@@ -73,9 +73,10 @@ class PostgresBucket(AbstractBucket):
         try:
             with self._get_conn() as conn:
                 qry = "SELECT (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint"
-                cur = conn.execute(qry)
-                row = cur.fetchone()
-                return int(row[0])
+                with conn.cursor() as cur:
+                    cur.execute(qry)
+                    row = cur.fetchone()
+                    return int(row[0])
         except Exception:
             logger.exception("Postgres time query failed, falling back to local clock")
 
