@@ -53,13 +53,11 @@ class PostgresClock(AbstractClock):
         """
         # used `clock_timestamp` instead of `current_timestamp`,
         # because we want the actual current time
-        qry = "SELECT (extract(EPOCH FROM clock_timestamp()) * 1000)::bigint"
+        query = "SELECT (extract(epoch FROM clock_timestamp()) * 1000)::bigint"
 
         try:
-            with (
-                self.pool.connection() as connection,
-            ):
-                cursor = connection.execute(qry)
+            with self.pool.connection() as connection:
+                cursor = connection.execute(query)
                 row = cursor.fetchone()
                 return row[0]
         except Exception:
