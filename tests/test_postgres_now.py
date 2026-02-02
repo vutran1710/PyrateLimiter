@@ -57,9 +57,9 @@ class FailingConn:
         return False
 
     def execute(self, query, args=None):
-        # raise the same error type caught by PostgresBucket.now() so
+        # raise an exception type caught by PostgresBucket.now() so
         # the fallback code path is exercised.
-        raise postgres.Error("execute failed")
+        raise RuntimeError("execute failed")
 
 
 class BadPool:
