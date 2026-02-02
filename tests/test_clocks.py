@@ -128,13 +128,12 @@ def test_postgres_clock_fallback_to_local_on_exception(monkeypatch):
 
     clock.pool = BadPool()
 
-    mocked_ns = 1234567890000
-    expected_ms = mocked_ns // 1000000
+    expected_ms = 1_234_567_890_000
+
     # patch the clocks._get_monotonic_ms used in PostgresClock fallback
     monkeypatch.setattr(
         "pyrate_limiter.clocks.AbstractClock._get_monotonic_ms",
         staticmethod(lambda: expected_ms),
-        raising=False,
     )
 
     got = clock.now()
