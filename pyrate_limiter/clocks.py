@@ -52,7 +52,7 @@ class PostgresClock(AbstractClock):
         Falls back to local time if the DB query fails for any reason.
         """
         # used `clock_timestamp` instead of `current_timestamp`,
-        # cause we want the actual current time
+        # because we want the actual current time
         qry = "SELECT (extract(EPOCH FROM clock_timestamp()) * 1000)::bigint"
 
         try:
