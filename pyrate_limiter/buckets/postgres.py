@@ -76,7 +76,7 @@ class PostgresBucket(AbstractBucket):
                 with conn.cursor() as cur:
                     cur.execute(qry)
                     row = cur.fetchone()
-                    return int(row[0])
+                    return row[0]
         except Exception:
             logger.exception("Postgres time query failed, falling back to local clock")
 
