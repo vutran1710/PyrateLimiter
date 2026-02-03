@@ -1,6 +1,8 @@
-from pyrate_limiter import clocks
-import pytest
 from inspect import isawaitable
+
+import pytest
+
+from pyrate_limiter import clocks
 
 
 class DummyCursor:
