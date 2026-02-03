@@ -66,6 +66,9 @@ class PostgresClock(AbstractClock):
             ):
                 cursor.execute(query)
                 row = cursor.fetchone()
+                if row is None:
+                    msg = "Postgres time query returned no rows"
+                    raise RuntimeError(msg)
                 return row[0]
         except Exception:
             logger.exception("Postgres time query failed, falling back to local clock")
