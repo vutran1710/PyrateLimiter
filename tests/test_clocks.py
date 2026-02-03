@@ -103,12 +103,6 @@ class BadPool:
         return FailingConn()
 
 
-def make_rate_list():
-    # make simple object with attributes expected by PostgresBucket;
-    # values are not used by now()
-    return [type("R", (), {"limit": 1, "interval": 1000})()]
-
-
 def test_postgres_clock_now_uses_db_time():
     expected_ms = 1_600_000_000_000
     conn = DummyConn(now_row=expected_ms)
