@@ -182,3 +182,34 @@ async def test_monotonic_async_clock_now_non_decreasing():
     assert isinstance(t1, int)
     assert isinstance(t2, int)
     assert t2 >= t1
+
+
+def test_postgres_clock_no_rows_falls_back(monkeypatch):
+    """If the Postgres time query returns no rows, the clock should
+    fall back to the local monotonic time (exercise the row is None branch).
+    """
+
+    class ConnNoRow:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def cursor(self):
+            # return a cursor that will not populate any row (fetchone -> None)
+            return DummyCursor(None)
+
+    pool = DummyPool(ConnNoRow())
+    clock = clocks.PostgresClock(pool=pool)
+
+    expected_ms = 9_000_000_000
+
+    # force the fallback monotonic value so the result is predictable
+    monkeypatch.setattr(
+        "pyrate_limiter.clocks.AbstractClock._get_monotonic_ms",
+        staticmethod(lambda: expected_ms),
+    )
+
+    got = clock.now()
+    assert got == expected_ms
