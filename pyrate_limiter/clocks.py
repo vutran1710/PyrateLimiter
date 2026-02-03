@@ -56,8 +56,15 @@ class PostgresClock(AbstractClock):
         query = "SELECT (extract(epoch FROM clock_timestamp()) * 1000)::bigint"
 
         try:
-            with self.pool.connection() as connection:
-                cursor = connection.execute(query)
+            with (
+                self.pool.connection() as connection,
+                # the cursor should be explicitly closed to avoid
+                # potential resource leaks. E.g. psycopg3, cursors
+                # should either be used with a context manager or
+                # closed explicitly after use.
+                connection.cursor() as cursor,
+            ):
+                cursor.execute(query)
                 row = cursor.fetchone()
                 return row[0]
         except Exception:
