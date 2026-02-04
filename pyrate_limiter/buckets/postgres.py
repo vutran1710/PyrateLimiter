@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from time import time_ns
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
+from ..clocks import PostgresClock
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class Queries:
     DELETE FROM {table}
     """
     PEEK = """
-    SELECT name, weight, (extract(EPOCH FROM item_timestamp) * 1000) as item_timestamp
+    SELECT name, weight, (extract(epoch FROM item_timestamp) * 1000) as item_timestamp
     FROM {table}
     ORDER BY item_timestamp DESC
     LIMIT 1
@@ -58,16 +58,13 @@ class PostgresBucket(AbstractBucket):
     pool: ConnectionPool
 
     def __init__(self, pool: ConnectionPool, table: str, rates: List[Rate]):
+        self._clock = PostgresClock(pool)
         self.table = table.lower()
         self.pool = pool
         assert rates
         self.rates = rates
         self._full_tbl = f"ratelimit___{self.table}"
         self._create_table()
-
-    def now(self):
-        # TODO: Use a Postgres time source via SQL
-        return time_ns() // 1000000
 
     @contextmanager
     def _get_conn(self):
