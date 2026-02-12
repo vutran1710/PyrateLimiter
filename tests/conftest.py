@@ -7,6 +7,7 @@ from tempfile import gettempdir
 from typing import List
 from typing import Union
 
+import importlib.util
 import pytest
 
 from pyrate_limiter import Duration
@@ -95,17 +96,26 @@ async def create_postgres_bucket(rates: List[Rate]):
     return bucket
 
 
-@pytest.fixture(
-    params=[
-        pytest.param(create_in_memory_bucket, marks=pytest.mark.inmemory),
-        pytest.param(create_redis_bucket, marks=pytest.mark.redis),
-        pytest.param(create_async_redis_bucket, marks=pytest.mark.asyncredis),
-        pytest.param(create_sqlite_bucket, marks=pytest.mark.sqlite),
+bucket_factories = [
+    pytest.param(create_in_memory_bucket, marks=pytest.mark.inmemory),
+    pytest.param(create_sqlite_bucket, marks=pytest.mark.sqlite),
+    pytest.param(create_mp_bucket, marks=pytest.mark.mpbucket),
+    pytest.param(create_filelocksqlite_bucket, marks=pytest.mark.filelocksqlite),
+]
+
+if importlib.util.find_spec("redis") is not None:
+    bucket_factories.extend(
+        [
+            pytest.param(create_redis_bucket, marks=pytest.mark.redis),
+            pytest.param(create_async_redis_bucket, marks=pytest.mark.asyncredis),
+        ]
+    )
+
+if importlib.util.find_spec("psycopg_pool") is not None:
+    bucket_factories.append(
         pytest.param(create_postgres_bucket, marks=pytest.mark.postgres),
-        pytest.param(create_filelocksqlite_bucket, marks=pytest.mark.filelocksqlite),
-        pytest.param(create_mp_bucket, marks=pytest.mark.mpbucket)
-    ]
-)
+    )
+@pytest.fixture(params=bucket_factories)
 def create_bucket(request):
     """Parametrization for different bucket."""
     return request.param
