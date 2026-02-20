@@ -28,7 +28,7 @@ extensions = [
     "myst_parser",
 ]
 
-suppress_warnings = ["ref.ref", "ref.python"]
+suppress_warnings = ["ref.ref", "duplicate.object", "ref.python"]
 
 myst_enable_extensions = ["html_image"]
 myst_heading_anchors = 6
