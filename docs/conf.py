@@ -50,6 +50,9 @@ copybutton_prompt_is_regexp = True
 # Disable autodoc's built-in type hints, and use sphinx_autodoc_typehints extension instead
 autodoc_typehints = "none"
 
+# Mock optional dependency so autodoc can resolve its type annotations
+autodoc_mock_imports = ["psycopg"]
+
 # Auto-generage module docs with sphinx-apidoc
 apidoc_module_dir = PACKAGE_DIR
 apidoc_output_dir = MODULE_DOCS_DIR
