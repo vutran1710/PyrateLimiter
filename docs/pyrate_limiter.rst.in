@@ -1,0 +1,32 @@
+.. Use a static doc source for top-level __init__ instead of an apidoc-generated one,
+.. so we can no-index the exports which generate build warnings
+
+pyrate\_limiter package
+=======================
+
+.. automodule:: pyrate_limiter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   pyrate_limiter.abstracts
+   pyrate_limiter.buckets
+   pyrate_limiter.extras
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   pyrate_limiter.clocks
+   pyrate_limiter.limiter
+   pyrate_limiter.limiter_factory
+   pyrate_limiter.utils
