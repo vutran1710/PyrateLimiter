@@ -4,8 +4,6 @@ from typing import Dict
 from typing import Optional
 
 from typing import Iterable
-from redis.asyncio import ConnectionPool as AsyncConnectionPool
-from redis.asyncio import Redis as AsyncRedis
 
 from .conftest import DEFAULT_RATES
 from .helpers import flushing_bucket
@@ -99,6 +97,9 @@ class DemoAsyncGetBucketFactory(BucketFactory):
             bucket = self.buckets[item.name]
             assert isinstance(bucket, AbstractBucket)
             return bucket
+
+        from redis.asyncio import ConnectionPool as AsyncConnectionPool
+        from redis.asyncio import Redis as AsyncRedis
 
         pool: AsyncConnectionPool = AsyncConnectionPool.from_url(getenv("REDIS", "redis://localhost:6379"))
         redis_db: AsyncRedis = AsyncRedis(connection_pool=pool)

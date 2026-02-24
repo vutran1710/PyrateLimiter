@@ -11,6 +11,7 @@ class TestPostgresConcurrent:
 
     @pytest.fixture
     def pg_pool(self):
+        pytest.importorskip("psycopg_pool")
         from psycopg_pool import ConnectionPool
 
         pool = ConnectionPool(

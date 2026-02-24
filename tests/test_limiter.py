@@ -126,6 +126,7 @@ async def test_limiter_01(
 @pytest.mark.asyncio
 async def test_limiter_async_factory_get_weight0(
 ):
+    pytest.importorskip("redis")
     factory = DemoAsyncGetBucketFactory()
     limiter = Limiter(
         factory,
