@@ -1,5 +1,6 @@
 """Config file for Sphinx documentation"""
 
+import shutil
 from importlib.metadata import version as pkg_version
 from pathlib import Path
 
@@ -28,7 +29,7 @@ extensions = [
     "myst_parser",
 ]
 
-suppress_warnings = ["ref.ref"]
+suppress_warnings = ["ref.ref", "duplicate.object", "ref.python"]
 
 myst_enable_extensions = ["html_image"]
 myst_heading_anchors = 6
@@ -50,6 +51,9 @@ copybutton_prompt_is_regexp = True
 # Disable autodoc's built-in type hints, and use sphinx_autodoc_typehints extension instead
 autodoc_typehints = "none"
 
+# Mock optional dependency so autodoc can resolve its type annotations
+autodoc_mock_imports = ["psycopg"]
+
 # Auto-generage module docs with sphinx-apidoc
 apidoc_module_dir = PACKAGE_DIR
 apidoc_output_dir = MODULE_DOCS_DIR
@@ -69,3 +73,14 @@ html_theme = "furo"
 html_theme_options = {
     "sidebar_hide_name": True,
 }
+
+
+def setup(app: object) -> None:
+    """Overwrite apidoc-generated rst for __init__ with a static version that adds :no-index:"""
+
+    def copy_static_package_rst(app: object) -> None:
+        src = PROJECT_DIR / "docs" / "pyrate_limiter.rst.in"
+        dst = PROJECT_DIR / "docs" / MODULE_DOCS_DIR / "pyrate_limiter.rst"
+        shutil.copy(src, dst)
+
+    app.connect("builder-inited", copy_static_package_rst)  # type: ignore [attr-defined]
