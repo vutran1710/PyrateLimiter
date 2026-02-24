@@ -12,7 +12,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/vutran1710/PyrateLimiter/graphs/commit-activity)
 [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/pyrate-limiter/)
 
-> **Upgrading from v3.x?** See the [Migration Guide](docs/migrating.md) for breaking changes.
+> **Upgrading from v3.x?** See the [Migration Guide](https://github.com/vutran1710/PyrateLimiter/blob/master/docs/migrating.md) for breaking changes.
 
 <br>
 
