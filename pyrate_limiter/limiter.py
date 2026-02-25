@@ -7,7 +7,7 @@ from functools import wraps
 from inspect import isawaitable, iscoroutinefunction
 from threading import RLock, local
 from time import monotonic, sleep
-from typing import Any, Awaitable, Callable, Generic, Iterable, List, Optional, Protocol, Tuple, Union, overload
+from typing import Any, Awaitable, Callable, Iterable, List, Optional, Protocol, Tuple, Union
 
 from .abstracts import AbstractBucket, BucketFactory, Rate, RateItem
 from .buckets import InMemoryBucket
@@ -150,7 +150,9 @@ class Limiter:
 
         return argument
 
-    def _delay_waiter(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None) -> Union[bool, Awaitable[bool]]:
+    def _delay_waiter(
+        self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None
+    ) -> Union[bool, Awaitable[bool]]:
         """On `try_acquire` failed, handle delay"""
         assert bucket.failing_rate is not None
 
@@ -205,7 +207,9 @@ class Limiter:
                     return True
                 delay = bucket.waiting(item)
 
-    def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None) -> Union[bool, Awaitable[bool]]:
+    def handle_bucket_put(
+        self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None
+    ) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
 
         def _handle_result(is_success: bool):
