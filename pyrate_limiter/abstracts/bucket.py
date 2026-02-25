@@ -117,7 +117,7 @@ class AbstractBucket(ABC, Generic[_BucketMode]):
         if item.weight > self.failing_rate.limit:
             return -1
 
-        bound_item = self.peek(self.failing_rate.limit - item.weight)  # type: ignore[reportAttributeAccessIssue]
+        bound_item = self.peek(self.failing_rate.limit - item.weight)  # pyright: ignore[reportAttributeAccessIssue]
 
         if bound_item is None:
             # NOTE: No waiting, bucket is immediately ready
