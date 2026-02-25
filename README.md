@@ -117,7 +117,7 @@ for i in range(6):
 
 - create_sqlite_limiter(rate_per_duration: int, duration: Duration, ...)
 - create_inmemory_limiter(rate_per_duration: int, duration: Duration, ...)
-- - more to be added...
+- more to be added...
 
 ## Examples
 
