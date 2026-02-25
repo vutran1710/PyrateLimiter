@@ -23,7 +23,7 @@ class LockLike(Protocol):
     def release(self) -> None: ...
 
 
-class SingleBucketFactory(BucketFactory[_BucketMode]):
+class SingleBucketFactory(BucketFactory[_SyncMode]):
     """Single-bucket factory for quick use with Limiter"""
 
     bucket: AbstractBucket
@@ -39,30 +39,12 @@ class SingleBucketFactory(BucketFactory[_BucketMode]):
         if schedule_leak:
             self.schedule_leak(bucket)
 
-    @overload
-    def wrap_item(self: "SingleBucketFactory[_SyncMode]", name: str, weight: int = 1) -> RateItem: ...
-
-    @overload
-    def wrap_item(self: "SingleBucketFactory[_AsyncMode]", name: str, weight: int = 1) -> Awaitable[RateItem]: ...
-
-    def wrap_item(self, name: str, weight: int = 1):
+    def wrap_item(self, name: str, weight: int = 1) -> RateItem:
         now = self.bucket.now()
+        assert not isawaitable(now), "SingleBucketFactory requires a sync clock; use a custom BucketFactory for async buckets"
+        return RateItem(name, now, weight=weight)
 
-        async def wrap_async():
-            return RateItem(name, await now, weight=weight)
-
-        def wrap_sync():
-            return RateItem(name, now, weight=weight)
-
-        return wrap_async() if isawaitable(now) else wrap_sync()
-
-    @overload
-    def get(self: "SingleBucketFactory[_SyncMode]", item: RateItem) -> "AbstractBucket[_SyncMode]": ...
-
-    @overload
-    def get(self: "SingleBucketFactory[_AsyncMode]", item: RateItem) -> "AbstractBucket[_AsyncMode]": ...
-
-    def get(self, _: RateItem) -> AbstractBucket:
+    def get(self, item: RateItem) -> "AbstractBucket[_SyncMode]":  # noqa: ARG002
         return self.bucket
 
 
@@ -168,12 +150,6 @@ class Limiter(Generic[_BucketMode]):
 
         return argument
 
-    @overload
-    def _delay_waiter(self: "Limiter[_SyncMode]", bucket: "AbstractBucket[_SyncMode]", item: RateItem, blocking: bool, _force_async: bool = False) -> bool: ...
-
-    @overload
-    def _delay_waiter(self: "Limiter[_AsyncMode]", bucket: "AbstractBucket[_AsyncMode]", item: RateItem, blocking: bool, _force_async: bool = False) -> Awaitable[bool]: ...
-
     def _delay_waiter(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """On `try_acquire` failed, handle delay"""
         assert bucket.failing_rate is not None
@@ -218,12 +194,6 @@ class Limiter(Generic[_BucketMode]):
                 if re_acquire:
                     return True
                 delay = bucket.waiting(item)
-
-    @overload
-    def handle_bucket_put(self: "Limiter[_SyncMode]", bucket: "AbstractBucket[_SyncMode]", item: RateItem, blocking: bool, _force_async: bool = False) -> bool: ...
-
-    @overload
-    def handle_bucket_put(self: "Limiter[_AsyncMode]", bucket: "AbstractBucket[_AsyncMode]", item: RateItem, blocking: bool, _force_async: bool = False) -> Awaitable[bool]: ...
 
     def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
@@ -429,23 +399,26 @@ class Limiter(Generic[_BucketMode]):
             if iscoroutinefunction(func):
 
                 @wraps(func)
-                async def wrapper(*args, **kwargs):
+                async def async_wrapper(*args, **kwargs):
                     r = await self.try_acquire_async(name=name, weight=weight)
                     while isawaitable(r):
                         r = await r
                     return await func(*args, **kwargs)
 
-                return wrapper
+                return async_wrapper
             else:
 
                 @wraps(func)
-                def wrapper(*args, **kwargs):
-                    r = self.try_acquire(name=name, weight=weight)
+                def sync_wrapper(*args, **kwargs):
+                    try:
+                        r = self._try_acquire(name=name, weight=weight, blocking=True, timeout=-1)
+                    except TimeoutError:
+                        r = False
                     if isawaitable(r):
                         raise RuntimeError("Can't use async bucket with sync decorator")
                     return func(*args, **kwargs)
 
-                return wrapper
+                return sync_wrapper
 
         return deco
 

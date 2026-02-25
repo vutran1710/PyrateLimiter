@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from inspect import isawaitable
 from time import time_ns
-from typing import TYPE_CHECKING, Awaitable, Generic, List, Optional, Tuple, TypeVar, Union, overload
+from typing import TYPE_CHECKING, Any, Awaitable, Generic, List, Optional, Tuple, TypeVar, Union, cast, overload
 
 from ..abstracts import AbstractBucket, Rate, RateItem
 from ..utils import id_generator
@@ -44,7 +44,7 @@ class LuaScript:
     """
 
 
-class RedisBucket(AbstractBucket, Generic[_RedisType]):
+class RedisBucket(AbstractBucket[Any], Generic[_RedisType]):
     """A bucket using redis for storing data
     - We are not using redis' built-in TIME since it is non-deterministic
     - In distributed context, use local server time or a remote time server
@@ -94,20 +94,14 @@ class RedisBucket(AbstractBucket, Generic[_RedisType]):
 
         if isawaitable(script_hash):
 
-            async def _async_init():
+            async def _async_init() -> RedisBucket[AsyncRedis]:
                 nonlocal script_hash
                 script_hash = await script_hash
-                return cls(rates, redis, bucket_key, script_hash)
+                return cast("RedisBucket[AsyncRedis]", cls(rates, redis, bucket_key, script_hash))  # type: ignore[arg-type]  # type: 
 
             return _async_init()
 
-        return cls(rates, redis, bucket_key, script_hash)
-
-    @overload
-    def _check_and_insert(self: RedisBucket[Redis], item: RateItem) -> Optional[Rate]: ...
-
-    @overload
-    def _check_and_insert(self: RedisBucket[AsyncRedis], item: RateItem) -> Awaitable[Optional[Rate]]: ...
+        return cast("RedisBucket[Redis]", cls(rates, redis, bucket_key, script_hash))  # type: ignore[arg-type]
 
     def _check_and_insert(self, item: RateItem) -> Union[Optional[Rate], Awaitable[Optional[Rate]]]:
         keys = [self.bucket_key]
@@ -135,7 +129,7 @@ class RedisBucket(AbstractBucket, Generic[_RedisType]):
             awaited_idx = await returned_idx
             return _handle_sync(awaited_idx)
 
-        return _handle_async(idx) if isawaitable(idx) else _handle_sync(idx)
+        return _handle_async(idx) if isawaitable(idx) else _handle_sync(idx)  # type: ignore[return-value]
 
     @overload
     def put(self: RedisBucket[Redis], item: RateItem) -> bool: ...
