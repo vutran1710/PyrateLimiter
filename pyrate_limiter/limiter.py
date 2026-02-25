@@ -175,15 +175,15 @@ class Limiter(Generic[_BucketMode]):
 
         if _force_async or isawaitable(delay):
 
-            async def _handle_async(delay):
+            async def _handle_async(delay: Union[int, Awaitable[int]]):
                 while True:
-                    d = await delay if isawaitable(delay) else delay
+                    d = await delay if isawaitable(delay) else delay  # type: ignore[misc]
                     assert isinstance(d, int) and d >= 0
                     d += self.buffer_ms
                     await asyncio.sleep(d / 1000)
                     item.timestamp += d
                     r = bucket.put(item)
-                    r = await r if isawaitable(r) else r
+                    r = await r if isawaitable(r) else r  # type: ignore[misc]
                     if r:
                         return True
                     delay = bucket.waiting(item)
