@@ -98,7 +98,7 @@ class Limiter(Generic[_BucketMode]):
     and make working with async/sync functions easily
     """
 
-    bucket_factory: BucketFactory
+    bucket_factory: BucketFactory[_BucketMode]
     lock: Union[RLock, Iterable]
     buffer_ms: int
 
@@ -124,7 +124,7 @@ class Limiter(Generic[_BucketMode]):
         """
 
         self.buffer_ms = buffer_ms
-        self.bucket_factory = self._init_bucket_factory(argument)
+        self.bucket_factory = self._init_bucket_factory(argument)  # type: ignore[assignment]
         self.lock = RLock()
         self._thread_local = local()
 
@@ -340,7 +340,7 @@ class Limiter(Generic[_BucketMode]):
         _force_async: bool = False,
     ):
         this_item = await item
-        bucket = self.bucket_factory.get(this_item)
+        bucket = self.bucket_factory.get(this_item)  # type: ignore[misc]
         if isawaitable(bucket):
             bucket = await bucket
         assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {this_item.name}"
@@ -389,14 +389,14 @@ class Limiter(Generic[_BucketMode]):
                 # NOTE: this might change in the future
                 return True
 
-            item = self.bucket_factory.wrap_item(name, weight)
+            item = self.bucket_factory.wrap_item(name, weight)  # type: ignore[misc]
 
             if isawaitable(item):
                 return self._handle_async_acquire(item, blocking=blocking)
 
             assert isinstance(item, RateItem)
 
-            bucket = self.bucket_factory.get(item)
+            bucket = self.bucket_factory.get(item)  # type: ignore[misc]
             if isawaitable(bucket):
                 return self._handle_async_bucket(bucket=bucket, item=item, blocking=blocking, _force_async=_force_async)
 
