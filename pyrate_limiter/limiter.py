@@ -23,7 +23,7 @@ class LockLike(Protocol):
     def release(self) -> None: ...
 
 
-class SingleBucketFactory(BucketFactory[_SyncMode]):
+class SingleBucketFactory(BucketFactory[_BucketMode]):
     """Single-bucket factory for quick use with Limiter"""
 
     bucket: AbstractBucket
@@ -39,12 +39,26 @@ class SingleBucketFactory(BucketFactory[_SyncMode]):
         if schedule_leak:
             self.schedule_leak(bucket)
 
-    def wrap_item(self, name: str, weight: int = 1) -> RateItem:
+    def wrap_item(self, name: str, weight: int = 1) -> Union[RateItem, Awaitable[RateItem]]:  # type: ignore[override]
+        # The return type is wider than the _SyncMode overload alone (RateItem),
+        # but is correct: an async clock causes wrap_item to return Awaitable[RateItem].
+        # Limiter handles both cases via isawaitable() at runtime.
         now = self.bucket.now()
-        assert not isawaitable(now), "SingleBucketFactory requires a sync clock; use a custom BucketFactory for async buckets"
+
+        if isawaitable(now):
+
+            async def wrap_async():
+                return RateItem(name, await now, weight=weight)
+
+            return wrap_async()
+
+        if not isinstance(now, int):
+            raise TypeError(f"Expected int timestamp from bucket.now(), got {type(now).__name__}")
         return RateItem(name, now, weight=weight)
 
-    def get(self, item: RateItem) -> "AbstractBucket[_SyncMode]":  # noqa: ARG002
+    def get(self, item: RateItem) -> AbstractBucket:  # type: ignore[override]  # noqa: ARG002
+        # SingleBucketFactory always returns the bucket synchronously regardless of mode.
+        # Limiter handles both sync and async bucket returns via isawaitable() at runtime.
         return self.bucket
 
 
