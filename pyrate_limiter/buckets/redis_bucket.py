@@ -97,7 +97,7 @@ class RedisBucket(AbstractBucket[Any], Generic[_RedisType]):
             async def _async_init() -> RedisBucket[AsyncRedis]:
                 nonlocal script_hash
                 script_hash = await script_hash
-                return cast("RedisBucket[AsyncRedis]", cls(rates, redis, bucket_key, script_hash))  # type: ignore[arg-type]  # type: 
+                return cast("RedisBucket[AsyncRedis]", cls(rates, redis, bucket_key, script_hash))  # type: ignore[arg-type]
 
             return _async_init()
 
