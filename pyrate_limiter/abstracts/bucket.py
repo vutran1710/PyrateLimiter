@@ -88,6 +88,12 @@ class AbstractBucket(ABC, Generic[_BucketMode]):
     def count(self) -> Union[int, Awaitable[int]]:
         """Count number of items in the bucket"""
 
+    @overload
+    def peek(self: "AbstractBucket[_SyncMode]", index: int) -> Optional[RateItem]: ...
+
+    @overload
+    def peek(self: "AbstractBucket[_AsyncMode]", index: int) -> Awaitable[Optional[RateItem]]: ...
+
     @abstractmethod
     def peek(self, index: int) -> Union[Optional[RateItem], Awaitable[Optional[RateItem]]]:
         """Peek at the rate-item at a specific index in latest-to-earliest order
@@ -111,7 +117,7 @@ class AbstractBucket(ABC, Generic[_BucketMode]):
         if item.weight > self.failing_rate.limit:
             return -1
 
-        bound_item = self.peek(self.failing_rate.limit - item.weight)
+        bound_item = self.peek(self.failing_rate.limit - item.weight)  # type: ignore[reportAttributeAccessIssue]
 
         if bound_item is None:
             # NOTE: No waiting, bucket is immediately ready
