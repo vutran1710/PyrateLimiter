@@ -6,7 +6,7 @@ import logging
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
-from ..abstracts import AbstractBucket, Rate, RateItem
+from ..abstracts import AbstractBucket, Rate, RateItem, _SyncMode
 from ..clocks import PostgresClock
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class Queries:
     """
 
 
-class PostgresBucket(AbstractBucket):
+class PostgresBucket(AbstractBucket[_SyncMode]):
     table: str
     pool: ConnectionPool
 

@@ -9,7 +9,7 @@ from threading import RLock
 from time import time, time_ns
 from typing import List, Optional, Tuple, Union
 
-from ..abstracts import AbstractBucket, Rate, RateItem
+from ..abstracts import AbstractBucket, Rate, RateItem, _SyncMode
 from ..clocks import AbstractClock
 from ..utils import dedicated_sqlite_clock_connection
 
@@ -57,7 +57,7 @@ class Queries:
     PEEK = 'SELECT * FROM "{table}" ORDER BY item_timestamp DESC LIMIT 1 OFFSET {count}'
 
 
-class SQLiteBucket(AbstractBucket):
+class SQLiteBucket(AbstractBucket[_SyncMode]):
     """For sqlite bucket, we are using the sql time function as the clock
     item's timestamp wont matter here
     """

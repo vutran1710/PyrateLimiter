@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from inspect import isawaitable, iscoroutine
 from threading import Event, Thread
-from typing import Any, Awaitable, Dict, List, Optional, Type, Union
+from typing import Any, Awaitable, Dict, Generic, List, Optional, Type, TypeVar, Union, overload
 
 from ..clocks import AbstractClock, MonotonicClock
 from .rate import Rate, RateItem
@@ -16,7 +16,18 @@ from .rate import Rate, RateItem
 logger = logging.getLogger("pyrate_limiter")
 
 
-class AbstractBucket(ABC):
+class _SyncMode:
+    """Sentinel type marking a synchronous bucket/factory."""
+
+
+class _AsyncMode:
+    """Sentinel type marking an asynchronous bucket/factory."""
+
+
+_BucketMode = TypeVar("_BucketMode", _SyncMode, _AsyncMode)
+
+
+class AbstractBucket(ABC, Generic[_BucketMode]):
     """Base bucket interface
     Assumption: len(rates) always > 0
     TODO: allow empty rates
@@ -30,11 +41,23 @@ class AbstractBucket(ABC):
         """Retrieve current timestamp from the clock backend."""
         return self._clock.now()
 
+    @overload
+    def put(self: "AbstractBucket[_SyncMode]", item: RateItem) -> bool: ...
+
+    @overload
+    def put(self: "AbstractBucket[_AsyncMode]", item: RateItem) -> Awaitable[bool]: ...
+
     @abstractmethod
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Put an item (typically the current time) in the bucket
         return true if successful, otherwise false
         """
+
+    @overload
+    def leak(self: "AbstractBucket[_SyncMode]", current_timestamp: Optional[int] = None) -> int: ...
+
+    @overload
+    def leak(self: "AbstractBucket[_AsyncMode]", current_timestamp: Optional[int] = None) -> Awaitable[int]: ...
 
     @abstractmethod
     def leak(
@@ -43,15 +66,33 @@ class AbstractBucket(ABC):
     ) -> Union[int, Awaitable[int]]:
         """leaking bucket - removing items that are outdated"""
 
+    @overload
+    def flush(self: "AbstractBucket[_SyncMode]") -> None: ...
+
+    @overload
+    def flush(self: "AbstractBucket[_AsyncMode]") -> Awaitable[None]: ...
+
     @abstractmethod
     def flush(self) -> Union[None, Awaitable[None]]:
         """Flush the whole bucket
         - Must remove `failing-rate` after flushing
         """
 
+    @overload
+    def count(self: "AbstractBucket[_SyncMode]") -> int: ...
+
+    @overload
+    def count(self: "AbstractBucket[_AsyncMode]") -> Awaitable[int]: ...
+
     @abstractmethod
     def count(self) -> Union[int, Awaitable[int]]:
         """Count number of items in the bucket"""
+
+    @overload
+    def peek(self: "AbstractBucket[_SyncMode]", index: int) -> Optional[RateItem]: ...
+
+    @overload
+    def peek(self: "AbstractBucket[_AsyncMode]", index: int) -> Awaitable[Optional[RateItem]]: ...
 
     @abstractmethod
     def peek(self, index: int) -> Union[Optional[RateItem], Awaitable[Optional[RateItem]]]:
@@ -59,6 +100,12 @@ class AbstractBucket(ABC):
         NOTE: The reason we cannot peek from the start of the queue(earliest-to-latest) is
         we can't really tell how many outdated items are still in the queue
         """
+
+    @overload
+    def waiting(self: "AbstractBucket[_SyncMode]", item: RateItem) -> int: ...
+
+    @overload
+    def waiting(self: "AbstractBucket[_AsyncMode]", item: RateItem) -> Awaitable[int]: ...
 
     def waiting(self, item: RateItem) -> Union[int, Awaitable[int]]:
         """Calculate time until bucket become availabe to consume an item again"""
@@ -221,7 +268,7 @@ class Leaker(Thread):
         self.async_buckets.clear()
 
 
-class BucketFactory(ABC):
+class BucketFactory(ABC, Generic[_BucketMode]):
     """Asbtract BucketFactory class.
     It is reserved for user to implement/override this class with
     his own bucket-routing/creating logic
@@ -244,6 +291,12 @@ class BucketFactory(ABC):
             self._leaker.leak_interval = value
         self._leak_interval = value
 
+    @overload
+    def wrap_item(self: "BucketFactory[_SyncMode]", name: str, weight: int = 1) -> RateItem: ...
+
+    @overload
+    def wrap_item(self: "BucketFactory[_AsyncMode]", name: str, weight: int = 1) -> Awaitable[RateItem]: ...
+
     @abstractmethod
     def wrap_item(
         self,
@@ -254,6 +307,12 @@ class BucketFactory(ABC):
         - Turn it into a RateItem
         - Can return either a coroutine or a RateItem instance
         """
+
+    @overload
+    def get(self: "BucketFactory[_SyncMode]", item: RateItem) -> "AbstractBucket[_SyncMode]": ...
+
+    @overload
+    def get(self: "BucketFactory[_AsyncMode]", item: RateItem) -> "Awaitable[AbstractBucket[_AsyncMode]]": ...
 
     @abstractmethod
     def get(self, item: RateItem) -> Union[AbstractBucket, Awaitable[AbstractBucket]]:

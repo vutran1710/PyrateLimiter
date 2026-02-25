@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from inspect import isawaitable
 from time import time_ns
-from typing import TYPE_CHECKING, Awaitable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Awaitable, Generic, List, Optional, Tuple, TypeVar, Union, overload
 
 from ..abstracts import AbstractBucket, Rate, RateItem
 from ..utils import id_generator
@@ -12,6 +12,8 @@ from ..utils import id_generator
 if TYPE_CHECKING:
     from redis import Redis
     from redis.asyncio import Redis as AsyncRedis
+
+_RedisType = TypeVar("_RedisType", "Redis", "AsyncRedis")
 
 
 class LuaScript:
@@ -42,7 +44,7 @@ class LuaScript:
     """
 
 
-class RedisBucket(AbstractBucket):
+class RedisBucket(AbstractBucket, Generic[_RedisType]):
     """A bucket using redis for storing data
     - We are not using redis' built-in TIME since it is non-deterministic
     - In distributed context, use local server time or a remote time server
@@ -54,12 +56,12 @@ class RedisBucket(AbstractBucket):
     failing_rate: Optional[Rate]
     bucket_key: str
     script_hash: str
-    redis: Union[Redis, AsyncRedis]
+    redis: _RedisType
 
     def __init__(
         self,
         rates: List[Rate],
-        redis: Union[Redis, AsyncRedis],
+        redis: _RedisType,
         bucket_key: str,
         script_hash: str,
     ):
@@ -73,13 +75,21 @@ class RedisBucket(AbstractBucket):
         # TODO: Use a Redis time source via a Lua script
         return time_ns() // 1000000
 
+    @overload
+    @classmethod
+    def init(cls, rates: List[Rate], redis: Redis, bucket_key: str) -> RedisBucket[Redis]: ...
+
+    @overload
+    @classmethod
+    def init(cls, rates: List[Rate], redis: AsyncRedis, bucket_key: str) -> Awaitable[RedisBucket[AsyncRedis]]: ...
+
     @classmethod
     def init(
         cls,
         rates: List[Rate],
         redis: Union[Redis, AsyncRedis],
         bucket_key: str,
-    ):
+    ) -> Union[RedisBucket[Redis], Awaitable[RedisBucket[AsyncRedis]]]:
         script_hash = redis.script_load(LuaScript.PUT_ITEM)
 
         if isawaitable(script_hash):
@@ -93,7 +103,13 @@ class RedisBucket(AbstractBucket):
 
         return cls(rates, redis, bucket_key, script_hash)
 
-    def _check_and_insert(self, item: RateItem) -> Union[Rate, None, Awaitable[Optional[Rate]]]:
+    @overload
+    def _check_and_insert(self: RedisBucket[Redis], item: RateItem) -> Optional[Rate]: ...
+
+    @overload
+    def _check_and_insert(self: RedisBucket[AsyncRedis], item: RateItem) -> Awaitable[Optional[Rate]]: ...
+
+    def _check_and_insert(self, item: RateItem) -> Union[Optional[Rate], Awaitable[Optional[Rate]]]:
         keys = [self.bucket_key]
 
         args = [
@@ -121,6 +137,12 @@ class RedisBucket(AbstractBucket):
 
         return _handle_async(idx) if isawaitable(idx) else _handle_sync(idx)
 
+    @overload
+    def put(self: RedisBucket[Redis], item: RateItem) -> bool: ...
+
+    @overload
+    def put(self: RedisBucket[AsyncRedis], item: RateItem) -> Awaitable[bool]: ...
+
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Add item to key"""
         failing_rate = self._check_and_insert(item)
@@ -136,6 +158,12 @@ class RedisBucket(AbstractBucket):
         self.failing_rate = failing_rate
         return not bool(self.failing_rate)
 
+    @overload
+    def leak(self: RedisBucket[Redis], current_timestamp: Optional[int] = None) -> int: ...
+
+    @overload
+    def leak(self: RedisBucket[AsyncRedis], current_timestamp: Optional[int] = None) -> Awaitable[int]: ...
+
     def leak(self, current_timestamp: Optional[int] = None) -> Union[int, Awaitable[int]]:
         assert current_timestamp is not None
         return self.redis.zremrangebyscore(
@@ -144,14 +172,32 @@ class RedisBucket(AbstractBucket):
             current_timestamp - self.rates[-1].interval,
         )
 
-    def flush(self):
+    @overload
+    def flush(self: RedisBucket[Redis]) -> None: ...
+
+    @overload
+    def flush(self: RedisBucket[AsyncRedis]) -> Awaitable[None]: ...
+
+    def flush(self) -> Union[None, Awaitable[None]]:
         self.failing_rate = None
         return self.redis.delete(self.bucket_key)
 
-    def count(self):
+    @overload
+    def count(self: RedisBucket[Redis]) -> int: ...
+
+    @overload
+    def count(self: RedisBucket[AsyncRedis]) -> Awaitable[int]: ...
+
+    def count(self) -> Union[int, Awaitable[int]]:
         return self.redis.zcard(self.bucket_key)
 
-    def peek(self, index: int) -> Union[RateItem, None, Awaitable[Optional[RateItem]]]:
+    @overload
+    def peek(self: RedisBucket[Redis], index: int) -> Optional[RateItem]: ...
+
+    @overload
+    def peek(self: RedisBucket[AsyncRedis], index: int) -> Awaitable[Optional[RateItem]]: ...
+
+    def peek(self, index: int) -> Union[Optional[RateItem], Awaitable[Optional[RateItem]]]:
         items = self.redis.zrange(
             self.bucket_key,
             -1 - index,
@@ -182,3 +228,12 @@ class RedisBucket(AbstractBucket):
 
         assert isinstance(items, list)
         return _handle_items(items)
+
+    @overload
+    def waiting(self: RedisBucket[Redis], item: RateItem) -> int: ...
+
+    @overload
+    def waiting(self: RedisBucket[AsyncRedis], item: RateItem) -> Awaitable[int]: ...
+
+    def waiting(self, item: RateItem) -> Union[int, Awaitable[int]]:
+        return super().waiting(item)
