@@ -72,8 +72,14 @@ async def test_try_acquire_async_timeout():
     assert ok is False                       # timed out
     assert 0.09 <= (t1 - t0) <= 0.25         # waited ~timeout, not full 200ms
 
-# --- sync timeout is not implemented ---
-def test_try_acquire_sync_timeout_not_implemented():
+# --- sync timeout enforces max wait ---
+def test_try_acquire_sync_timeout():
     lim = make_limiter()
-    with pytest.raises(NotImplementedError):
-        lim.try_acquire("k", blocking=True, timeout=0.1)
+    assert lim.try_acquire("k", blocking=True) is True  # take the only slot
+
+    t0 = time.perf_counter()
+    ok = lim.try_acquire("k", blocking=True, timeout=0.1)
+    t1 = time.perf_counter()
+
+    assert ok is False                        # timed out
+    assert 0.09 <= (t1 - t0) <= 0.25         # waited ~timeout, not full 200ms
