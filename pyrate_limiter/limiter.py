@@ -6,8 +6,8 @@ from contextlib import contextmanager
 from functools import wraps
 from inspect import isawaitable, iscoroutinefunction
 from threading import RLock, local
-from time import sleep
-from typing import Any, Awaitable, Callable, Iterable, List, Protocol, Tuple, Union
+from time import monotonic, sleep
+from typing import Any, Awaitable, Callable, Generic, Iterable, List, Optional, Protocol, Tuple, Union, overload
 
 from .abstracts import AbstractBucket, BucketFactory, Rate, RateItem
 from .buckets import InMemoryBucket
@@ -150,7 +150,7 @@ class Limiter:
 
         return argument
 
-    def _delay_waiter(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
+    def _delay_waiter(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None) -> Union[bool, Awaitable[bool]]:
         """On `try_acquire` failed, handle delay"""
         assert bucket.failing_rate is not None
 
@@ -185,7 +185,17 @@ class Limiter:
                 delay += self.buffer_ms
                 total_delay += delay
 
-                sleep(delay / 1000)
+                if deadline is not None:
+                    remaining_ms = (deadline - monotonic()) * 1000
+                    if remaining_ms <= 0:
+                        raise TimeoutError()
+                    sleep(min(delay, remaining_ms) / 1000)
+                else:
+                    sleep(delay / 1000)
+
+                if deadline is not None and monotonic() >= deadline:
+                    raise TimeoutError()
+
                 item.timestamp += delay
                 re_acquire = bucket.put(item)
                 # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
@@ -195,12 +205,12 @@ class Limiter:
                     return True
                 delay = bucket.waiting(item)
 
-    def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
+    def handle_bucket_put(self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None) -> Union[bool, Awaitable[bool]]:
         """Putting item into bucket"""
 
         def _handle_result(is_success: bool):
             if not is_success:
-                return self._delay_waiter(bucket, item, blocking=blocking, _force_async=_force_async)
+                return self._delay_waiter(bucket, item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             return True
 
@@ -248,7 +258,6 @@ class Limiter:
             Number of permits to consume.
         timeout : int, default -1
             Maximum time (in seconds) to wait; -1 means wait indefinitely.
-            ** Timeout is not yet implemented for sync path. Use try_acquire_async **
         blocking : bool, default True
             If True, block until a permit is available (subject to timeout);
             if False, return immediately.
@@ -358,8 +367,7 @@ class Limiter:
         Return true on success, false on failure
         """
 
-        if timeout != -1:
-            raise NotImplementedError("timeout not implemented for sync try_acquire yet")
+        deadline: Optional[float] = monotonic() + timeout if timeout != -1 else None
 
         with combined_lock(self.lock, blocking=blocking, timeout=timeout):
             assert weight >= 0, "item's weight must be >= 0"
@@ -381,7 +389,7 @@ class Limiter:
                 return self._handle_async_bucket(bucket=bucket, item=item, blocking=blocking, _force_async=_force_async)
 
             assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
-            result = self.handle_bucket_put(bucket, item, blocking=blocking, _force_async=_force_async)
+            result = self.handle_bucket_put(bucket, item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             if isawaitable(result):
                 return self._handle_async_result(result)
