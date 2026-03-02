@@ -454,6 +454,8 @@ class Limiter(Generic[_BucketMode]):
                         r = False
                     if isawaitable(r):
                         raise RuntimeError("Can't use async bucket with sync decorator")
+                    if not r:
+                        raise TimeoutError("Rate limit acquisition failed in sync decorator")
                     return func(*args, **kwargs)
 
                 return sync_wrapper
