@@ -103,9 +103,33 @@ async def test_try_acquire_allows_async_factory_get():
 
 @pytest.mark.asyncio
 async def test_try_acquire_allows_async_bucket_put_result():
-    class AsyncPutBucket(InMemoryBucket):
+    class AsyncPutBucket(AbstractBucket):
+        def __init__(self, rates):
+            self._inner = InMemoryBucket(rates)
+            self.rates = self._inner.rates
+
+        def now(self):
+            return self._inner.now()
+
         async def put(self, item: RateItem):
-            return super().put(item)
+            result = self._inner.put(item)
+            self.failing_rate = self._inner.failing_rate
+            return result
+
+        def leak(self, current_timestamp=None):
+            result = self._inner.leak(current_timestamp)
+            self.failing_rate = self._inner.failing_rate
+            return result
+
+        def flush(self):
+            self._inner.flush()
+            self.failing_rate = self._inner.failing_rate
+
+        def count(self):
+            return self._inner.count()
+
+        def peek(self, index: int):
+            return self._inner.peek(index)
 
     bucket = AsyncPutBucket(DEFAULT_RATES)
     limiter = Limiter(bucket)
