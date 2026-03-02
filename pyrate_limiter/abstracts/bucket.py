@@ -226,19 +226,32 @@ class Leaker(Thread):
     async def _leak(self, buckets: Dict[int, AbstractBucket]) -> None:
         while not self._stop_event.is_set() and buckets:
             try:
-                for _, bucket in tuple(buckets.items()):
+                for bucket_id, bucket in tuple(buckets.items()):
                     now = bucket.now()
 
                     while isawaitable(now):
                         now = await now
 
                     assert isinstance(now, int)
-                    leak = bucket.leak(now)
+
+                    try:
+                        leak = bucket.leak(now)
+                    except Exception as e:
+                        logger.debug("Leak skipped for bucket %s due to %s: %s", bucket_id, type(e).__name__, e)
+                        self.deregister(bucket_id)
+                        continue
 
                     while isawaitable(leak):
-                        leak = await leak
+                        try:
+                            leak = await leak
+                        except Exception as e:
+                            logger.debug("Leak await skipped for bucket %s due to %s: %s", bucket_id, type(e).__name__, e)
+                            self.deregister(bucket_id)
+                            leak = None
+                            break
 
-                    assert isinstance(leak, int)
+                    if leak is not None:
+                        assert isinstance(leak, int)
 
                 await asyncio.sleep(self.leak_interval / 1000)
             except RuntimeError as e:

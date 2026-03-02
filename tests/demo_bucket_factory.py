@@ -1,8 +1,6 @@
 from inspect import isawaitable
 from os import getenv
 from typing import cast
-from typing import Dict
-from typing import Optional
 
 from typing import Iterable
 
@@ -22,10 +20,10 @@ from pyrate_limiter import RedisBucket
 class DemoBucketFactory(BucketFactory[_SyncMode]):
     """Multi-bucket factory used for testing schedule-leaks"""
 
-    buckets: Optional[Dict[str, AbstractBucket]] = None
+    buckets: dict[str, AbstractBucket[_SyncMode]]
     auto_leak: bool
 
-    def __init__(self, auto_leak=False, **buckets: AbstractBucket):
+    def __init__(self, auto_leak=False, **buckets: AbstractBucket[_SyncMode]):
         self.auto_leak = auto_leak
         self.buckets = {}
         self.leak_interval = 300
@@ -51,16 +49,12 @@ class DemoBucketFactory(BucketFactory[_SyncMode]):
         return wrap_async() if isawaitable(now) else wrap_sync()
 
     def get(self, item: RateItem) -> AbstractBucket[_SyncMode]:
-        assert self.buckets is not None
-
         if item.name in self.buckets:
-            bucket = self.buckets[item.name]
-            assert isinstance(bucket, AbstractBucket)
-            return cast(AbstractBucket[_SyncMode], bucket)
+            return self.buckets[item.name]
 
-        bucket = self.create(InMemoryBucket, DEFAULT_RATES)
+        bucket = cast(AbstractBucket[_SyncMode], self.create(InMemoryBucket, DEFAULT_RATES))
         self.buckets[item.name] = bucket
-        return cast(AbstractBucket[_SyncMode], bucket)
+        return bucket
 
     def schedule_leak(self, *args):
         if self.auto_leak:

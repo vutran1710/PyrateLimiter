@@ -248,13 +248,29 @@ async def test_limiter_decorator(
         nonlocal counter
         counter += num
 
-    if isawaitable(bucket.count()):
-        with pytest.raises(RuntimeError):
-            @limiter_wrapper
-            def inc_counter(num: int):
-                nonlocal counter
-                counter += num
-            inc = inc_counter(1)
+    count = bucket.count()
+    if isawaitable(count):
+        await count
+
+        @limiter_wrapper
+        def inc_counter(num: int):
+            nonlocal counter
+            counter += num
+
+        original_try_acquire = limiter._try_acquire
+
+        class _AwaitableAcquire:
+            def __await__(self):
+                if False:
+                    yield
+                return True
+
+        limiter._try_acquire = lambda *args, **kwargs: _AwaitableAcquire()
+        try:
+            with pytest.raises(RuntimeError):
+                inc_counter(1)
+        finally:
+            limiter._try_acquire = original_try_acquire
 
     else:
         @limiter_wrapper
