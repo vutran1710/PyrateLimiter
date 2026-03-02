@@ -240,16 +240,19 @@ class Leaker(Thread):
                         logger.debug("Leak skipped for bucket %s due to %s: %s", bucket_id, type(e).__name__, e)
                         continue
 
+                    await_failed = False
                     while isawaitable(leak):
                         try:
                             leak = await leak
                         except Exception as e:
                             logger.debug("Leak await skipped for bucket %s due to %s: %s", bucket_id, type(e).__name__, e)
-                            leak = None
+                            await_failed = True
                             break
 
-                    if leak is not None:
-                        assert isinstance(leak, int)
+                    if await_failed:
+                        continue
+
+                    assert isinstance(leak, int)
 
                 await asyncio.sleep(self.leak_interval / 1000)
             except RuntimeError as e:
