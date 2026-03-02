@@ -112,20 +112,21 @@ class AbstractBucket(ABC, Generic[_BucketMode]):
         if self.failing_rate is None:
             return 0
 
+        failing_rate = self.failing_rate
+
         assert item.weight > 0, "Item's weight must > 0"
 
-        if item.weight > self.failing_rate.limit:
+        if item.weight > failing_rate.limit:
             return -1
 
-        bound_item = self.peek(self.failing_rate.limit - item.weight)  # pyright: ignore[reportAttributeAccessIssue]
+        bound_item = self.peek(failing_rate.limit - item.weight)
 
         if bound_item is None:
             # NOTE: No waiting, bucket is immediately ready
             return 0
 
         def _calc_waiting(inner_bound_item: RateItem) -> int:
-            assert self.failing_rate is not None  # NOTE: silence mypy
-            lower_time_bound = item.timestamp - self.failing_rate.interval
+            lower_time_bound = item.timestamp - failing_rate.interval
             upper_time_bound = inner_bound_item.timestamp
             return upper_time_bound - lower_time_bound
 
