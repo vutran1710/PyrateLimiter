@@ -330,7 +330,7 @@ class BucketFactory(ABC, Generic[_BucketMode]):
     def get(self: "BucketFactory[_AsyncMode]", item: RateItem) -> "Union[AbstractBucket[_AsyncMode], Awaitable[AbstractBucket[_AsyncMode]]]": ...
 
     @abstractmethod
-    def get(self, item: RateItem) -> Union[AbstractBucket, Awaitable[AbstractBucket]]:
+    def get(self, item: RateItem) -> Union["AbstractBucket[_BucketMode]", Awaitable["AbstractBucket[_BucketMode]"]]:
         """Get the corresponding bucket to this item"""
 
     def create(
