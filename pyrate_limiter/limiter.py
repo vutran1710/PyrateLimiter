@@ -51,7 +51,10 @@ class SingleBucketFactory(BucketFactory[_BucketMode]):
         if isawaitable(now):
 
             async def wrap_async():
-                return RateItem(name, await now, weight=weight)
+                ts = await now
+                if not isinstance(ts, int):
+                    raise TypeError(f"Expected int timestamp from bucket.now(), got {type(ts).__name__}")
+                return RateItem(name, ts, weight=weight)
 
             return wrap_async()
 

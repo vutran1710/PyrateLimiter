@@ -238,7 +238,6 @@ class Leaker(Thread):
                         leak = bucket.leak(now)
                     except Exception as e:
                         logger.debug("Leak skipped for bucket %s due to %s: %s", bucket_id, type(e).__name__, e)
-                        self.deregister(bucket_id)
                         continue
 
                     while isawaitable(leak):
@@ -246,7 +245,6 @@ class Leaker(Thread):
                             leak = await leak
                         except Exception as e:
                             logger.debug("Leak await skipped for bucket %s due to %s: %s", bucket_id, type(e).__name__, e)
-                            self.deregister(bucket_id)
                             leak = None
                             break
 
