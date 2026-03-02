@@ -13,7 +13,9 @@ if TYPE_CHECKING:
     from redis import Redis
     from redis.asyncio import Redis as AsyncRedis
 
-_RedisType = TypeVar("_RedisType", "Redis", "AsyncRedis")
+    _RedisType = TypeVar("_RedisType", Redis, AsyncRedis)
+else:
+    _RedisType = TypeVar("_RedisType")
 
 
 class LuaScript:
