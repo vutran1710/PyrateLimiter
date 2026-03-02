@@ -253,13 +253,9 @@ class Limiter:
         if isawaitable(acquire):
 
             async def _put_async(acquire):
-                acquire = await acquire
-                result = _handle_result(acquire)
-
-                while isawaitable(result):
-                    result = await result
-
-                return result
+                acquire_result = await self._handle_async_result(acquire, deadline=deadline)
+                result = _handle_result(acquire_result)
+                return await self._handle_async_result(result, deadline=deadline)
 
             return _put_async(acquire)
 
