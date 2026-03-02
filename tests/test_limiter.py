@@ -26,6 +26,7 @@ from pyrate_limiter import RedisBucket
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem
 from pyrate_limiter import SingleBucketFactory
+from pyrate_limiter.abstracts import _SyncMode
 
 buffer_ms = 10
 # Compute a windows specific jitter, due to clock timing
@@ -82,24 +83,24 @@ async def test_limiter_constructor_02(
 
 @pytest.mark.asyncio
 async def test_delay_waiter_handles_never_satisfiable_sync():
-    class NeverAvailableBucket(AbstractBucket):
-        def __init__(self):
+    class NeverAvailableBucket(AbstractBucket[_SyncMode]):
+        def __init__(self) -> None:
             self.rates = [Rate(1, Duration.SECOND)]
             self.failing_rate = self.rates[0]
 
-        def put(self, item: RateItem):
+        def put(self, item: RateItem) -> bool:
             raise AssertionError("put should not be called when waiting() returns -1")
 
-        def leak(self, current_timestamp=None):
+        def leak(self, current_timestamp=None) -> int:
             return 0
 
-        def flush(self):
+        def flush(self) -> None:
             return None
 
-        def count(self):
+        def count(self) -> int:
             return 0
 
-        def peek(self, index: int):
+        def peek(self, index: int) -> RateItem | None:
             return None
 
     bucket = NeverAvailableBucket()
@@ -111,24 +112,24 @@ async def test_delay_waiter_handles_never_satisfiable_sync():
 
 @pytest.mark.asyncio
 async def test_delay_waiter_handles_never_satisfiable_async():
-    class NeverAvailableBucket(AbstractBucket):
-        def __init__(self):
+    class NeverAvailableBucket(AbstractBucket[_SyncMode]):
+        def __init__(self) -> None:
             self.rates = [Rate(1, Duration.SECOND)]
             self.failing_rate = self.rates[0]
 
-        def put(self, item: RateItem):
+        def put(self, item: RateItem) -> bool:
             raise AssertionError("put should not be called when waiting() returns -1")
 
-        def leak(self, current_timestamp=None):
+        def leak(self, current_timestamp=None) -> int:
             return 0
 
-        def flush(self):
+        def flush(self) -> None:
             return None
 
-        def count(self):
+        def count(self) -> int:
             return 0
 
-        def peek(self, index: int):
+        def peek(self, index: int) -> RateItem | None:
             return None
 
     bucket = NeverAvailableBucket()

@@ -68,7 +68,7 @@ class DemoAsyncGetBucketFactory(BucketFactory[_AsyncMode]):
 
     def __init__(self, auto_leak: bool = False, **buckets: AbstractBucket[_AsyncMode]):
         self.auto_leak = auto_leak
-        self.buckets = {"test": InMemoryBucket(DEFAULT_RATES)}
+        self.buckets = {}
         self.leak_interval = 300
 
         for item_name_pattern, bucket in buckets.items():
