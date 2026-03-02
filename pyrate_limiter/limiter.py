@@ -276,7 +276,7 @@ class Limiter(Generic[_BucketMode]):
     @overload
     def try_acquire(
         self: "Limiter[_AsyncMode]", name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1
-    ) -> Awaitable[bool]: ...
+    ) -> Union[bool, Awaitable[bool]]: ...
 
     def try_acquire(self, name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> Union[bool, Awaitable[bool]]:
         """
