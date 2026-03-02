@@ -171,14 +171,9 @@ class Limiter:
                     if deadline is not None:
                         remaining_ms = (deadline - monotonic()) * 1000
                         if remaining_ms <= 0:
-                            if isawaitable(delay):
-                                if iscoroutine(delay):
-                                    delay.close()
-                                elif isinstance(delay, asyncio.Future):
-                                    delay.cancel()
                             raise TimeoutError()
 
-                    d = await delay if isawaitable(delay) else delay
+                    d = await self._handle_async_result(delay, deadline=deadline) if isawaitable(delay) else delay
                     assert isinstance(d, int)
                     if d == -1:
                         return False
