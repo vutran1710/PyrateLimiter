@@ -130,17 +130,17 @@ class AbstractBucket(ABC, Generic[_BucketMode]):
             return upper_time_bound - lower_time_bound
 
         async def _calc_waiting_async() -> int:
-            nonlocal bound_item
+            awaited_bound_item: Union[Optional[RateItem], Awaitable[Optional[RateItem]]] = bound_item
 
-            while isawaitable(bound_item):
-                bound_item = await bound_item
+            while isawaitable(awaited_bound_item):
+                awaited_bound_item = await awaited_bound_item
 
-            if bound_item is None:
+            if awaited_bound_item is None:
                 # NOTE: No waiting, bucket is immediately ready
                 return 0
 
-            assert isinstance(bound_item, RateItem)
-            return _calc_waiting(bound_item)
+            assert isinstance(awaited_bound_item, RateItem)
+            return _calc_waiting(awaited_bound_item)
 
         if isawaitable(bound_item):
             return _calc_waiting_async()

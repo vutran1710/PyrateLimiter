@@ -106,7 +106,7 @@ class RedisBucket(AbstractBucket[_BucketMode], Generic[_BucketMode, _RedisType])
     def _check_and_insert(self, item: RateItem) -> Union[Optional[Rate], Awaitable[Optional[Rate]]]:
         keys = [self.bucket_key]
 
-        args = [
+        args: List[Union[str, int]] = [
             item.timestamp,
             item.weight,
             # NOTE: this is to avoid key collision since we are using ZSET
@@ -114,8 +114,9 @@ class RedisBucket(AbstractBucket[_BucketMode], Generic[_BucketMode, _RedisType])
             len(self.rates),
             *[value for rate in self.rates for value in (rate.interval, rate.limit)],
         ]
+        argv = [str(value) for value in args]
 
-        idx = self.redis.evalsha(self.script_hash, len(keys), *keys, *args)
+        idx = cast(Union[int, Awaitable[int]], self.redis.evalsha(self.script_hash, len(keys), *keys, *argv))
 
         def _handle_sync(returned_idx: int):
             assert isinstance(returned_idx, int), "Not int"
@@ -129,7 +130,7 @@ class RedisBucket(AbstractBucket[_BucketMode], Generic[_BucketMode, _RedisType])
             awaited_idx = await returned_idx
             return _handle_sync(awaited_idx)
 
-        return _handle_async(idx) if isawaitable(idx) else _handle_sync(idx)  # type: ignore[return-value]
+        return _handle_async(idx) if isawaitable(idx) else _handle_sync(idx)
 
     @overload
     def put(self: "RedisBucket[_SyncMode, Redis]", item: RateItem) -> bool: ...

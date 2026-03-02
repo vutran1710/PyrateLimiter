@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
+from typing import TYPE_CHECKING, List, Optional
 
 from ..abstracts import AbstractBucket, Rate, RateItem, _SyncMode
 from ..clocks import PostgresClock
@@ -79,7 +79,7 @@ class PostgresBucket(AbstractBucket[_SyncMode]):
             index_name = f"timestampIndex_{self.table}"
             conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
 
-    def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
+    def put(self, item: RateItem) -> bool:
         """Put an item (typically the current time) in the bucket
         return true if successful, otherwise false
         """
@@ -132,7 +132,7 @@ class PostgresBucket(AbstractBucket[_SyncMode]):
     def leak(
         self,
         current_timestamp: Optional[int] = None,
-    ) -> Union[int, Awaitable[int]]:
+    ) -> int:
         """leaking bucket - removing items that are outdated"""
         assert current_timestamp is not None, "current-time must be passed on for leak"
         lower_bound = current_timestamp - self.rates[-1].interval
@@ -152,7 +152,7 @@ class PostgresBucket(AbstractBucket[_SyncMode]):
 
         return count
 
-    def flush(self) -> Union[None, Awaitable[None]]:
+    def flush(self) -> None:
         """Flush the whole bucket
         - Must remove `failing-rate` after flushing
         """
@@ -162,7 +162,7 @@ class PostgresBucket(AbstractBucket[_SyncMode]):
 
         return None
 
-    def count(self) -> Union[int, Awaitable[int]]:
+    def count(self) -> int:
         """Count number of items in the bucket"""
         count = 0
         with self._get_conn() as conn:
@@ -173,7 +173,7 @@ class PostgresBucket(AbstractBucket[_SyncMode]):
 
         return count
 
-    def peek(self, index: int) -> Union[Optional[RateItem], Awaitable[Optional[RateItem]]]:
+    def peek(self, index: int) -> Optional[RateItem]:
         """Peek at the rate-item at a specific index in latest-to-earliest order
         NOTE: The reason we cannot peek from the start of the queue(earliest-to-latest) is
         we can't really tell how many outdated items are still in the queue

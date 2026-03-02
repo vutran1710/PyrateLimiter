@@ -106,10 +106,14 @@ class Limiter(Generic[_BucketMode]):
     _thread_local: local
 
     @overload
-    def __init__(self: "Limiter[_SyncMode]", argument: Union["BucketFactory[_SyncMode]", "AbstractBucket[_SyncMode]", Rate, List[Rate]], buffer_ms: int = 50) -> None: ...
+    def __init__(
+        self: "Limiter[_SyncMode]", argument: Union["BucketFactory[_SyncMode]", "AbstractBucket[_SyncMode]", Rate, List[Rate]], buffer_ms: int = 50
+    ) -> None: ...
 
     @overload
-    def __init__(self: "Limiter[_AsyncMode]", argument: Union["BucketFactory[_AsyncMode]", "AbstractBucket[_AsyncMode]"], buffer_ms: int = 50) -> None: ...
+    def __init__(
+        self: "Limiter[_AsyncMode]", argument: Union["BucketFactory[_AsyncMode]", "AbstractBucket[_AsyncMode]"], buffer_ms: int = 50
+    ) -> None: ...
 
     def __init__(
         self,
@@ -254,7 +258,9 @@ class Limiter(Generic[_BucketMode]):
     def try_acquire(self: "Limiter[_SyncMode]", name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool: ...
 
     @overload
-    def try_acquire(self: "Limiter[_AsyncMode]", name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> Awaitable[bool]: ...
+    def try_acquire(
+        self: "Limiter[_AsyncMode]", name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1
+    ) -> Awaitable[bool]: ...
 
     def try_acquire(self, name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> Union[bool, Awaitable[bool]]:
         """
@@ -340,11 +346,10 @@ class Limiter(Generic[_BucketMode]):
         _force_async: bool = False,
     ):
         this_item = await item
-        bucket = self.bucket_factory.get(this_item)  # type: ignore[misc]
-        if isawaitable(bucket):
-            bucket = await bucket
-        assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {this_item.name}"
-        result = self.handle_bucket_put(bucket, this_item, blocking=blocking, _force_async=_force_async)
+        maybe_bucket = self.bucket_factory.get(this_item)  # type: ignore[misc]
+        resolved_bucket = await maybe_bucket if isawaitable(maybe_bucket) else maybe_bucket
+        assert isinstance(resolved_bucket, AbstractBucket), f"Invalid bucket: item: {this_item.name}"
+        result = self.handle_bucket_put(resolved_bucket, this_item, blocking=blocking, _force_async=_force_async)
 
         while isawaitable(result):
             result = await result
