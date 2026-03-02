@@ -230,7 +230,25 @@ class Limiter:
 
                 item.timestamp += delay
                 re_acquire = bucket.put(item)
-                # NOTE: if delay is not Awaitable, then `bucket.put` is not Awaitable
+
+                if isawaitable(re_acquire):
+
+                    async def _resume_async(re_acquire):
+                        reacquired = await self._handle_async_result(re_acquire, deadline=deadline)
+                        if reacquired:
+                            return True
+
+                        continued = self._delay_waiter(
+                            bucket,
+                            item,
+                            blocking=blocking,
+                            _force_async=True,
+                            deadline=deadline,
+                        )
+                        return await self._handle_async_result(continued, deadline=deadline)
+
+                    return _resume_async(re_acquire)
+
                 assert isinstance(re_acquire, bool)
 
                 if re_acquire:
@@ -254,7 +272,16 @@ class Limiter:
 
             async def _put_async(acquire):
                 acquire_result = await self._handle_async_result(acquire, deadline=deadline)
-                result = _handle_result(acquire_result)
+                if acquire_result:
+                    return True
+
+                result = self._delay_waiter(
+                    bucket,
+                    item,
+                    blocking=blocking,
+                    _force_async=True,
+                    deadline=deadline,
+                )
                 return await self._handle_async_result(result, deadline=deadline)
 
             return _put_async(acquire)

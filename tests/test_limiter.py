@@ -152,6 +152,40 @@ async def test_handle_async_result_cancels_pending_task_on_timeout():
 
 
 @pytest.mark.asyncio
+async def test_delay_waiter_handles_sync_waiting_with_async_put():
+    class MixedModeBucket(AbstractBucket):
+        def __init__(self):
+            self.rates = [Rate(1, Duration.SECOND)]
+            self.failing_rate = self.rates[0]
+
+        def put(self, item: RateItem):
+            async def _put_result():
+                return True
+
+            return _put_result()
+
+        def leak(self, current_timestamp=None):
+            return 0
+
+        def flush(self):
+            return None
+
+        def count(self):
+            return 0
+
+        def peek(self, index: int):
+            return None
+
+    limiter = Limiter(DEFAULT_RATES[0], buffer_ms=0)
+    bucket = MixedModeBucket()
+    item = RateItem(name="demo", timestamp=0, weight=1)
+
+    delayed = limiter._delay_waiter(bucket, item, blocking=True)
+    assert isawaitable(delayed)
+    assert await delayed is True
+
+
+@pytest.mark.asyncio
 async def test_limiter_01(
     request,
     create_bucket,
