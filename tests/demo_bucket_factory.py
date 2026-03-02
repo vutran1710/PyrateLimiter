@@ -1,12 +1,13 @@
 from inspect import isawaitable
 from os import getenv
-from typing import Dict
-from typing import Optional
+from typing import cast
 
 from typing import Iterable
 
 from .conftest import DEFAULT_RATES
 from .helpers import flushing_bucket
+from pyrate_limiter.abstracts import _AsyncMode
+from pyrate_limiter.abstracts import _SyncMode
 from pyrate_limiter import AbstractBucket
 from pyrate_limiter import AbstractClock
 from pyrate_limiter import BucketFactory
@@ -16,13 +17,13 @@ from pyrate_limiter import RateItem
 from pyrate_limiter import RedisBucket
 
 
-class DemoBucketFactory(BucketFactory):
+class DemoBucketFactory(BucketFactory[_SyncMode]):
     """Multi-bucket factory used for testing schedule-leaks"""
 
-    buckets: Optional[Dict[str, AbstractBucket]] = None
+    buckets: dict[str, AbstractBucket[_SyncMode]]
     auto_leak: bool
 
-    def __init__(self, auto_leak=False, **buckets: AbstractBucket):
+    def __init__(self, auto_leak=False, **buckets: AbstractBucket[_SyncMode]):
         self.auto_leak = auto_leak
         self.buckets = {}
         self.leak_interval = 300
@@ -47,15 +48,11 @@ class DemoBucketFactory(BucketFactory):
 
         return wrap_async() if isawaitable(now) else wrap_sync()
 
-    def get(self, item: RateItem) -> AbstractBucket:
-        assert self.buckets is not None
-
+    def get(self, item: RateItem) -> AbstractBucket[_SyncMode]:
         if item.name in self.buckets:
-            bucket = self.buckets[item.name]
-            assert isinstance(bucket, AbstractBucket)
-            return bucket
+            return self.buckets[item.name]
 
-        bucket = self.create(InMemoryBucket, DEFAULT_RATES)
+        bucket = cast(AbstractBucket[_SyncMode], self.create(InMemoryBucket, DEFAULT_RATES))
         self.buckets[item.name] = bucket
         return bucket
 
@@ -64,12 +61,12 @@ class DemoBucketFactory(BucketFactory):
             super().schedule_leak(*args)
 
 
-class DemoAsyncGetBucketFactory(BucketFactory):
+class DemoAsyncGetBucketFactory(BucketFactory[_AsyncMode]):
     """Async multi-bucket factory used for testing schedule-leaks"""
 
-    buckets: dict[str, AbstractBucket] 
+    buckets: dict[str, AbstractBucket[_AsyncMode]]
 
-    def __init__(self, auto_leak=False, **buckets: AbstractBucket):
+    def __init__(self, auto_leak: bool = False, **buckets: AbstractBucket[_AsyncMode]):
         self.auto_leak = auto_leak
         self.buckets = {"test": InMemoryBucket(DEFAULT_RATES)}
         self.leak_interval = 300
@@ -90,13 +87,13 @@ class DemoAsyncGetBucketFactory(BucketFactory):
 
         return wrap_async() if isawaitable(now) else wrap_sync()
 
-    async def get(self, item: RateItem) -> AbstractBucket:
+    async def get(self, item: RateItem) -> AbstractBucket[_AsyncMode]:
         assert self.buckets is not None
 
         if item.name in self.buckets:
             bucket = self.buckets[item.name]
             assert isinstance(bucket, AbstractBucket)
-            return bucket
+            return cast(AbstractBucket[_AsyncMode], bucket)
 
         from redis.asyncio import ConnectionPool as AsyncConnectionPool
         from redis.asyncio import Redis as AsyncRedis
@@ -108,7 +105,7 @@ class DemoAsyncGetBucketFactory(BucketFactory):
         bucket = await RedisBucket.init(DEFAULT_RATES, redis_db, key)
         self.schedule_leak(bucket)
         self.buckets.update({item.name: bucket})
-        return bucket
+        return cast(AbstractBucket[_AsyncMode], bucket)
 
     def schedule_leak(self, *args):
         if self.auto_leak:

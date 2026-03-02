@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Union
 
-from requests import Response, Session
+from requests import Response, Session  # type: ignore[import-untyped]
 
 from pyrate_limiter import Limiter
 

@@ -7,9 +7,9 @@ from functools import wraps
 from inspect import isawaitable, iscoroutinefunction
 from threading import RLock, local
 from time import sleep
-from typing import Any, Awaitable, Callable, Iterable, List, Protocol, Tuple, Union
+from typing import Any, Awaitable, Callable, Generic, Iterable, List, Protocol, Tuple, Union, cast, overload
 
-from .abstracts import AbstractBucket, BucketFactory, Rate, RateItem
+from .abstracts import AbstractBucket, BucketFactory, Rate, RateItem, _AsyncMode, _BucketMode, _SyncMode
 from .buckets import InMemoryBucket
 
 logger = logging.getLogger(__name__)
@@ -23,12 +23,12 @@ class LockLike(Protocol):
     def release(self) -> None: ...
 
 
-class SingleBucketFactory(BucketFactory):
+class SingleBucketFactory(BucketFactory[_BucketMode]):
     """Single-bucket factory for quick use with Limiter"""
 
-    bucket: AbstractBucket
+    bucket: AbstractBucket[_BucketMode]
 
-    def __init__(self, bucket: AbstractBucket, schedule_leak: bool = True):
+    def __init__(self, bucket: AbstractBucket[_BucketMode], schedule_leak: bool = True):
         """
         Initialize the SingleBucketFactory with a bucket and an optional leak scheduling flag.
 
@@ -39,19 +39,37 @@ class SingleBucketFactory(BucketFactory):
         if schedule_leak:
             self.schedule_leak(bucket)
 
-    def wrap_item(self, name: str, weight: int = 1):
+    @overload
+    def wrap_item(self: "SingleBucketFactory[_SyncMode]", name: str, weight: int = 1) -> RateItem: ...
+
+    @overload
+    def wrap_item(self: "SingleBucketFactory[_AsyncMode]", name: str, weight: int = 1) -> Union[RateItem, Awaitable[RateItem]]: ...
+
+    def wrap_item(self, name: str, weight: int = 1) -> Union[RateItem, Awaitable[RateItem]]:
         now = self.bucket.now()
 
-        async def wrap_async():
-            return RateItem(name, await now, weight=weight)
+        if isawaitable(now):
 
-        def wrap_sync():
-            return RateItem(name, now, weight=weight)
+            async def wrap_async():
+                ts = await now
+                if not isinstance(ts, int):
+                    raise TypeError(f"Expected int timestamp from bucket.now(), got {type(ts).__name__}")
+                return RateItem(name, ts, weight=weight)
 
-        return wrap_async() if isawaitable(now) else wrap_sync()
+            return wrap_async()
 
-    def get(self, _: RateItem) -> AbstractBucket:
-        return self.bucket
+        if not isinstance(now, int):
+            raise TypeError(f"Expected int timestamp from bucket.now(), got {type(now).__name__}")
+        return RateItem(name, now, weight=weight)
+
+    @overload
+    def get(self: "SingleBucketFactory[_SyncMode]", item: RateItem) -> AbstractBucket[_SyncMode]: ...
+
+    @overload
+    def get(self: "SingleBucketFactory[_AsyncMode]", item: RateItem) -> AbstractBucket[_AsyncMode]: ...
+
+    def get(self, item: RateItem) -> Union[AbstractBucket[_SyncMode], AbstractBucket[_AsyncMode]]:
+        return cast(Union[AbstractBucket[_SyncMode], AbstractBucket[_AsyncMode]], self.bucket)
 
 
 @contextmanager
@@ -85,17 +103,27 @@ def combined_lock(locks: Union[Iterable[LockLike], RLock], blocking: bool, timeo
                 lock.release()
 
 
-class Limiter:
+class Limiter(Generic[_BucketMode]):
     """This class responsibility is to sum up all underlying logic
     and make working with async/sync functions easily
     """
 
-    bucket_factory: BucketFactory
+    bucket_factory: BucketFactory[_BucketMode]
     lock: Union[RLock, Iterable]
     buffer_ms: int
 
     # async_lock is thread local, created on first use
     _thread_local: local
+
+    @overload
+    def __init__(
+        self: "Limiter[_SyncMode]", argument: Union["BucketFactory[_SyncMode]", "AbstractBucket[_SyncMode]", Rate, List[Rate]], buffer_ms: int = 50
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self: "Limiter[_AsyncMode]", argument: Union["BucketFactory[_AsyncMode]", "AbstractBucket[_AsyncMode]"], buffer_ms: int = 50
+    ) -> None: ...
 
     def __init__(
         self,
@@ -110,7 +138,7 @@ class Limiter:
         """
 
         self.buffer_ms = buffer_ms
-        self.bucket_factory = self._init_bucket_factory(argument)
+        self.bucket_factory = cast(BucketFactory[_BucketMode], self._init_bucket_factory(argument))
         self.lock = RLock()
         self._thread_local = local()
 
@@ -161,15 +189,18 @@ class Limiter:
 
         if _force_async or isawaitable(delay):
 
-            async def _handle_async(delay):
+            async def _handle_async(delay: Union[int, Awaitable[int]]):
                 while True:
-                    d = await delay if isawaitable(delay) else delay
-                    assert isinstance(d, int) and d >= 0
+                    d = await delay if isawaitable(delay) else delay  # type: ignore[misc]
+                    assert isinstance(d, int)
+                    if d == -1:
+                        return False
+                    assert d >= 0
                     d += self.buffer_ms
                     await asyncio.sleep(d / 1000)
                     item.timestamp += d
                     r = bucket.put(item)
-                    r = await r if isawaitable(r) else r
+                    r = await r if isawaitable(r) else r  # type: ignore[misc]
                     if r:
                         return True
                     delay = bucket.waiting(item)
@@ -181,6 +212,9 @@ class Limiter:
             while True:
                 assert not isawaitable(delay)
                 logger.debug("delay=%d, total_delay=%s", delay, total_delay)
+
+                if delay == -1:
+                    return False
 
                 delay += self.buffer_ms
                 total_delay += delay
@@ -235,6 +269,14 @@ class Limiter:
         self._thread_local.async_lock = lock
         self._thread_local.async_lock_loop = loop
         return lock
+
+    @overload
+    def try_acquire(self: "Limiter[_SyncMode]", name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> bool: ...
+
+    @overload
+    def try_acquire(
+        self: "Limiter[_AsyncMode]", name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1
+    ) -> Awaitable[bool]: ...
 
     def try_acquire(self, name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int = -1) -> Union[bool, Awaitable[bool]]:
         """
@@ -320,11 +362,10 @@ class Limiter:
         _force_async: bool = False,
     ):
         this_item = await item
-        bucket = self.bucket_factory.get(this_item)
-        if isawaitable(bucket):
-            bucket = await bucket
-        assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {this_item.name}"
-        result = self.handle_bucket_put(bucket, this_item, blocking=blocking, _force_async=_force_async)
+        maybe_bucket = self.bucket_factory.get(this_item)  # type: ignore[misc]
+        resolved_bucket = await maybe_bucket if isawaitable(maybe_bucket) else maybe_bucket
+        assert isinstance(resolved_bucket, AbstractBucket), f"Invalid bucket: item: {this_item.name}"
+        result = self.handle_bucket_put(resolved_bucket, this_item, blocking=blocking, _force_async=_force_async)
 
         while isawaitable(result):
             result = await result
@@ -369,14 +410,14 @@ class Limiter:
                 # NOTE: this might change in the future
                 return True
 
-            item = self.bucket_factory.wrap_item(name, weight)
+            item = self.bucket_factory.wrap_item(name, weight)  # type: ignore[misc]
 
             if isawaitable(item):
                 return self._handle_async_acquire(item, blocking=blocking)
 
             assert isinstance(item, RateItem)
 
-            bucket = self.bucket_factory.get(item)
+            bucket = self.bucket_factory.get(item)  # type: ignore[misc]
             if isawaitable(bucket):
                 return self._handle_async_bucket(bucket=bucket, item=item, blocking=blocking, _force_async=_force_async)
 
@@ -393,23 +434,26 @@ class Limiter:
             if iscoroutinefunction(func):
 
                 @wraps(func)
-                async def wrapper(*args, **kwargs):
+                async def async_wrapper(*args, **kwargs):
                     r = await self.try_acquire_async(name=name, weight=weight)
                     while isawaitable(r):
                         r = await r
                     return await func(*args, **kwargs)
 
-                return wrapper
+                return async_wrapper
             else:
 
                 @wraps(func)
-                def wrapper(*args, **kwargs):
-                    r = self.try_acquire(name=name, weight=weight)
+                def sync_wrapper(*args, **kwargs):
+                    try:
+                        r = self._try_acquire(name=name, weight=weight, blocking=True, timeout=-1)
+                    except TimeoutError:
+                        r = False
                     if isawaitable(r):
                         raise RuntimeError("Can't use async bucket with sync decorator")
                     return func(*args, **kwargs)
 
-                return wrapper
+                return sync_wrapper
 
         return deco
 

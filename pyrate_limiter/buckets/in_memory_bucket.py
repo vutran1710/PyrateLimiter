@@ -2,12 +2,12 @@
 
 from typing import List, Optional
 
-from ..abstracts.bucket import AbstractBucket
+from ..abstracts.bucket import AbstractBucket, _SyncMode
 from ..abstracts.rate import Rate, RateItem
 from ..utils import binary_search
 
 
-class InMemoryBucket(AbstractBucket):
+class InMemoryBucket(AbstractBucket[_SyncMode]):
     """Simple In-memory Bucket using native list
     Clock can be either `time.time` or `time.monotonic`
     When leak, clock is required

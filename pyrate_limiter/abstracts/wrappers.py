@@ -1,22 +1,22 @@
 """Wrappers over different abstract types"""
 
 from inspect import isawaitable
-from typing import Optional
+from typing import Any, Optional
 
-from .bucket import AbstractBucket
+from .bucket import AbstractBucket, _AsyncMode
 from .rate import RateItem
 
 
-class BucketAsyncWrapper(AbstractBucket):
+class BucketAsyncWrapper(AbstractBucket[_AsyncMode]):
     """BucketAsyncWrapper is a wrapping over any bucket
     that turns a async/synchronous bucket into an async one
     """
 
-    def __init__(self, bucket: AbstractBucket):
+    def __init__(self, bucket: AbstractBucket[Any]):
         assert isinstance(bucket, AbstractBucket)
         self.bucket = bucket
 
-    async def put(self, item: RateItem):
+    async def put(self, item: RateItem) -> bool:
         result = self.bucket.put(item)
 
         while isawaitable(result):
@@ -24,7 +24,7 @@ class BucketAsyncWrapper(AbstractBucket):
 
         return result
 
-    async def count(self):
+    async def count(self) -> int:
         result = self.bucket.count()
 
         while isawaitable(result):
@@ -60,10 +60,12 @@ class BucketAsyncWrapper(AbstractBucket):
         return item
 
     async def waiting(self, item: RateItem) -> int:
-        wait = super().waiting(item)
+        wait_or_awaitable = super().waiting(item)
 
-        if isawaitable(wait):
-            wait = await wait
+        if isawaitable(wait_or_awaitable):
+            wait = await wait_or_awaitable
+        else:
+            wait = wait_or_awaitable
 
         assert isinstance(wait, int)
         return wait

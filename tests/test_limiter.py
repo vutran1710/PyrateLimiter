@@ -24,6 +24,7 @@ from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import RedisBucket
 from pyrate_limiter import Rate
+from pyrate_limiter import RateItem
 from pyrate_limiter import SingleBucketFactory
 
 buffer_ms = 10
@@ -77,6 +78,66 @@ async def test_limiter_constructor_02(
 
     )
     assert limiter.bucket_factory is factory
+
+
+@pytest.mark.asyncio
+async def test_delay_waiter_handles_never_satisfiable_sync():
+    class NeverAvailableBucket(AbstractBucket):
+        def __init__(self):
+            self.rates = [Rate(1, Duration.SECOND)]
+            self.failing_rate = self.rates[0]
+
+        def put(self, item: RateItem):
+            raise AssertionError("put should not be called when waiting() returns -1")
+
+        def leak(self, current_timestamp=None):
+            return 0
+
+        def flush(self):
+            return None
+
+        def count(self):
+            return 0
+
+        def peek(self, index: int):
+            return None
+
+    bucket = NeverAvailableBucket()
+    limiter = Limiter(bucket)
+    item = RateItem(name="demo", timestamp=0, weight=2)
+
+    assert limiter._delay_waiter(bucket, item, blocking=True) is False
+
+
+@pytest.mark.asyncio
+async def test_delay_waiter_handles_never_satisfiable_async():
+    class NeverAvailableBucket(AbstractBucket):
+        def __init__(self):
+            self.rates = [Rate(1, Duration.SECOND)]
+            self.failing_rate = self.rates[0]
+
+        def put(self, item: RateItem):
+            raise AssertionError("put should not be called when waiting() returns -1")
+
+        def leak(self, current_timestamp=None):
+            return 0
+
+        def flush(self):
+            return None
+
+        def count(self):
+            return 0
+
+        def peek(self, index: int):
+            return None
+
+    bucket = NeverAvailableBucket()
+    limiter = Limiter(bucket)
+    item = RateItem(name="demo", timestamp=0, weight=2)
+
+    delayed = limiter._delay_waiter(bucket, item, blocking=True, _force_async=True)
+    assert isawaitable(delayed)
+    assert await delayed is False
 
 
 @pytest.mark.asyncio
@@ -248,13 +309,29 @@ async def test_limiter_decorator(
         nonlocal counter
         counter += num
 
-    if isawaitable(bucket.count()):
-        with pytest.raises(RuntimeError):
-            @limiter_wrapper
-            def inc_counter(num: int):
-                nonlocal counter
-                counter += num
-            inc = inc_counter(1)
+    count = bucket.count()
+    if isawaitable(count):
+        await count
+
+        @limiter_wrapper
+        def inc_counter(num: int):
+            nonlocal counter
+            counter += num
+
+        original_try_acquire = limiter._try_acquire
+
+        class _AwaitableAcquire:
+            def __await__(self):
+                if False:
+                    yield
+                return True
+
+        limiter._try_acquire = lambda *args, **kwargs: _AwaitableAcquire()
+        try:
+            with pytest.raises(RuntimeError):
+                inc_counter(1)
+        finally:
+            limiter._try_acquire = original_try_acquire
 
     else:
         @limiter_wrapper

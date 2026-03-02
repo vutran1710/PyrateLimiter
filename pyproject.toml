@@ -71,7 +71,8 @@ dev = [
     "httpx",
     "aiohttp",
     "requests",
-    "psycopg[binary]>=3.2.10; sys_platform == 'win32' or sys_platform == 'darwin'"
+    "psycopg[binary]>=3.2.10; sys_platform == 'win32' or sys_platform == 'darwin'",
+    "mypy>=1.19.1",
 ]
 
 
