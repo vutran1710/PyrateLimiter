@@ -64,9 +64,9 @@ class DemoBucketFactory(BucketFactory[_SyncMode]):
 class DemoAsyncGetBucketFactory(BucketFactory[_AsyncMode]):
     """Async multi-bucket factory used for testing schedule-leaks"""
 
-    buckets: dict[str, AbstractBucket]
+    buckets: dict[str, AbstractBucket[_AsyncMode]]
 
-    def __init__(self, auto_leak=False, **buckets: AbstractBucket):
+    def __init__(self, auto_leak: bool = False, **buckets: AbstractBucket[_AsyncMode]):
         self.auto_leak = auto_leak
         self.buckets = {"test": InMemoryBucket(DEFAULT_RATES)}
         self.leak_interval = 300
