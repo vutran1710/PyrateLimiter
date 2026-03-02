@@ -506,7 +506,7 @@ class Limiter:
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(item)
                     raise RuntimeError("Can't use async bucket with sync decorator")
-                return self._handle_async_acquire(item, blocking=blocking, deadline=deadline)
+                return self._handle_async_acquire(item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             assert isinstance(item, RateItem)
 
