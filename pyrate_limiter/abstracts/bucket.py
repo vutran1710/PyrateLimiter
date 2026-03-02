@@ -108,7 +108,7 @@ class AbstractBucket(ABC, Generic[_BucketMode]):
     def waiting(self: "AbstractBucket[_AsyncMode]", item: RateItem) -> Awaitable[int]: ...
 
     def waiting(self, item: RateItem) -> Union[int, Awaitable[int]]:
-        """Calculate time until bucket become availabe to consume an item again"""
+        """Calculate time until bucket become available to consume an item again"""
         if self.failing_rate is None:
             return 0
 
