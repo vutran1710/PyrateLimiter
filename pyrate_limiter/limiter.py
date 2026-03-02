@@ -438,6 +438,9 @@ class Limiter(Generic[_BucketMode]):
                     r = await self.try_acquire_async(name=name, weight=weight)
                     while isawaitable(r):
                         r = await r
+                    if not r:
+                        # Do not execute the wrapped coroutine if rate limit acquisition failed.
+                        raise TimeoutError("acquire failed")
                     return await func(*args, **kwargs)
 
                 return async_wrapper
