@@ -76,7 +76,7 @@ Full project documentation can be found at [pyratelimiter.readthedocs.io](https:
 
 ## Installation
 
-**PyrateLimiter** supports **python ^3.8**
+**PyrateLimiter** supports **python ^3.10**
 
 Install using pip:
 
