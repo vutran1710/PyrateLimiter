@@ -67,6 +67,7 @@ def combined_lock(locks: Union[Iterable[LockLike], RLock], blocking: bool, timeo
 
     else:
         acquired_locks = []
+        deadline = monotonic() + timeout if blocking and timeout != -1 else None
         try:
             for lock in locks:
                 if not blocking:
@@ -74,7 +75,9 @@ def combined_lock(locks: Union[Iterable[LockLike], RLock], blocking: bool, timeo
                 elif timeout == -1:
                     ok = lock.acquire()
                 else:
-                    ok = lock.acquire(timeout=timeout)
+                    assert deadline is not None
+                    remaining = max(0.0, deadline - monotonic())
+                    ok = lock.acquire(timeout=remaining)
 
                 if not ok:
                     raise TimeoutError("Timeout while acquiring combined lock.")
@@ -406,6 +409,12 @@ class Limiter:
         return await self._handle_async_result(result, deadline=deadline)
 
     async def _handle_async_result(self, result, deadline: Optional[float] = None):
+        timed_out = False
+
+        def _cancel_if_pending(awaitable: Any) -> None:
+            if asyncio.isfuture(awaitable) and not awaitable.done():
+                awaitable.cancel()
+
         try:
             while isawaitable(result):
                 if deadline is None:
@@ -414,15 +423,22 @@ class Limiter:
 
                 remaining = deadline - monotonic()
                 if remaining <= 0:
+                    timed_out = True
+                    _cancel_if_pending(result)
                     raise TimeoutError()
 
                 try:
                     result = await asyncio.wait_for(result, timeout=remaining)
                 except asyncio.TimeoutError as exc:
+                    timed_out = True
+                    _cancel_if_pending(result)
                     raise TimeoutError() from exc
 
             return result
         finally:
+            if timed_out:
+                _cancel_if_pending(result)
+
             if iscoroutine(result):
                 result.close()
 
@@ -432,6 +448,23 @@ class Limiter:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
+
+        def _cleanup_awaitable(awaitable: Any) -> None:
+            if asyncio.isfuture(awaitable):
+                awaitable.cancel()
+                return
+
+            if iscoroutine(awaitable):
+                awaitable.close()
+                return
+
+            cancel = getattr(awaitable, "cancel", None)
+            if callable(cancel):
+                cancel()
+
+            close = getattr(awaitable, "close", None)
+            if callable(close):
+                close()
 
         deadline: Optional[float] = monotonic() + timeout if timeout != -1 else None
 
@@ -446,18 +479,31 @@ class Limiter:
             item = self.bucket_factory.wrap_item(name, weight)
 
             if isawaitable(item):
+                if not _force_async:
+                    _cleanup_awaitable(item)
+                    raise RuntimeError("Can't use async bucket with sync decorator")
                 return self._handle_async_acquire(item, blocking=blocking, deadline=deadline)
 
             assert isinstance(item, RateItem)
 
             bucket = self.bucket_factory.get(item)
             if isawaitable(bucket):
+                if not _force_async:
+                    _cleanup_awaitable(bucket)
+                    raise RuntimeError("Can't use async bucket with sync decorator")
                 return self._handle_async_bucket(bucket=bucket, item=item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
+
+            if not _force_async and self.bucket_factory._leaker and id(bucket) in self.bucket_factory._leaker.async_buckets:
+                raise RuntimeError("Can't use async bucket with sync decorator")
+
             result = self.handle_bucket_put(bucket, item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             if isawaitable(result):
+                if not _force_async:
+                    _cleanup_awaitable(result)
+                    raise RuntimeError("Can't use async bucket with sync decorator")
                 return self._handle_async_result(result, deadline=deadline)
 
             return result
@@ -483,28 +529,20 @@ class Limiter:
                     except TimeoutError:
                         r = False
                     if isawaitable(r):
-                        if iscoroutine(r):
-                            pending: list[Any] = [r]
-                            seen: set[int] = set()
-
-                            while pending:
-                                current = pending.pop()
-                                current_id = id(current)
-                                if current_id in seen:
-                                    continue
-
-                                seen.add(current_id)
-                                if not iscoroutine(current):
-                                    continue
-
-                                frame = current.cr_frame
-                                if frame is not None:
-                                    for value in frame.f_locals.values():
-                                        if isawaitable(value):
-                                            pending.append(value)
-
-                                current.close()
-                        raise RuntimeError("Can't use async bucket with sync decorator")
+                        try:
+                            if asyncio.isfuture(r):
+                                r.cancel()
+                            elif iscoroutine(r):
+                                r.close()
+                            else:
+                                cancel = getattr(r, "cancel", None)
+                                if callable(cancel):
+                                    cancel()
+                                close = getattr(r, "close", None)
+                                if callable(close):
+                                    close()
+                        finally:
+                            raise RuntimeError("Can't use async bucket with sync decorator")
                     return func(*args, **kwargs)
 
                 return wrapper

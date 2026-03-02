@@ -80,6 +80,18 @@ async def test_limiter_constructor_02(
 
 
 @pytest.mark.asyncio
+async def test_handle_async_result_cancels_pending_task_on_timeout():
+    limiter = Limiter(DEFAULT_RATES[0])
+    task = asyncio.create_task(asyncio.sleep(1))
+
+    with pytest.raises(TimeoutError):
+        await limiter._handle_async_result(task, deadline=time.monotonic() - 0.01)
+
+    await asyncio.sleep(0)
+    assert task.cancelled()
+
+
+@pytest.mark.asyncio
 async def test_limiter_01(
     request,
     create_bucket,
