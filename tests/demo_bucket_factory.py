@@ -70,7 +70,7 @@ class DemoBucketFactory(BucketFactory[_SyncMode]):
 class DemoAsyncGetBucketFactory(BucketFactory[_AsyncMode]):
     """Async multi-bucket factory used for testing schedule-leaks"""
 
-    buckets: dict[str, AbstractBucket] 
+    buckets: dict[str, AbstractBucket]
 
     def __init__(self, auto_leak=False, **buckets: AbstractBucket):
         self.auto_leak = auto_leak
