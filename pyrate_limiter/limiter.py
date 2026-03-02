@@ -288,6 +288,9 @@ class Limiter:
             True if the permit was acquired, False otherwise. Async limiters
             return an awaitable resolving to the same.
         """
+        if timeout < 0 and timeout != -1:
+            raise ValueError("timeout must be -1 or >= 0")
+
         if not blocking and timeout != -1:
             raise RuntimeError("Can't set timeout with non-blocking")
 
@@ -341,6 +344,9 @@ class Limiter:
 
         if weight == 0:
             return True
+
+        if timeout < 0 and timeout != -1:
+            raise ValueError("timeout must be -1 or >= 0")
 
         if not blocking and timeout != -1:
             raise RuntimeError("Can't set timeout with non-blocking")

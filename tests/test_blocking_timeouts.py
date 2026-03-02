@@ -94,6 +94,13 @@ def test_try_acquire_sync_nonblocking_rejects_timeout():
         lim.try_acquire("k", blocking=False, timeout=0.1)
 
 
+def test_try_acquire_sync_rejects_invalid_negative_timeout():
+    lim = make_limiter()
+
+    with pytest.raises(ValueError, match="timeout must be -1 or >= 0"):
+        lim.try_acquire("k", blocking=True, timeout=-2)
+
+
 @pytest.mark.asyncio
 async def test_try_acquire_timeout_with_awaitable_wrap_item():
     class AsyncNowInMemoryBucket(InMemoryBucket):
@@ -115,6 +122,14 @@ async def test_try_acquire_timeout_with_awaitable_wrap_item():
 
     assert ok is False
     assert 0.09 <= (t1 - t0) <= 0.25
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_async_rejects_invalid_negative_timeout():
+    lim = make_limiter()
+
+    with pytest.raises(ValueError, match="timeout must be -1 or >= 0"):
+        await lim.try_acquire_async("k", blocking=True, timeout=-2)
 
 
 @pytest.mark.asyncio
