@@ -1,8 +1,10 @@
 # tests/test_limiter_blocking_behavior.py
 import asyncio
 import time
+from inspect import isawaitable
 import pytest
 from pyrate_limiter import Rate
+from pyrate_limiter.abstracts import AbstractBucket, BucketFactory, RateItem
 from pyrate_limiter.buckets import InMemoryBucket
 from pyrate_limiter.limiter import Limiter
 
@@ -83,3 +85,53 @@ def test_try_acquire_sync_timeout():
 
     assert ok is False                        # timed out
     assert 0.09 <= (t1 - t0) <= 0.25         # waited ~timeout, not full 200ms
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_timeout_with_awaitable_wrap_item():
+    class AsyncNowInMemoryBucket(InMemoryBucket):
+        async def now(self):
+            await asyncio.sleep(0.2)
+            now = super().now()
+            if isawaitable(now):
+                now = await now
+            assert isinstance(now, int)
+            return now
+
+    lim = Limiter(AsyncNowInMemoryBucket([RATE]), buffer_ms=0)
+
+    t0 = time.perf_counter()
+    result = lim.try_acquire("k", blocking=True, timeout=0.1)
+    assert isawaitable(result)
+    ok = await result
+    t1 = time.perf_counter()
+
+    assert ok is False
+    assert 0.09 <= (t1 - t0) <= 0.25
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_timeout_with_awaitable_get_bucket():
+    class AsyncGetFactory(BucketFactory):
+        def __init__(self, bucket: AbstractBucket):
+            self.bucket = bucket
+
+        def wrap_item(self, name: str, weight: int = 1):
+            now = self.bucket.now()
+            assert isinstance(now, int)
+            return RateItem(name, now, weight=weight)
+
+        async def get(self, item: RateItem):
+            await asyncio.sleep(0.2)
+            return self.bucket
+
+    lim = Limiter(AsyncGetFactory(InMemoryBucket([RATE])), buffer_ms=0)
+
+    t0 = time.perf_counter()
+    result = lim.try_acquire("k", blocking=True, timeout=0.1)
+    assert isawaitable(result)
+    ok = await result
+    t1 = time.perf_counter()
+
+    assert ok is False
+    assert 0.09 <= (t1 - t0) <= 0.25
