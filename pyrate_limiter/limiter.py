@@ -135,7 +135,7 @@ class Limiter(Generic[_BucketMode]):
         """
 
         self.buffer_ms = buffer_ms
-        self.bucket_factory = self._init_bucket_factory(argument)  # type: ignore[assignment]
+        self.bucket_factory = cast(BucketFactory[_BucketMode], self._init_bucket_factory(argument))
         self.lock = RLock()
         self._thread_local = local()
 
