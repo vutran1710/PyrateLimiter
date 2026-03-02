@@ -178,12 +178,12 @@ class Limiter:
                         remaining_ms = (deadline - monotonic()) * 1000
                         if remaining_ms <= 0:
                             raise TimeoutError()
-                        await asyncio.sleep(min(d, remaining_ms) / 1000)
+                        if remaining_ms < d:
+                            await asyncio.sleep(remaining_ms / 1000)
+                            raise TimeoutError()
+                        await asyncio.sleep(d / 1000)
                     else:
                         await asyncio.sleep(d / 1000)
-
-                    if deadline is not None and monotonic() >= deadline:
-                        raise TimeoutError()
 
                     item.timestamp += d
                     r = bucket.put(item)
@@ -207,12 +207,12 @@ class Limiter:
                     remaining_ms = (deadline - monotonic()) * 1000
                     if remaining_ms <= 0:
                         raise TimeoutError()
-                    sleep(min(delay, remaining_ms) / 1000)
+                    if remaining_ms < delay:
+                        sleep(remaining_ms / 1000)
+                        raise TimeoutError()
+                    sleep(delay / 1000)
                 else:
                     sleep(delay / 1000)
-
-                if deadline is not None and monotonic() >= deadline:
-                    raise TimeoutError()
 
                 item.timestamp += delay
                 re_acquire = bucket.put(item)
