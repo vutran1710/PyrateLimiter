@@ -443,7 +443,13 @@ class Limiter:
                 result.close()
 
     def _try_acquire(
-        self, name: str, weight: int, blocking: bool, timeout: int | float = -1, _force_async: bool = False
+        self,
+        name: str,
+        weight: int,
+        blocking: bool,
+        timeout: int | float = -1,
+        _force_async: bool = False,
+        _allow_async_result: bool = True,
     ) -> Union[bool, Awaitable[bool]]:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
@@ -479,7 +485,7 @@ class Limiter:
             item = self.bucket_factory.wrap_item(name, weight)
 
             if isawaitable(item):
-                if not _force_async:
+                if not _force_async and not _allow_async_result:
                     _cleanup_awaitable(item)
                     raise RuntimeError("Can't use async bucket with sync decorator")
                 return self._handle_async_acquire(item, blocking=blocking, deadline=deadline)
@@ -488,20 +494,20 @@ class Limiter:
 
             bucket = self.bucket_factory.get(item)
             if isawaitable(bucket):
-                if not _force_async:
+                if not _force_async and not _allow_async_result:
                     _cleanup_awaitable(bucket)
                     raise RuntimeError("Can't use async bucket with sync decorator")
                 return self._handle_async_bucket(bucket=bucket, item=item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
 
-            if not _force_async and self.bucket_factory._leaker and id(bucket) in self.bucket_factory._leaker.async_buckets:
+            if not _force_async and not _allow_async_result and self.bucket_factory._leaker and id(bucket) in self.bucket_factory._leaker.async_buckets:
                 raise RuntimeError("Can't use async bucket with sync decorator")
 
             result = self.handle_bucket_put(bucket, item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             if isawaitable(result):
-                if not _force_async:
+                if not _force_async and not _allow_async_result:
                     _cleanup_awaitable(result)
                     raise RuntimeError("Can't use async bucket with sync decorator")
                 return self._handle_async_result(result, deadline=deadline)
@@ -525,7 +531,7 @@ class Limiter:
                 @wraps(func)
                 def wrapper(*args, **kwargs):
                     try:
-                        r = self._try_acquire(name=name, weight=weight, blocking=True)
+                        r = self._try_acquire(name=name, weight=weight, blocking=True, _allow_async_result=False)
                     except TimeoutError:
                         r = False
                     if isawaitable(r):

@@ -24,6 +24,7 @@ from pyrate_limiter import InMemoryBucket
 from pyrate_limiter import Limiter
 from pyrate_limiter import RedisBucket
 from pyrate_limiter import Rate
+from pyrate_limiter import RateItem
 from pyrate_limiter import SingleBucketFactory
 
 buffer_ms = 10
@@ -77,6 +78,41 @@ async def test_limiter_constructor_02(
 
     )
     assert limiter.bucket_factory is factory
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_allows_async_factory_get():
+    class AsyncGetFactory(BucketFactory):
+        def __init__(self, bucket: AbstractBucket):
+            self.bucket = bucket
+
+        def wrap_item(self, name: str, weight: int = 1):
+            return RateItem(name=name, timestamp=0, weight=weight)
+
+        async def get(self, _: RateItem):
+            await asyncio.sleep(0)
+            return self.bucket
+
+    bucket = InMemoryBucket(DEFAULT_RATES)
+    limiter = Limiter(AsyncGetFactory(bucket))
+
+    acquired = limiter.try_acquire("example", blocking=False)
+    assert isawaitable(acquired)
+    assert await acquired
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_allows_async_bucket_put_result():
+    class AsyncPutBucket(InMemoryBucket):
+        async def put(self, item: RateItem):
+            return super().put(item)
+
+    bucket = AsyncPutBucket(DEFAULT_RATES)
+    limiter = Limiter(bucket)
+
+    acquired = limiter.try_acquire("example", blocking=False)
+    assert isawaitable(acquired)
+    assert await acquired
 
 
 @pytest.mark.asyncio
