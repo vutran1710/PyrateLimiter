@@ -1,5 +1,6 @@
 from inspect import isawaitable
 from os import getenv
+from time import time_ns
 from typing import cast
 
 from typing import Iterable
@@ -77,7 +78,12 @@ class DemoAsyncGetBucketFactory(BucketFactory[_AsyncMode]):
             self.buckets[item_name_pattern] = bucket
 
     def wrap_item(self, name: str, weight: int = 1):
-        now = next((b for b in self.buckets.values())).now()
+        first_bucket = next(iter(self.buckets.values()), None)
+        # Use wall-clock ms as fallback rather than MonotonicClock, because RedisBucket.now()
+        # also uses wall-clock (time_ns // 1_000_000). A monotonic timestamp would be orders
+        # of magnitude smaller, causing the Redis ZCOUNT range queries to miss items stored
+        # under the fallback timestamp and silently under-count the bucket.
+        now = first_bucket.now() if first_bucket is not None else time_ns() // 1_000_000
 
         async def wrap_async():
             return RateItem(name, await now, weight=weight)
