@@ -101,6 +101,17 @@ def test_try_acquire_sync_rejects_invalid_negative_timeout():
         lim.try_acquire("k", blocking=True, timeout=-2)
 
 
+def test_try_acquire_sync_blocking_unacquirable_weight_returns_false():
+    lim = make_limiter()
+
+    t0 = time.perf_counter()
+    ok = lim.try_acquire("k", weight=2, blocking=True)
+    t1 = time.perf_counter()
+
+    assert ok is False
+    assert (t1 - t0) < 0.05
+
+
 @pytest.mark.asyncio
 async def test_try_acquire_timeout_with_awaitable_wrap_item():
     class AsyncNowInMemoryBucket(InMemoryBucket):
@@ -130,6 +141,18 @@ async def test_try_acquire_async_rejects_invalid_negative_timeout():
 
     with pytest.raises(ValueError, match="timeout must be -1 or >= 0"):
         await lim.try_acquire_async("k", blocking=True, timeout=-2)
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_async_blocking_unacquirable_weight_returns_false():
+    lim = make_limiter()
+
+    t0 = time.perf_counter()
+    ok = await lim.try_acquire_async("k", weight=2, blocking=True)
+    t1 = time.perf_counter()
+
+    assert ok is False
+    assert (t1 - t0) < 0.05
 
 
 @pytest.mark.asyncio

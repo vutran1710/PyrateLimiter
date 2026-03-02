@@ -171,7 +171,10 @@ class Limiter:
                             raise TimeoutError()
 
                     d = await delay if isawaitable(delay) else delay
-                    assert isinstance(d, int) and d >= 0
+                    assert isinstance(d, int)
+                    if d == -1:
+                        return False
+                    assert d >= 0
                     d += self.buffer_ms
 
                     if deadline is not None:
@@ -199,6 +202,9 @@ class Limiter:
             while True:
                 assert not isawaitable(delay)
                 logger.debug("delay=%d, total_delay=%s", delay, total_delay)
+
+                if delay == -1:
+                    return False
 
                 delay += self.buffer_ms
                 total_delay += delay
