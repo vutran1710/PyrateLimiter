@@ -87,6 +87,13 @@ def test_try_acquire_sync_timeout():
     assert 0.09 <= (t1 - t0) <= 0.25         # waited ~timeout, not full 200ms
 
 
+def test_try_acquire_sync_nonblocking_rejects_timeout():
+    lim = make_limiter()
+
+    with pytest.raises(RuntimeError, match="Can't set timeout with non-blocking"):
+        lim.try_acquire("k", blocking=False, timeout=0.1)
+
+
 @pytest.mark.asyncio
 async def test_try_acquire_timeout_with_awaitable_wrap_item():
     class AsyncNowInMemoryBucket(InMemoryBucket):

@@ -288,6 +288,9 @@ class Limiter:
             True if the permit was acquired, False otherwise. Async limiters
             return an awaitable resolving to the same.
         """
+        if not blocking and timeout != -1:
+            raise RuntimeError("Can't set timeout with non-blocking")
+
         try:
             result = self._try_acquire(name=name, weight=weight, timeout=timeout, blocking=blocking)
         except TimeoutError:
