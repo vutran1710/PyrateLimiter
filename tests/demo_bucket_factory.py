@@ -94,7 +94,6 @@ class DemoAsyncGetBucketFactory(BucketFactory[_AsyncMode]):
         return wrap_async() if isawaitable(now) else wrap_sync()
 
     async def get(self, item: RateItem) -> AbstractBucket[_AsyncMode]:
-        assert self.buckets is not None
 
         if item.name in self.buckets:
             bucket = self.buckets[item.name]
