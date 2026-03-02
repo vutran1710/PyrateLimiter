@@ -4,7 +4,7 @@ Here are some basic instructions for local development setup and contributing to
 
 ## Setup & Commands
 
-To setup local development, *uv* and *Python 3.10+* are required. Follow instructions at <https://docs.astral.sh/uv/getting-started/installation/> for installing uv.
+To set up local development, *uv* and *Python 3.10+* are required. Follow instructions at <https://docs.astral.sh/uv/getting-started/installation/> for installing uv.
 
 Then, in the repository directory, run the following to install all optional backend dependencies and dev dependencies:
 
