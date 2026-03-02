@@ -4,7 +4,7 @@ import asyncio
 import logging
 from contextlib import contextmanager
 from functools import wraps
-from inspect import isawaitable, iscoroutinefunction
+from inspect import isawaitable, iscoroutine, iscoroutinefunction
 from threading import RLock, local
 from time import monotonic, sleep
 from typing import Any, Awaitable, Callable, Iterable, List, Optional, Protocol, Tuple, Union
@@ -389,23 +389,29 @@ class Limiter:
         return await self._handle_async_result(result, deadline=deadline)
 
     async def _handle_async_result(self, result, deadline: Optional[float] = None):
-        while isawaitable(result):
-            if deadline is None:
-                result = await result
-                continue
+        try:
+            while isawaitable(result):
+                if deadline is None:
+                    result = await result
+                    continue
 
-            remaining = deadline - monotonic()
-            if remaining <= 0:
-                raise TimeoutError()
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    raise TimeoutError()
 
-            try:
-                result = await asyncio.wait_for(result, timeout=remaining)
-            except asyncio.TimeoutError as exc:
-                raise TimeoutError() from exc
+                try:
+                    result = await asyncio.wait_for(result, timeout=remaining)
+                except asyncio.TimeoutError as exc:
+                    raise TimeoutError() from exc
 
-        return result
+            return result
+        finally:
+            if iscoroutine(result):
+                result.close()
 
-    def _try_acquire(self, name: str, weight: int, blocking: bool, timeout: int | float = -1, _force_async: bool = False) -> Union[bool, Awaitable[bool]]:
+    def _try_acquire(
+        self, name: str, weight: int, blocking: bool, timeout: int | float = -1, _force_async: bool = False
+    ) -> Union[bool, Awaitable[bool]]:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
         """
@@ -455,8 +461,32 @@ class Limiter:
 
                 @wraps(func)
                 def wrapper(*args, **kwargs):
-                    r = self.try_acquire(name=name, weight=weight)
+                    try:
+                        r = self._try_acquire(name=name, weight=weight, blocking=True)
+                    except TimeoutError:
+                        r = False
                     if isawaitable(r):
+                        if iscoroutine(r):
+                            pending: list[Any] = [r]
+                            seen: set[int] = set()
+
+                            while pending:
+                                current = pending.pop()
+                                current_id = id(current)
+                                if current_id in seen:
+                                    continue
+
+                                seen.add(current_id)
+                                if not iscoroutine(current):
+                                    continue
+
+                                frame = current.cr_frame
+                                if frame is not None:
+                                    for value in frame.f_locals.values():
+                                        if isawaitable(value):
+                                            pending.append(value)
+
+                                current.close()
                         raise RuntimeError("Can't use async bucket with sync decorator")
                     return func(*args, **kwargs)
 

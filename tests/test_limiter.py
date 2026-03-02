@@ -248,7 +248,9 @@ async def test_limiter_decorator(
         nonlocal counter
         counter += num
 
-    if isawaitable(bucket.count()):
+    bucket_count = bucket.count()
+    if isawaitable(bucket_count):
+        await bucket_count
         with pytest.raises(RuntimeError):
             @limiter_wrapper
             def inc_counter(num: int):
