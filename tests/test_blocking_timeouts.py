@@ -1,8 +1,10 @@
 # tests/test_limiter_blocking_behavior.py
 import asyncio
 import time
+from inspect import isawaitable
 import pytest
 from pyrate_limiter import Rate
+from pyrate_limiter.abstracts import AbstractBucket, BucketFactory, RateItem
 from pyrate_limiter.buckets import InMemoryBucket
 from pyrate_limiter.limiter import Limiter
 
@@ -72,8 +74,109 @@ async def test_try_acquire_async_timeout():
     assert ok is False                       # timed out
     assert 0.09 <= (t1 - t0) <= 0.25         # waited ~timeout, not full 200ms
 
-# --- sync timeout is not implemented ---
-def test_try_acquire_sync_timeout_not_implemented():
+# --- sync timeout enforces max wait ---
+def test_try_acquire_sync_timeout():
     lim = make_limiter()
-    with pytest.raises(NotImplementedError):
-        lim.try_acquire("k", blocking=True, timeout=0.1)
+    assert lim.try_acquire("k", blocking=True) is True  # take the only slot
+
+    t0 = time.perf_counter()
+    ok = lim.try_acquire("k", blocking=True, timeout=0.1)
+    t1 = time.perf_counter()
+
+    assert ok is False                        # timed out
+    assert 0.09 <= (t1 - t0) <= 0.25         # waited ~timeout, not full 200ms
+
+
+def test_try_acquire_sync_nonblocking_rejects_timeout():
+    lim = make_limiter()
+
+    with pytest.raises(RuntimeError, match="Can't set timeout with non-blocking"):
+        lim.try_acquire("k", blocking=False, timeout=0.1)
+
+
+def test_try_acquire_sync_rejects_invalid_negative_timeout():
+    lim = make_limiter()
+
+    with pytest.raises(ValueError, match="timeout must be -1 or >= 0"):
+        lim.try_acquire("k", blocking=True, timeout=-2)
+
+
+def test_try_acquire_sync_blocking_unacquirable_weight_returns_false():
+    lim = make_limiter()
+
+    t0 = time.perf_counter()
+    ok = lim.try_acquire("k", weight=2, blocking=True)
+    t1 = time.perf_counter()
+
+    assert ok is False
+    assert (t1 - t0) < 0.05
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_timeout_with_awaitable_wrap_item():
+    class AsyncNowInMemoryBucket(InMemoryBucket):
+        async def now(self):
+            await asyncio.sleep(0.2)
+            now = super().now()
+            if isawaitable(now):
+                now = await now
+            assert isinstance(now, int)
+            return now
+
+    lim = Limiter(AsyncNowInMemoryBucket([RATE]), buffer_ms=0)
+
+    t0 = time.perf_counter()
+    result = lim.try_acquire("k", blocking=True, timeout=0.1)
+    assert isawaitable(result)
+    ok = await result
+    t1 = time.perf_counter()
+
+    assert ok is False
+    assert 0.09 <= (t1 - t0) <= 0.25
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_async_rejects_invalid_negative_timeout():
+    lim = make_limiter()
+
+    with pytest.raises(ValueError, match="timeout must be -1 or >= 0"):
+        await lim.try_acquire_async("k", blocking=True, timeout=-2)
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_async_blocking_unacquirable_weight_returns_false():
+    lim = make_limiter()
+
+    t0 = time.perf_counter()
+    ok = await lim.try_acquire_async("k", weight=2, blocking=True)
+    t1 = time.perf_counter()
+
+    assert ok is False
+    assert (t1 - t0) < 0.05
+
+
+@pytest.mark.asyncio
+async def test_try_acquire_timeout_with_awaitable_get_bucket():
+    class AsyncGetFactory(BucketFactory):
+        def __init__(self, bucket: AbstractBucket):
+            self.bucket = bucket
+
+        def wrap_item(self, name: str, weight: int = 1):
+            now = self.bucket.now()
+            assert isinstance(now, int)
+            return RateItem(name, now, weight=weight)
+
+        async def get(self, item: RateItem):
+            await asyncio.sleep(0.2)
+            return self.bucket
+
+    lim = Limiter(AsyncGetFactory(InMemoryBucket([RATE])), buffer_ms=0)
+
+    t0 = time.perf_counter()
+    result = lim.try_acquire("k", blocking=True, timeout=0.1)
+    assert isawaitable(result)
+    ok = await result
+    t1 = time.perf_counter()
+
+    assert ok is False
+    assert 0.09 <= (t1 - t0) <= 0.25

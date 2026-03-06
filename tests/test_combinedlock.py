@@ -1,7 +1,8 @@
 import logging
 import re
 from inspect import isawaitable
-from time import time
+from threading import Thread
+from time import monotonic, sleep, time
 
 import pytest
 
@@ -105,3 +106,28 @@ def test_order_doesnt_deadlock_when_second_is_locked():
             with combined_lock([m1, m2], True, timeout=0.01): pass
     finally:
         m2.release()
+
+
+def test_timeout_is_global_budget_across_locks():
+    m1, m2 = Lock(), Lock()
+    m1.acquire()
+    m2.acquire()
+
+    def release_first_lock_later():
+        sleep(0.03)
+        m1.release()
+
+    releaser = Thread(target=release_first_lock_later)
+    releaser.start()
+    started = monotonic()
+
+    try:
+        with pytest.raises(TimeoutError):
+            with combined_lock([m1, m2], True, timeout=0.05):
+                pass
+    finally:
+        releaser.join()
+        m2.release()
+
+    elapsed = monotonic() - started
+    assert elapsed < 0.08
