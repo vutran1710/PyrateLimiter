@@ -167,9 +167,9 @@ async def test_bucket_waiting(create_bucket):
     assert isinstance(availability, int)
     logger.info("1 space available in: %s", availability)
 
-    await asyncio.sleep(availability / 1000 - 0.03)
+    await asyncio.sleep(availability / 1000 - 0.02)
     assert await bucket.put(await create_item()) is False
-    await asyncio.sleep(0.04)
+    await asyncio.sleep(0.06)
     assert await bucket.put(await create_item()) is True
 
     assert await bucket.put(await create_item(2)) is False
@@ -177,9 +177,9 @@ async def test_bucket_waiting(create_bucket):
     assert isinstance(availability, int)
     logger.info("2 space available in: %s", availability)
 
-    await asyncio.sleep(availability / 1000 - 0.03)
+    await asyncio.sleep(availability / 1000 - 0.02)
     assert await bucket.put(await create_item(2)) is False
-    await asyncio.sleep(0.04)
+    await asyncio.sleep(0.06)
     assert await bucket.put(await create_item(2)) is True
 
     assert await bucket.put(await create_item(3)) is False
@@ -187,9 +187,9 @@ async def test_bucket_waiting(create_bucket):
     assert isinstance(availability, int)
     logger.info("3 space available in: %s", availability)
 
-    await asyncio.sleep(availability / 1000 - 0.03)
+    await asyncio.sleep(availability / 1000 - 0.02)
     assert await bucket.put(await create_item(3)) is False
-    await asyncio.sleep(0.04)
+    await asyncio.sleep(0.06)
     assert await bucket.put(await create_item(3)) is True
 
 
