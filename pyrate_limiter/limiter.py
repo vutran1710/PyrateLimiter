@@ -576,3 +576,16 @@ class Limiter:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
+
+    def __getstate__(self):
+        """Get state for pickling"""
+        state = self.__dict__.copy()
+        state.pop("lock", None)
+        state.pop("_thread_local", None)
+        return state
+
+    def __setstate__(self, state):
+        """Restore state after unpickling"""
+        self.__dict__.update(state)
+        self.lock = RLock()
+        self._thread_local = local()

@@ -420,3 +420,20 @@ async def test_bucket_no_schedule_leak():
 
     await asyncio.sleep(1.2)
     assert bucket.count() == 2
+
+
+def test_limiter_pickle():
+    """Test that Limiter can be pickled and unpickled (issue #262)"""
+    import pickle
+
+    limiter = Limiter(Rate(10, Duration.SECOND))
+
+    assert limiter.try_acquire("test")
+
+    # Pickle roundtrip
+    pickled = pickle.dumps(limiter)
+    restored = pickle.loads(pickled)
+
+    # Verify
+    assert restored.try_acquire("test")
+    assert restored.buffer_ms == limiter.buffer_ms
