@@ -332,3 +332,14 @@ class BucketFactory(ABC):
                 bucket.close()
             except Exception as e:
                 logger.info("Exception %s (%s) deleting bucket %r", type(e).__name__, e, bucket)
+
+    def __getstate__(self):
+        """Get state for pickling"""
+        state = self.__dict__.copy()
+        state.pop("_leaker", None)
+        return state
+
+    def __setstate__(self, state):
+        """Restore state after unpickling"""
+        self.__dict__.update(state)
+        self._leaker = None
