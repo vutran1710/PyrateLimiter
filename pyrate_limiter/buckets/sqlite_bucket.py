@@ -1,5 +1,6 @@
 """Bucket implementation using SQLite"""
 
+
 import logging
 import sqlite3
 from contextlib import nullcontext
@@ -7,66 +8,76 @@ from pathlib import Path
 from tempfile import gettempdir
 from threading import RLock
 from time import time, time_ns
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
-from ..abstracts import AbstractBucket, Rate, RateItem
-from ..clocks import AbstractClock
-from ..utils import dedicated_sqlite_clock_connection
+try:
+    # Running inside package source tree
+    from ..abstracts import AbstractBucket, Rate, RateItem
+    from ..clocks import AbstractClock
+    from ..utils import dedicated_sqlite_clock_connection
+except ImportError:
+    # Running as standalone module with installed package
+    from pyrate_limiter import AbstractBucket, Rate, RateItem  # type: ignore
+    from pyrate_limiter.clocks import AbstractClock  # type: ignore
+    from pyrate_limiter.utils import dedicated_sqlite_clock_connection  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 
+def _quote_identifier(identifier: str) -> str:
+    """Quote SQLite identifier safely."""
+    if not identifier:
+        raise ValueError("identifier must not be empty")
+    if "\x00" in identifier:
+        raise ValueError("identifier contains null byte")
+    return '"' + identifier.replace('"', '""') + '"'
+
+
 class Queries:
     CREATE_BUCKET_TABLE = """
-    CREATE TABLE IF NOT EXISTS '{table}' (
-        name VARCHAR,
+    CREATE TABLE IF NOT EXISTS {table} (
+        name TEXT,
         item_timestamp INTEGER
     )
     """
     CREATE_INDEX_ON_TIMESTAMP = """
-    CREATE INDEX IF NOT EXISTS '{index_name}' ON '{table_name}' (item_timestamp)
+    CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} (item_timestamp)
     """
     COUNT_BEFORE_INSERT = """
-    SELECT :interval{index} as interval, COUNT(*) FROM '{table}'
-    WHERE item_timestamp >= :current_timestamp - :interval{index}
+    SELECT COUNT(*) FROM {table}
+    WHERE item_timestamp >= ? - ?
     """
     PUT_ITEM = """
-    INSERT INTO '{table}' (name, item_timestamp) VALUES %s
+    INSERT INTO {table} (name, item_timestamp) VALUES (?, ?)
     """
     LEAK = """
-    DELETE FROM "{table}" WHERE rowid IN (
-    SELECT rowid FROM "{table}" ORDER BY item_timestamp ASC LIMIT {count});
-    """.strip()
-    COUNT_BEFORE_LEAK = """SELECT COUNT(*) FROM '{table}' WHERE item_timestamp < {current_timestamp} - {interval}"""
-    FLUSH = """DELETE FROM '{table}'"""
-    # The below sqls are for testing only
-    DROP_TABLE = "DROP TABLE IF EXISTS '{table}'"
-    DROP_INDEX = "DROP INDEX IF EXISTS '{index}'"
-    COUNT_ALL = "SELECT COUNT(*) FROM '{table}'"
-    GET_ALL_ITEM = "SELECT * FROM '{table}' ORDER BY item_timestamp ASC"
-    GET_FIRST_ITEM = "SELECT name, item_timestamp FROM '{table}' ORDER BY item_timestamp ASC"
-    GET_LAG = """
-    SELECT (strftime ('%s', 'now') || substr(strftime ('%f', 'now'), 4)) - (
-    SELECT item_timestamp
-    FROM '{table}'
-    ORDER BY item_timestamp
-    ASC
-    LIMIT 1
+    DELETE FROM {table} WHERE rowid IN (
+        SELECT rowid FROM {table}
+        ORDER BY item_timestamp ASC
+        LIMIT ?
     )
+    """.strip()
+    COUNT_BEFORE_LEAK = """
+    SELECT COUNT(*) FROM {table}
+    WHERE item_timestamp < ? - ?
     """
-    PEEK = 'SELECT * FROM "{table}" ORDER BY item_timestamp DESC LIMIT 1 OFFSET {count}'
+    FLUSH = "DELETE FROM {table}"
+    COUNT_ALL = "SELECT COUNT(*) FROM {table}"
+    PEEK = """
+    SELECT name, item_timestamp
+    FROM {table}
+    ORDER BY item_timestamp DESC
+    LIMIT 1 OFFSET ?
+    """
 
 
 class SQLiteBucket(AbstractBucket):
-    """For sqlite bucket, we are using the sql time function as the clock
-    item's timestamp wont matter here
-    """
+    """SQLite-backed bucket with injection-safe SQL handling."""
 
     rates: List[Rate]
     failing_rate: Optional[Rate]
-    conn: sqlite3.Connection
+    conn: Optional[sqlite3.Connection]
     table: str
-    full_count_query: str
     lock: RLock
     use_limiter_lock: bool
 
@@ -74,6 +85,7 @@ class SQLiteBucket(AbstractBucket):
         self.conn = conn
         self.table = table
         self.rates = rates
+        self._quoted_table = _quote_identifier(table)
 
         if not lock:
             self.use_limiter_lock = False
@@ -83,91 +95,83 @@ class SQLiteBucket(AbstractBucket):
             self.lock = lock
 
     def now(self):
-        # TODO: Use Sqlite time source via a Lua script
+        # Keep existing behavior for compatibility
         return time_ns() // 1000000
 
     def limiter_lock(self):
         if self.use_limiter_lock:
             return self.lock
-        else:
-            return None
+        return None
 
-    def _build_full_count_query(self, current_timestamp: int) -> Tuple[str, dict]:
-        full_query: List[str] = []
-
-        parameters = {"current_timestamp": current_timestamp}
-
-        for index, rate in enumerate(self.rates):
-            parameters[f"interval{index}"] = rate.interval
-            query = Queries.COUNT_BEFORE_INSERT.format(table=self.table, index=index)
-            full_query.append(query)
-
-        join_full_query = " union ".join(full_query) if len(full_query) > 1 else full_query[0]
-        return join_full_query, parameters
+    def _require_conn(self) -> sqlite3.Connection:
+        if self.conn is None:
+            raise RuntimeError("SQLiteBucket is already closed")
+        return self.conn
 
     def put(self, item: RateItem) -> bool:
         with self.lock:
-            query, parameters = self._build_full_count_query(item.timestamp)
-            cur = self.conn.execute(query, parameters)
-            rate_limit_counts = cur.fetchall()
-            cur.close()
+            conn = self._require_conn()
+            count_query = Queries.COUNT_BEFORE_INSERT.format(table=self._quoted_table)
 
-            for idx, result in enumerate(rate_limit_counts):
-                interval, count = result
-                rate = self.rates[idx]
-                assert interval == rate.interval
+            for rate in self.rates:
+                cur = conn.execute(count_query, (item.timestamp, rate.interval))
+                count = int(cur.fetchone()[0])
+                cur.close()
+
                 space_available = rate.limit - count
-
                 if space_available < item.weight:
                     self.failing_rate = rate
                     return False
 
-            items = ", ".join([f"('{name}', {item.timestamp})" for name in [item.name] * item.weight])
-            query = (Queries.PUT_ITEM.format(table=self.table)) % items
-            self.conn.execute(query).close()
-            self.conn.commit()
+            self.failing_rate = None
+            insert_query = Queries.PUT_ITEM.format(table=self._quoted_table)
+            conn.executemany(insert_query, ((item.name, item.timestamp) for _ in range(item.weight)))
+            conn.commit()
             return True
 
     def leak(self, current_timestamp: Optional[int] = None) -> int:
-        """Leaking/clean up bucket"""
         with self.lock:
             assert current_timestamp is not None
-            query = Queries.COUNT_BEFORE_LEAK.format(
-                table=self.table,
-                interval=self.rates[-1].interval,
-                current_timestamp=current_timestamp,
-            )
-            cur = self.conn.execute(query)
-            count = cur.fetchone()[0]
-            query = Queries.LEAK.format(table=self.table, count=count)
-            cur.execute(query)
+            conn = self._require_conn()
+
+            count_query = Queries.COUNT_BEFORE_LEAK.format(table=self._quoted_table)
+            cur = conn.execute(count_query, (current_timestamp, self.rates[-1].interval))
+            count = int(cur.fetchone()[0])
             cur.close()
-            self.conn.commit()
+
+            if count <= 0:
+                return 0
+
+            leak_query = Queries.LEAK.format(table=self._quoted_table)
+            conn.execute(leak_query, (count,)).close()
+            conn.commit()
             return count
 
     def flush(self) -> None:
         with self.lock:
-            self.conn.execute(Queries.FLUSH.format(table=self.table)).close()
-            self.conn.commit()
+            conn = self._require_conn()
+            conn.execute(Queries.FLUSH.format(table=self._quoted_table)).close()
+            conn.commit()
             self.failing_rate = None
 
     def count(self) -> int:
         with self.lock:
-            cur = self.conn.execute(Queries.COUNT_ALL.format(table=self.table))
-            ret = cur.fetchone()[0]
+            conn = self._require_conn()
+            cur = conn.execute(Queries.COUNT_ALL.format(table=self._quoted_table))
+            ret = int(cur.fetchone()[0])
             cur.close()
             return ret
 
     def peek(self, index: int) -> Optional[RateItem]:
         with self.lock:
-            query = Queries.PEEK.format(table=self.table, count=index)
-            cur = self.conn.execute(query)
+            conn = self._require_conn()
+            query = Queries.PEEK.format(table=self._quoted_table)
+            cur = conn.execute(query, (index,))
             item = cur.fetchone()
             cur.close()
 
             if not item:
                 return None
-
             return RateItem(item[0], item[1])
 
     def close(self):
@@ -176,25 +180,25 @@ class SQLiteBucket(AbstractBucket):
                 try:
                     self.conn.close()
                     self.conn = None
-                except Exception as e:
-                    logger.debug("Exception %s closing sql connection", e)
+                except Exception as exc:  # pragma: no cover
+                    logger.debug("Exception %s closing sql connection", exc)
 
     @classmethod
     def init_from_file(
-        cls, rates: List[Rate], table: str = "rate_bucket", db_path: Optional[str] = None, create_new_table: bool = True, use_file_lock: bool = False
+        cls,
+        rates: List[Rate],
+        table: str = "rate_bucket",
+        db_path: Optional[str] = None,
+        create_new_table: bool = True,
+        use_file_lock: bool = False,
     ) -> "SQLiteBucket":
         if db_path is None and use_file_lock:
             raise ValueError("db_path must be specified when using use_file_lock")
 
         if db_path is None:
             temp_dir = Path(gettempdir())
-
             db_path = str(temp_dir / f"pyrate_limiter_{time()}.sqlite")
 
-        # TBD: FileLock switched to a thread-local FileLock in 3.11.0.
-        # Should we set FileLock's thread_local to False, for cases where user is both multiprocessing & threading?
-        # As is, the file lock should be Multi Process - Single Thread and non-filelock is Single Process - Multi Thread
-        # A hybrid lock may be needed to gracefully handle both cases
         file_lock = None
         file_lock_ctx = nullcontext()
 
@@ -203,13 +207,15 @@ class SQLiteBucket(AbstractBucket):
                 from filelock import FileLock  # type: ignore[import-untyped]
 
                 file_lock = FileLock(db_path + ".lock")  # type: ignore[no-redef]
-                file_lock_ctx: Union[nullcontext, FileLock] = file_lock  # type: ignore[no-redef]
-            except ImportError as e:
-                raise ImportError("filelock is required for file locking. Please install it as optional dependency") from e
+                file_lock_ctx = file_lock  # type: ignore[assignment]
+            except ImportError as exc:
+                raise ImportError("filelock is required for file locking. Please install it as optional dependency") from exc
+
+        quoted_table = _quote_identifier(table)
+        quoted_index = _quote_identifier(f"idx_{table}_rate_item_timestamp")
 
         with file_lock_ctx:
             assert db_path is not None
-
             sqlite_connection = sqlite3.connect(
                 db_path,
                 isolation_level="DEFERRED",
@@ -218,21 +224,13 @@ class SQLiteBucket(AbstractBucket):
 
             cur = sqlite_connection.cursor()
             if use_file_lock:
-                # https://www.sqlite.org/wal.html
                 cur.execute("PRAGMA journal_mode=WAL;")
-
-                # https://www.sqlite.org/pragma.html#pragma_synchronous
                 cur.execute("PRAGMA synchronous=NORMAL;")
 
             if create_new_table:
-                cur.execute(Queries.CREATE_BUCKET_TABLE.format(table=table))
+                cur.execute(Queries.CREATE_BUCKET_TABLE.format(table=quoted_table))
 
-            create_idx_query = Queries.CREATE_INDEX_ON_TIMESTAMP.format(
-                index_name=f"idx_{table}_rate_item_timestamp",
-                table_name=table,
-            )
-
-            cur.execute(create_idx_query)
+            cur.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(index_name=quoted_index, table_name=quoted_table))
             cur.close()
             sqlite_connection.commit()
 
@@ -240,15 +238,11 @@ class SQLiteBucket(AbstractBucket):
 
 
 class SQLiteClock(AbstractClock):
-    """Get timestamp using SQLite as remote clock backend"""
+    """Get timestamp using SQLite as remote clock backend."""
 
     time_query = "SELECT CAST(ROUND((julianday('now') - 2440587.5)*86400000) As INTEGER)"
 
     def __init__(self, conn: Union[sqlite3.Connection, SQLiteBucket]):
-        """
-        In multiprocessing cases, use the bucket, so that a shared lock is used.
-        """
-
         self.lock: Optional[RLock] = None
 
         if isinstance(conn, SQLiteBucket):
@@ -264,6 +258,7 @@ class SQLiteClock(AbstractClock):
 
     def now(self) -> int:
         with self.lock if self.lock else nullcontext():
+            assert self.conn is not None
             cur = self.conn.execute(self.time_query)
             now = cur.fetchone()[0]
             cur.close()
