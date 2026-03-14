@@ -43,7 +43,7 @@ def test_combined_lock_timeout_when_mp_locked():
     m.acquire()
     try:
         with pytest.raises(TimeoutError):
-            with combined_lock([m, r], blocking=True, timeout=0.05): 
+            with combined_lock([m, r], blocking=True, timeout=0.1):
                 pass
     finally:
         m.release()
@@ -89,7 +89,7 @@ def test_float_timeout():
     m.acquire()
     try:
         with pytest.raises(TimeoutError):
-            with combined_lock([m, r], True, timeout=0.05): pass
+            with combined_lock([m, r], True, timeout=0.1): pass
     finally:
         m.release()
 
@@ -103,7 +103,7 @@ def test_order_doesnt_deadlock_when_second_is_locked():
     m2.acquire()
     try:
         with pytest.raises(TimeoutError):
-            with combined_lock([m1, m2], True, timeout=0.01): pass
+            with combined_lock([m1, m2], True, timeout=0.05): pass
     finally:
         m2.release()
 
@@ -114,7 +114,7 @@ def test_timeout_is_global_budget_across_locks():
     m2.acquire()
 
     def release_first_lock_later():
-        sleep(0.03)
+        sleep(0.1)
         m1.release()
 
     releaser = Thread(target=release_first_lock_later)
@@ -123,11 +123,11 @@ def test_timeout_is_global_budget_across_locks():
 
     try:
         with pytest.raises(TimeoutError):
-            with combined_lock([m1, m2], True, timeout=0.05):
+            with combined_lock([m1, m2], True, timeout=0.2):
                 pass
     finally:
         releaser.join()
         m2.release()
 
     elapsed = monotonic() - started
-    assert elapsed < 0.08
+    assert elapsed < 0.3

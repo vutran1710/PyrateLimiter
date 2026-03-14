@@ -400,7 +400,7 @@ async def test_wait_too_long():
     # raise_when_fail = True
     limiter = Limiter(bucket)
 
-    tasks = [limiter.try_acquire_async("mytest", 1, timeout=0.0001) for i in range(500)]
+    tasks = [limiter.try_acquire_async("mytest", 1, timeout=0.01) for i in range(500)]
     r = await asyncio.gather(*tasks)
 
     # Not all requests could be satisfied within the timeout

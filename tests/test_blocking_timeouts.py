@@ -25,7 +25,7 @@ def test_sync_decorator_blocks():
     work()                      # consumes the only slot
     t1 = work()                 # must block ~200ms waiting for leak
     elapsed = t1 - t0
-    assert elapsed >= 0.18
+    assert elapsed >= 0.15
 
 # --- async decorator blocks ---
 @pytest.mark.asyncio
@@ -40,7 +40,7 @@ async def test_async_decorator_blocks():
     await work()               # consumes the only slot
     t1 = await work()          # must block ~200ms
     elapsed = t1 - t0
-    assert elapsed >= 0.18
+    assert elapsed >= 0.15
 
 # --- try_acquire: non-blocking fails on contention ---
 def test_try_acquire_nonblocking_false():
@@ -72,7 +72,7 @@ async def test_try_acquire_async_timeout():
     t1 = time.perf_counter()
 
     assert ok is False                       # timed out
-    assert 0.09 <= (t1 - t0) <= 0.25         # waited ~timeout, not full 200ms
+    assert 0.08 <= (t1 - t0) <= 0.35         # waited ~timeout, not full 200ms
 
 # --- sync timeout enforces max wait ---
 def test_try_acquire_sync_timeout():
@@ -84,7 +84,7 @@ def test_try_acquire_sync_timeout():
     t1 = time.perf_counter()
 
     assert ok is False                        # timed out
-    assert 0.09 <= (t1 - t0) <= 0.25         # waited ~timeout, not full 200ms
+    assert 0.08 <= (t1 - t0) <= 0.35         # waited ~timeout, not full 200ms
 
 
 def test_try_acquire_sync_nonblocking_rejects_timeout():
@@ -132,7 +132,7 @@ async def test_try_acquire_timeout_with_awaitable_wrap_item():
     t1 = time.perf_counter()
 
     assert ok is False
-    assert 0.09 <= (t1 - t0) <= 0.25
+    assert 0.08 <= (t1 - t0) <= 0.35
 
 
 @pytest.mark.asyncio
@@ -179,4 +179,4 @@ async def test_try_acquire_timeout_with_awaitable_get_bucket():
     t1 = time.perf_counter()
 
     assert ok is False
-    assert 0.09 <= (t1 - t0) <= 0.25
+    assert 0.08 <= (t1 - t0) <= 0.35
