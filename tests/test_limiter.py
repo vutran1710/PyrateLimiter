@@ -185,6 +185,38 @@ async def test_delay_waiter_handles_sync_waiting_with_async_put():
     assert await delayed is True
 
 
+def test_delay_waiter_clamps_negative_sync_delay_to_zero():
+    class NegativeWaitingBucket(AbstractBucket):
+        def __init__(self):
+            self.rates = [Rate(1, Duration.SECOND)]
+            self.failing_rate = self.rates[0]
+
+        def waiting(self, item: RateItem):
+            return -5
+
+        def put(self, item: RateItem):
+            return True
+
+        def leak(self, current_timestamp=None):
+            return 0
+
+        def flush(self):
+            return None
+
+        def count(self):
+            return 0
+
+        def peek(self, index: int):
+            return None
+
+    limiter = Limiter(DEFAULT_RATES[0], buffer_ms=0)
+    bucket = NegativeWaitingBucket()
+    item = RateItem(name="demo", timestamp=123, weight=1)
+
+    assert limiter._delay_waiter(bucket, item, blocking=True) is True
+    assert item.timestamp == 123
+
+
 @pytest.mark.asyncio
 async def test_limiter_01(
     request,

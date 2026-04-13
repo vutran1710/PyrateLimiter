@@ -209,6 +209,9 @@ class Limiter:
                 if delay == -1:
                     return False
 
+                if delay < 0:
+                    delay = 0
+
                 delay += self.buffer_ms
                 total_delay += delay
 
