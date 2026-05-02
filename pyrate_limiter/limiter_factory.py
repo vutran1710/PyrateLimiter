@@ -54,17 +54,15 @@ def create_sqlite_limiter(
     use_file_lock: bool = False,
 ) -> Limiter:
     """
-    Create a SQLite-backed rate limiter with configurable rate, persistence, and optional async support.
+    Create a SQLite-backed rate limiter with configurable rate, persistence, and file locking.
 
     Args:
         rate_per_duration: Number of allowed requests per duration.
         duration: Time window for the rate limit.
         db_path: Path to the SQLite database file (or in-memory if None).
         table_name: Name of the table used for rate buckets.
-        max_delay: Maximum delay before failing requests.
         buffer_ms: Extra wait time in milliseconds to account for clock drift.
         use_file_lock: Enable file locking for multi-process synchronization.
-        async_wrapper: Whether to wrap the bucket for async usage.
 
     Returns:
         Limiter: Configured SQLite-backed limiter instance.
@@ -91,14 +89,12 @@ def create_inmemory_limiter(
     buffer_ms: int = 50,
 ) -> Limiter:
     """
-    Create an in-memory rate limiter with configurable rate, duration, delay, and optional async support.
+    Create an in-memory rate limiter with configurable rate and clock-drift buffer.
 
     Args:
         rate_per_duration: Number of allowed requests per duration.
         duration: Time window for the rate limit.
-        max_delay: Maximum delay before failing requests.
         buffer_ms: Extra wait time in milliseconds to account for clock drift.
-        async_wrapper: Whether to wrap the bucket for async usage.
 
     Returns:
         Limiter: Configured in-memory limiter instance.
@@ -123,9 +119,6 @@ def init_global_limiter(
 
     Args:
         bucket: The rate-limiting bucket to be used.
-        max_delay: Maximum delay before failing requests.
-        raise_when_fail: Whether to raise an exception when a request fails.
-        retry_until_max_delay: Retry until the maximum delay is reached.
         buffer_ms: Additional buffer time in milliseconds for retries.
     """
 
