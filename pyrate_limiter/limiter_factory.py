@@ -36,7 +36,7 @@ def create_sqlite_bucket(
     logger.info("Table name is %s", table_name)
     bucket = SQLiteBucket.init_from_file(
         rates,
-        db_path=str(db_path),
+        db_path=db_path,
         table=table_name,
         create_new_table=True,
         use_file_lock=use_file_lock,
