@@ -20,7 +20,7 @@ def create_sqlite_bucket(
     db_path: Optional[str],
     table_name: str = "pyrate_limiter",
     use_file_lock: bool = False,
-):
+) -> SQLiteBucket:
     """
     Create and initialize a SQLite bucket for rate limiting.
 
@@ -115,7 +115,7 @@ def create_inmemory_limiter(
 def init_global_limiter(
     bucket: AbstractBucket,
     buffer_ms: int = 50,
-):
+) -> None:
     """
     Initialize a global Limiter instance using the provided bucket.
 
