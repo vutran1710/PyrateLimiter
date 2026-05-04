@@ -26,7 +26,7 @@ def create_sqlite_bucket(
 
     Args:
         rates: List of rate limit configurations.
-        db_path: Path to the SQLite database file (or in-memory if None).
+        db_path: Path to the SQLite database file. If None, a temporary on-disk SQLite database is created.
         table_name: Name of the table to store rate bucket data.
         use_file_lock: Enable file locking for multi-process synchronization.
 
@@ -59,7 +59,7 @@ def create_sqlite_limiter(
     Args:
         rate_per_duration: Number of allowed requests per duration.
         duration: Time window for the rate limit.
-        db_path: Path to the SQLite database file (or in-memory if None).
+        db_path: Path to the SQLite database file. If None, a temporary on-disk SQLite database is created.
         table_name: Name of the table used for rate buckets.
         buffer_ms: Extra wait time in milliseconds to account for clock drift.
         use_file_lock: Enable file locking for multi-process synchronization.
