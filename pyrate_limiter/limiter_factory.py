@@ -72,7 +72,7 @@ def create_sqlite_limiter(
 
     bucket: AbstractBucket = SQLiteBucket.init_from_file(
         rate_limits,
-        db_path=str(db_path),
+        db_path=db_path,
         table=table_name,
         create_new_table=True,
         use_file_lock=use_file_lock,
