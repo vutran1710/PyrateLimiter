@@ -89,3 +89,14 @@ class RateLimitedSession:
             Exception information, if any, from the context block.
         """
         await self._session.close()
+
+    async def close(self) -> None:
+        """
+        Close the underlying aiohttp.ClientSession.
+
+        This method ensures that the internal session is properly closed,
+        avoiding ResourceWarning about unclosed transports. It is safe to
+        call even if the session was already closed or if you did not use
+        the context manager.
+        """
+        await self._session.close()
