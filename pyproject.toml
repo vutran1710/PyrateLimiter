@@ -38,7 +38,7 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/vutran1710/PyrateLimiter"
 Repository = "https://github.com/vutran1710/PyrateLimiter"
-Documentation = "https://pyrate-limiter.readthedocs.io"
+Documentation = "https://pyratelimiter.readthedocs.io"
 
 [dependency-groups]
 all = [
