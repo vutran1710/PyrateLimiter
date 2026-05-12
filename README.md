@@ -628,7 +628,7 @@ from pyrate_limiter import Rate, Limiter, Duration, SQLiteBucket
 requests_per_minute = 5
 rate = Rate(requests_per_minute, Duration.MINUTE)
 bucket = SQLiteBucket.init_from_file([rate], use_file_lock=False)  # set use_file_lock to True if using across multiple processes
-limiter = Limiter(bucket, raise_when_fail=False, max_delay=max_delay)
+limiter = Limiter(bucket)
 ```
 
 You can also pass custom arguments to the `init_from_file` following its signature:
