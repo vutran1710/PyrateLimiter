@@ -89,7 +89,13 @@ class PostgresBucket(AbstractBucket):
         self._q_create_index = sql.SQL(Queries.CREATE_INDEX_ON_TIMESTAMP).format(index=index_name, table=tbl)
         self._q_lock = sql.SQL(Queries.LOCK_TABLE).format(table=tbl)
         self._q_count = sql.SQL(Queries.COUNT).format(table=tbl)
-        self._q_count_window = sql.SQL(Queries.COUNT_WINDOW).format(table=tbl)
+        # One scan computing every rate's windowed count via COUNT(*) FILTER,
+        # instead of one round trip per rate. Each rate contributes a
+        # (TO_TIMESTAMP(%s), %s) pair, filled in self.rates order at put time.
+        # Composed with psycopg.sql (no string interpolation).
+        _filter = sql.SQL("COUNT(*) FILTER (WHERE item_timestamp >= TO_TIMESTAMP(%s) - (%s * INTERVAL '1 milliseconds'))")
+        _fields = sql.SQL(", ").join([_filter] * len(self.rates))
+        self._q_count_windows = sql.SQL("SELECT {fields} FROM {table}").format(fields=_fields, table=tbl)
         self._q_put = sql.SQL(Queries.PUT).format(table=tbl)
         self._q_flush = sql.SQL(Queries.FLUSH).format(table=tbl)
         self._q_peek = sql.SQL(Queries.PEEK).format(table=tbl)
@@ -140,12 +146,13 @@ class PostgresBucket(AbstractBucket):
                 self.failing_rate = self.rates[0]
                 return False
 
-            for rate in self.rates:
-                cur = conn.execute(self._q_count_window, (item_ts_seconds, rate.interval))
-                count = int(cur.fetchone()[0])
-                cur.close()
+            params = [v for rate in self.rates for v in (item_ts_seconds, rate.interval)]
+            cur = conn.execute(self._q_count_windows, params)
+            counts = cur.fetchone()
+            cur.close()
 
-                if rate.limit - count < item.weight:
+            for rate, count in zip(self.rates, counts, strict=True):
+                if rate.limit - int(count) < item.weight:
                     self.failing_rate = rate
                     return False
 
