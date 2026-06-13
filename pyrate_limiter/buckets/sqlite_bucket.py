@@ -126,7 +126,7 @@ class SQLiteBucket(AbstractBucket):
             # user-supplied name into SQL (injection / quote-crash).
             query = Queries.PUT_ITEM.format(table=self.table)
             rows = [(item.name, item.timestamp)] * item.weight
-            self.conn.executemany(query, rows)
+            self.conn.executemany(query, rows).close()
             self.conn.commit()
             return True
 
