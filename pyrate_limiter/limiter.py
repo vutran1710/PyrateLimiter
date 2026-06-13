@@ -42,13 +42,15 @@ class SingleBucketFactory(BucketFactory):
     def wrap_item(self, name: str, weight: int = 1):
         now = self.bucket.now()
 
-        async def wrap_async():
-            return RateItem(name, await now, weight=weight)
+        if isawaitable(now):
 
-        def wrap_sync():
-            return RateItem(name, now, weight=weight)
+            async def wrap_async():
+                return RateItem(name, await now, weight=weight)
 
-        return wrap_async() if isawaitable(now) else wrap_sync()
+            return wrap_async()
+
+        # Sync fast path (every blocking-free acquire): no closures allocated.
+        return RateItem(name, now, weight=weight)
 
     def get(self, _: RateItem) -> AbstractBucket:
         return self.bucket
