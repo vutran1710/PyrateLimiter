@@ -62,6 +62,22 @@ def validate_rate_list(rates: List[Rate]) -> bool:
     return True
 
 
+def enforce_rate_list(rates: List[Rate]) -> None:
+    """Raise ValueError if rates are not a well-formed, ordered rate list.
+
+    A valid list is ordered by strictly increasing interval, with strictly
+    increasing limits and non-increasing density (limit/interval) - i.e. the
+    "generous-before-tight" contract. Pass rates already in the order the
+    bucket will use them (sort first if the bucket sorts).
+    """
+    if not validate_rate_list(rates):
+        raise ValueError(
+            "Invalid rate list: rates must be non-empty and ordered by strictly "
+            "increasing interval, with strictly increasing limits and non-increasing "
+            f"density (limit/interval). Got: {rates}"
+        )
+
+
 def id_generator(
     size=10,
 ) -> str:

@@ -22,7 +22,7 @@ class MultiprocessBucket(InMemoryBucket):
 
         self._clock = MonotonicClock()
 
-        self.rates = sorted(rates, key=lambda r: r.interval)
+        self.rates = rates  # AbstractBucket.rates setter sorts + validates
         self.items = items
         self.mp_lock = mp_lock
 
