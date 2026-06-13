@@ -142,7 +142,7 @@ from pyrate_limiter import limiter_factory
 from pyrate_limiter.extras.httpx_limiter import AsyncRateLimiterTransport, RateLimiterTransport
 import httpx
 
-limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND, max_delay=Duration.HOUR)
+limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND)
 url = "https://example.com"
 
 with httpx.Client(transport=RateLimiterTransport(limiter=limiter)) as client:
@@ -257,9 +257,9 @@ If you only need a single Bucket for everything, and python's built-in `time()` 
 ```python
 from pyrate_limiter import Limiter
 
-# Limiter constructor accepts single bucket as the only parameter,
-# the rest are 3 optional parameters with default values as following
-# Limiter(bucket, clock=MonotonicClock(), raise_when_fail=True, max_delay=None)
+# Limiter accepts a single bucket as its main argument; the only other
+# parameter is `buffer_ms` (clock-drift tolerance, default 50):
+# Limiter(bucket, buffer_ms=50)
 limiter = Limiter(bucket)
 
 # Limiter is now ready to work!
@@ -272,33 +272,66 @@ If you want to have finer grain control with routing & clocks etc, then you shou
 
 When multiple bucket types are needed and items must be routed based on certain conditions, use `BucketFactory`.
 
-First, define your clock (time source). Most use cases work with the built-in clocks:
+First, pick a clock (time source). Most use cases work with the built-in clocks:
 
 ```python
-from pyrate_limiter.clock import MonotonicClock, SQLiteClock
+from pyrate_limiter import MonotonicClock
 
 base_clock = MonotonicClock()
 ```
 
+> **Custom / distributed clock (v4)**
+>
+> In v4 each bucket owns its time source via `bucket.now()` — the `Limiter`
+> no longer takes a `clock=` parameter. To use a custom time source (e.g. a
+> shared Redis/DB clock so distributed workers agree on "now"), either
+> **override `now()`** on a bucket subclass (works for every backend and keeps
+> leaking consistent), or assign a clock to buckets that delegate to
+> `self._clock` (e.g. `InMemoryBucket`, `PostgresBucket`):
+>
+> ```python
+> from pyrate_limiter import AbstractClock, InMemoryBucket, RedisBucket
+>
+> class RedisClock(AbstractClock):
+>     def __init__(self, redis):
+>         self.redis = redis
+>
+>     def now(self) -> int:
+>         seconds, microseconds = self.redis.time()
+>         return seconds * 1000 + microseconds // 1000
+>
+> # Option A — override now() (recommended; applies to put + leak everywhere):
+> class RedisTimeBucket(RedisBucket):
+>     def now(self) -> int:
+>         seconds, microseconds = self.redis.time()
+>         return seconds * 1000 + microseconds // 1000
+>
+> # Option B — inject a clock into a bucket that uses self._clock:
+> bucket = InMemoryBucket(rates)
+> bucket._clock = RedisClock(redis_client)
+> ```
+
 PyrateLimiter does not assume routing logic, so you implement a custom BucketFactory. At a minimum, these two methods must be defined:
 
 ```python
-from pyrate_limiter import BucketFactory
-from pyrate_limiter import AbstractBucket
+from pyrate_limiter import AbstractBucket, BucketFactory, RateItem
 
 
 class MyBucketFactory(BucketFactory):
-    # You can use constructor here,
-    # nor it requires to make bucket-factory work!
+    def __init__(self, clock, bucket):
+        self.clock = clock
+        self.bucket = bucket
+        # Schedule background leaking for the bucket
+        self.schedule_leak(bucket)
 
     def wrap_item(self, name: str, weight: int = 1) -> RateItem:
         """Time-stamping item, return a RateItem"""
-        now = clock.now()
+        now = self.clock.now()
         return RateItem(name, now, weight=weight)
 
     def get(self, _item: RateItem) -> AbstractBucket:
         """For simplicity's sake, all items route to the same, single bucket"""
-        return bucket
+        return self.bucket
 ```
 
 ### Creating buckets dynamically
@@ -307,19 +340,18 @@ If more than one bucket is needed, the bucket-routing logic should go to BucketF
 
 When creating buckets dynamically, it is needed to schedule leak for each newly created buckets.
 
-To support this, BucketFactory comes with a predefined method call `self.create(..)`. It is meant to create the bucket and schedule that bucket for leaking using the Factory's clock
+To support this, BucketFactory comes with a predefined method `self.create(..)`. It creates the bucket and schedules that bucket for leaking:
 
 ```python
 def create(
         self,
-        clock: AbstractClock,
         bucket_class: Type[AbstractBucket],
         *args,
         **kwargs,
     ) -> AbstractBucket:
         """Creating a bucket dynamically"""
         bucket = bucket_class(*args, **kwargs)
-        self.schedule_leak(bucket, clock)
+        self.schedule_leak(bucket)
         return bucket
 ```
 
@@ -333,14 +365,14 @@ class MultiBucketFactory(BucketFactory):
 
     def wrap_item(self, name: str, weight: int = 1) -> RateItem:
         """Time-stamping item, return a RateItem"""
-        now = clock.now()
+        now = self.clock.now()
         return RateItem(name, now, weight=weight)
 
     def get(self, item: RateItem) -> AbstractBucket:
         if item.name not in self.buckets:
-            # Use `self.create(..)` method to both initialize new bucket and calling `schedule_leak` on that bucket
-            # We can create different buckets with different types/classes here as well
-            new_bucket = self.create(YourBucketClass, *your-arguments, **your-keyword-arguments)
+            # Use `self.create(..)` to both initialize a new bucket and call `schedule_leak` on it.
+            # Different buckets with different types/classes can be created here as well.
+            new_bucket = self.create(YourBucketClass, *your_arguments, **your_keyword_arguments)
             self.buckets.update({item.name: new_bucket})
 
         return self.buckets[item.name]
@@ -355,8 +387,7 @@ from pyrate_limiter import Limiter
 
 limiter = Limiter(
     bucket_factory,
-    raise_when_fail=False,  # Default = True
-    max_delay=1000,         # Default = None
+    buffer_ms=50,  # clock-drift tolerance in ms (default = 50)
 )
 
 item = "the-earth"
@@ -575,8 +606,7 @@ The bucket is shared across instances.
 
 An example is provided in [in_memory_multiprocess](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/in_memory_multiprocess.py)
 
-Whenever multiprocessing, bucket.waiting calculations will be often wrong because of the concurrency involved. Set Limiter.retry_until_max_delay=True so that the
-item keeps retrying rather than returning False when contention causes an extra delay.
+Whenever multiprocessing, `bucket.waiting` calculations will often be wrong because of the concurrency involved. Use `try_acquire(..., blocking=True)` (the default) so the item keeps waiting/retrying rather than returning False when contention causes an extra delay.
 
 #### RedisBucket
 
