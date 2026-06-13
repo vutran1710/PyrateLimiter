@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [4.3.0]
+
+Bug-fix and hardening release. It contains a few breaking changes that affect
+only edge or undocumented usage — see **Breaking Changes** below.
+
+### Breaking Changes
+- Ill-formed rate lists now raise `ValueError` at bucket construction instead
+  of being silently mis-enforced. A valid list is ordered by strictly
+  increasing interval, with strictly increasing limits and non-increasing
+  density (the "generous-before-tight" contract). (#239)
+- `binary_search` has been removed from the public API. It was an undocumented
+  internal helper, now replaced internally by the standard library `bisect`. (#290)
+- `PgQueries` SQL templates now use bound `%s` parameters instead of the
+  `{offset}` / `{timestamp}` format placeholders. (#233)
+
+### Security
+- SQLite and Postgres backends no longer build SQL through string
+  interpolation. The user-supplied item name (SQLite) and the table name
+  (Postgres) are now bound/quoted, closing a SQL-injection vector and fixing
+  crashes on names containing quotes or other metacharacters. (#233, #244)
+
+### Fixed
+- Blocking `try_acquire` no longer busy-spins (burning CPU until the next
+  background leak) or spuriously times out when `buffer_ms=0`; `waiting()` now
+  clears the inclusive window lower bound correctly. (#289)
+- `try_acquire_async(timeout=0)` now succeeds when capacity is available
+  instead of always returning `False`. (#289)
+- SQLite `leak()` no longer raises `AttributeError` when invoked on a closed
+  connection during teardown (fixes the unstable `test_sqlite_filelock_bucket`). (#244)
+- Rate lists are now consistently sorted by interval across all backends,
+  fixing a latent `leak()` bug when unsorted rates were passed to the Redis,
+  SQLite, or Postgres buckets. (#239)
+
+### Changed
+- Replaced the custom `binary_search` with the standard library `bisect`. (#290)
+
+### Documentation
+- Fixed stale v4 examples in the README (removed the long-gone `clock=`,
+  `raise_when_fail`, and `max_delay` parameters) and documented how to use a
+  custom / distributed clock in v4. (#261)
+
 ## [4.0.0]
 
 Fourth major release with significant API simplification and breaking changes.
