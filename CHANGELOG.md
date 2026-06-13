@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [4.3.1]
+
+Performance and maintenance release. No API or behavior changes.
+
+### Performance
+- **PostgresBucket**: insert all `weight` unit-rows in a single statement
+  (`SELECT … FROM generate_series`) instead of one INSERT per unit — ~3.4×
+  faster weighted puts and a shorter `EXCLUSIVE` lock hold. (#296)
+- **PostgresBucket**: compute every rate's windowed count in one query
+  (`COUNT(*) FILTER`) instead of one round trip per rate — ~2× faster
+  multi-rate checks, fewer round trips under the lock. (#297)
+- **Leaker**: leak sync buckets on a plain thread loop instead of spinning up
+  an asyncio event loop; `close()` now stops the leaker promptly instead of
+  lagging up to a full leak interval. (#296)
+- **`SingleBucketFactory.wrap_item`**: inline the sync fast path (no
+  per-acquire closures) — ~23% faster item wrapping on the hot path. (#296)
+- Deduplicate the sync/async deadline math in `_delay_waiter` into a single
+  shared helper. (#294)
+
+### Documentation
+- Rewrite the README for accuracy, structure, and presentation, and replace the
+  outdated architecture image with a component-level Mermaid diagram that
+  renders on both GitHub and ReadTheDocs. (#293, #295)
+
+### CI
+- Move GitHub Actions off the deprecated Node-20 runtime to Node-24
+  (`checkout@v5`, `setup-python@v6`, `setup-uv@v7`, `upload-artifact@v6`,
+  `download-artifact@v7`). (#295)
+
 ## [4.3.0]
 
 Bug-fix and hardening release. It contains a few breaking changes that affect
