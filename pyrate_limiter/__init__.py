@@ -20,7 +20,6 @@ from .clocks import MonotonicClock as MonotonicClock
 from .clocks import PostgresClock as PostgresClock
 from .limiter import Limiter as Limiter
 from .limiter import SingleBucketFactory as SingleBucketFactory
-from .utils import binary_search as binary_search
 from .utils import dedicated_sqlite_clock_connection as dedicated_sqlite_clock_connection
 from .utils import id_generator as id_generator
 from .utils import validate_rate_list as validate_rate_list
@@ -48,7 +47,6 @@ __all__ = [
     "PostgresClock",
     "Limiter",
     "SingleBucketFactory",
-    "binary_search",
     "dedicated_sqlite_clock_connection",
     "id_generator",
     "validate_rate_list",

@@ -1,10 +1,14 @@
 """Naive bucket implementation using built-in list"""
 
+from bisect import bisect_left
+from operator import attrgetter
 from typing import List, Optional
 
 from ..abstracts.bucket import AbstractBucket
 from ..abstracts.rate import Rate, RateItem
-from ..utils import binary_search
+
+# Items are kept sorted by timestamp ascending; key for bisect lookups.
+_by_timestamp = attrgetter("timestamp")
 
 
 class InMemoryBucket(AbstractBucket):
@@ -37,13 +41,11 @@ class InMemoryBucket(AbstractBucket):
                 break
 
             lower_bound_value = item.timestamp - rate.interval
-            lower_bound_idx = binary_search(self.items, lower_bound_value)
-
-            if lower_bound_idx >= 0:
-                count_existing_items = len(self.items) - lower_bound_idx
-                space_available = rate.limit - count_existing_items
-            else:
-                space_available = rate.limit
+            # First item still inside this rate's window (timestamp >= lower bound).
+            # When all items are older, bisect returns len(items) -> 0 in window.
+            lower_bound_idx = bisect_left(self.items, lower_bound_value, key=_by_timestamp)
+            count_existing_items = len(self.items) - lower_bound_idx
+            space_available = rate.limit - count_existing_items
 
             if space_available < item.weight:
                 self.failing_rate = rate
@@ -72,7 +74,7 @@ class InMemoryBucket(AbstractBucket):
             if lower_bound < self.items[0].timestamp:
                 return 0
 
-            idx = binary_search(self.items, lower_bound)
+            idx = bisect_left(self.items, lower_bound, key=_by_timestamp)
             del self.items[:idx]
             return idx
 

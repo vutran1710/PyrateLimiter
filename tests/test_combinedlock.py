@@ -6,7 +6,6 @@ from time import monotonic, sleep, time
 
 import pytest
 
-from pyrate_limiter import binary_search
 from pyrate_limiter import Duration
 from pyrate_limiter import Rate
 from pyrate_limiter import RateItem

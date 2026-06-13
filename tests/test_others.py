@@ -5,10 +5,8 @@ from time import time
 
 import pytest
 
-from pyrate_limiter import binary_search
 from pyrate_limiter import Duration
 from pyrate_limiter import Rate
-from pyrate_limiter import RateItem
 from pyrate_limiter import SQLiteClock
 from pyrate_limiter import MonotonicClock
 from pyrate_limiter import AbstractClock
@@ -68,31 +66,6 @@ def test_rate():
 
     rate = Rate(1000, Duration.MINUTE * 3)
     assert str(rate) == "limit=1000/3.0m"
-
-
-def test_binary_search():
-    """Testing binary-search that find item in array"""
-    # Normal list of items
-    items = [RateItem("item", nth * 2) for nth in range(5)]
-
-    print([item.timestamp for item in items])
-
-    assert binary_search(items, 0) == 0
-    assert binary_search(items, 1) == 1
-    assert binary_search(items, 2) == 1
-    assert binary_search(items, 3) == 2
-    assert binary_search(items, 9) == -1
-    assert binary_search(items, 8) == 4
-
-    # If the value is larger than the last item, idx would be -1
-    assert binary_search(items, 11) == -1
-
-    # Empty list
-    items = []
-
-    assert binary_search(items, 1) == 0
-    assert binary_search(items, 2) == 0
-    assert binary_search(items, 3) == 0
 
 
 def test_rate_validator():
