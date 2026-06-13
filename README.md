@@ -111,42 +111,38 @@ limiter.try_acquire("my-resource")
 ## How it works
 
 ```mermaid
-flowchart LR
-    caller([Your code]):::ext
+flowchart TB
+    user([Your application]):::ext
+    user -->|"limit a key: try_acquire · try_acquire_async · @as_decorator"| limiter
 
-    subgraph limiter["Limiter"]
+    subgraph pyrate["PyrateLimiter"]
         direction TB
-        lock["acquire lock"]:::core
-        wrap["BucketFactory.wrap_item()<br/>stamp item with clock time"]:::core
-        route["BucketFactory.get(item)<br/>route by name"]:::core
-        lock --> wrap --> route
+        limiter["Limiter<br/>public API"]:::api
+        factory["BucketFactory<br/>routes each key to its bucket"]:::core
+        leaker["Leaker<br/>background cleanup"]:::leak
+        clock(["Clock<br/>time source"]):::clk
+
+        limiter --> factory
+        factory -->|routes to| backends
+        leaker -.->|periodic leak| backends
+        backends -->|reads time from| clock
+
+        subgraph backends["Bucket backend — choose one"]
+            direction LR
+            mem["InMemory"]:::bkt
+            sqlite["SQLite"]:::bkt
+            redis["Redis<br/>sync · async"]:::bkt
+            pg["Postgres"]:::bkt
+            mp["Multiprocess"]:::bkt
+        end
     end
 
-    subgraph bucket["Bucket — InMemory · SQLite · Redis · Postgres · MP"]
-        direction TB
-        put["put(item)<br/>check rate limits"]:::bkt
-        clock(["Clock.now()"]):::clk
-        put -. timestamp .-> clock
-    end
-
-    leaker["Leaker<br/>background leak()"]:::leak
-
-    caller -- "try_acquire(name, weight)" --> limiter
-    route --> put
-    put -- "ok" --> ok([acquired ✓]):::good
-    put -- "full + blocking" --> wait["wait &amp; retry<br/>_delay_waiter"]:::wait
-    wait --> put
-    put -- "full + non-blocking" --> no([returns False]):::bad
-    leaker -. "evict expired" .-> put
-
+    classDef api fill:#E5484D,color:#ffffff,stroke:#E5484D;
     classDef core fill:#242A33,color:#ffffff,stroke:#242A33;
-    classDef bkt fill:#E5484D,color:#ffffff,stroke:#E5484D;
+    classDef bkt fill:#EEF2F6,color:#242A33,stroke:#CBD5E1;
     classDef clk fill:#ffffff,color:#242A33,stroke:#242A33;
     classDef leak fill:#F2C94C,color:#242A33,stroke:#E0B53C;
-    classDef ext fill:#EEF2F6,color:#242A33,stroke:#CBD5E1;
-    classDef good fill:#2BB673,color:#ffffff,stroke:#2BB673;
-    classDef bad fill:#9AA5B1,color:#ffffff,stroke:#9AA5B1;
-    classDef wait fill:#FCE8E8,color:#242A33,stroke:#E5484D;
+    classDef ext fill:#ffffff,color:#242A33,stroke:#9AA5B1;
 ```
 
 **The bucket analogy** — this library implements the [Leaky Bucket algorithm](https://en.wikipedia.org/wiki/Leaky_bucket):
