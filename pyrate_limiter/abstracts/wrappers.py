@@ -78,3 +78,8 @@ class BucketAsyncWrapper(AbstractBucket):
     @property
     def rates(self):
         return self.bucket.rates
+
+    @rates.setter
+    def rates(self, value):
+        # Delegate to the wrapped bucket, which sorts + validates.
+        self.bucket.rates = value

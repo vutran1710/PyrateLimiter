@@ -124,6 +124,26 @@ def test_rate_validator():
     assert validate_rate_list(rates) is True
 
 
+def test_inmemory_bucket_rejects_illformed_rates():
+    """Ill-formed rate lists must raise at construction instead of silently
+    misbehaving (issue #239). InMemoryBucket sorts by interval, so the rates
+    are validated in interval-ascending order."""
+    from pyrate_limiter import InMemoryBucket
+
+    # 3/min AND 1/day: the longer interval has a *smaller* limit -> ill-formed
+    bad_rates = [Rate(3, Duration.MINUTE), Rate(1, Duration.DAY)]
+    assert validate_rate_list(sorted(bad_rates, key=lambda r: r.interval)) is False
+
+    with pytest.raises(ValueError):
+        InMemoryBucket(bad_rates)
+
+    # Well-formed config (generous-before-tight) must still be accepted, and
+    # unordered-but-well-formed input is accepted because the bucket sorts it.
+    InMemoryBucket([Rate(100, Duration.SECOND), Rate(200, Duration.MINUTE)])
+    InMemoryBucket([Rate(200, Duration.MINUTE), Rate(100, Duration.SECOND)])
+    InMemoryBucket([Rate(10, Duration.SECOND)])
+
+
 @pytest.mark.asyncio
 async def test_clock(clock: AbstractClock | None = None):
     """Testing clock backends
