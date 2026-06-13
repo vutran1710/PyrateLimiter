@@ -44,7 +44,8 @@ class Queries:
     WHERE item_timestamp >= TO_TIMESTAMP(%s) - (%s * INTERVAL '1 milliseconds')
     """
     PUT = """
-    INSERT INTO {table} (name, weight, item_timestamp) VALUES (%s, %s, TO_TIMESTAMP(%s))
+    INSERT INTO {table} (name, weight, item_timestamp)
+    SELECT %s, %s, TO_TIMESTAMP(%s) FROM generate_series(1, %s)
     """
     FLUSH = """
     DELETE FROM {table}
@@ -149,8 +150,9 @@ class PostgresBucket(AbstractBucket):
                     return False
 
             self.failing_rate = None
-            for _ in range(item.weight):
-                conn.execute(self._q_put, (item.name, item.weight, item_ts_seconds))
+            # Insert all `weight` unit-rows in a single statement (one round
+            # trip) instead of `weight` separate INSERTs under the table lock.
+            conn.execute(self._q_put, (item.name, item.weight, item_ts_seconds, item.weight))
 
         return True
 
