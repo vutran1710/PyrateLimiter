@@ -31,7 +31,7 @@ class Queries:
     WHERE item_timestamp >= :current_timestamp - :interval{index}
     """
     PUT_ITEM = """
-    INSERT INTO '{table}' (name, item_timestamp) VALUES %s
+    INSERT INTO '{table}' (name, item_timestamp) VALUES (?, ?)
     """
     LEAK = """
     DELETE FROM "{table}" WHERE rowid IN (
@@ -122,15 +122,22 @@ class SQLiteBucket(AbstractBucket):
                     self.failing_rate = rate
                     return False
 
-            items = ", ".join([f"('{name}', {item.timestamp})" for name in [item.name] * item.weight])
-            query = (Queries.PUT_ITEM.format(table=self.table)) % items
-            self.conn.execute(query).close()
+            # Bind name + timestamp as parameters; never interpolate the
+            # user-supplied name into SQL (injection / quote-crash).
+            query = Queries.PUT_ITEM.format(table=self.table)
+            rows = [(item.name, item.timestamp)] * item.weight
+            self.conn.executemany(query, rows).close()
             self.conn.commit()
             return True
 
     def leak(self, current_timestamp: Optional[int] = None) -> int:
         """Leaking/clean up bucket"""
         with self.lock:
+            if self.conn is None:
+                # The background Leaker may call leak() after close() has
+                # dropped the connection during teardown (issue #244).
+                return 0
+
             assert current_timestamp is not None
             query = Queries.COUNT_BEFORE_LEAK.format(
                 table=self.table,
