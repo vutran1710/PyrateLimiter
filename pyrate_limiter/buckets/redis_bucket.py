@@ -35,9 +35,27 @@ class LuaScript:
         end
     end
 
+    local batch = {}
+    local batch_count = 0
+    -- Each member adds two unpacked arguments; 1000 stays below Lua 5.1 limits.
+    local batch_size = 1000
+
     for i=1,space_required do
-        redis.call('ZADD', bucket, now, item_name..i)
+        batch_count = batch_count + 1
+        batch[(batch_count * 2) - 1] = now
+        batch[batch_count * 2] = item_name..i
+
+        if batch_count == batch_size then
+            redis.call('ZADD', bucket, unpack(batch))
+            batch = {}
+            batch_count = 0
+        end
     end
+
+    if batch_count > 0 then
+        redis.call('ZADD', bucket, unpack(batch))
+    end
+
     return -1
     """
 

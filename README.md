@@ -333,6 +333,8 @@ redis_db = AsyncRedis(connection_pool=AsyncPool.from_url("redis://localhost:6379
 bucket = await RedisBucket.init(rates, redis_db, "bucket-key")
 ```
 
+RedisBucket stores one sorted-set member per consumed unit for exact sliding-window checks. For high-volume, long-window limits such as daily or monthly quotas, the retained sorted set can grow large; use shorter windows or a coarser counter-based backend if predictable memory and latency are more important than exact per-item history.
+
 ### SQLiteBucket
 
 Persists state to SQLite (sync only):
