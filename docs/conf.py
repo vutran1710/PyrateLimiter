@@ -26,6 +26,7 @@ extensions = [
     "sphinx_autodoc_typehints",
     "sphinx_copybutton",
     "sphinxcontrib.apidoc",
+    "sphinxcontrib.mermaid",
     "myst_parser",
 ]
 
@@ -33,6 +34,9 @@ suppress_warnings = ["ref.ref", "duplicate.object", "ref.python"]
 
 myst_enable_extensions = ["html_image"]
 myst_heading_anchors = 6
+# Render ```mermaid fenced blocks (from the included README) as diagrams
+# instead of failing under -W with an unknown-lexer warning.
+myst_fence_as_directive = ["mermaid"]
 
 # Enable automatic links to other projects' Sphinx docs
 intersphinx_mapping = {

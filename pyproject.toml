@@ -53,6 +53,7 @@ docs = [
     "sphinx-autodoc-typehints",
     "sphinx-copybutton",
     "sphinxcontrib-apidoc",
+    "sphinxcontrib-mermaid",
 ]
 dev = [
     "coverage>=7.10.1",
