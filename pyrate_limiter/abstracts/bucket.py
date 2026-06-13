@@ -103,7 +103,12 @@ class AbstractBucket(ABC):
             assert self.failing_rate is not None  # NOTE: silence mypy
             lower_time_bound = item.timestamp - self.failing_rate.interval
             upper_time_bound = inner_bound_item.timestamp
-            return upper_time_bound - lower_time_bound
+            # +1: the window lower bound is inclusive across all backends (an
+            # item counts while timestamp >= now - interval). Returning the bare
+            # difference lands the retry exactly ON the boundary, where the item
+            # is still counted, so the re-put fails and waiting() then returns 0
+            # -> _delay_waiter busy-spins. One extra ms pushes strictly past it.
+            return upper_time_bound - lower_time_bound + 1
 
         async def _calc_waiting_async() -> int:
             nonlocal bound_item
