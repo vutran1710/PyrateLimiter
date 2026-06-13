@@ -347,8 +347,8 @@ class Limiter:
 
         return _resolve_result(result)
 
-    async def _acquire_async(self, blocking, name, weight):
-        return await self._handle_async_result(self._try_acquire(name, weight, blocking=blocking, _force_async=True))
+    async def _acquire_async(self, blocking, name, weight, timeout=-1):
+        return await self._handle_async_result(self._try_acquire(name, weight, blocking=blocking, timeout=timeout, _force_async=True))
 
     async def try_acquire_async(self, name: str = "pyrate", weight: int = 1, blocking: bool = True, timeout: int | float = -1) -> bool:
         """
@@ -389,13 +389,18 @@ class Limiter:
         async def run():
             lock = self._get_async_lock()
             async with lock:
-                return await self._acquire_async(blocking=blocking, name=name, weight=weight)
+                # Pass timeout through so the internal deadline governs the wait
+                # (mirrors sync try_acquire). This makes timeout=0 a non-waiting
+                # attempt instead of asyncio.wait_for(timeout=0) failing before
+                # the acquire can even run.
+                return await self._acquire_async(blocking=blocking, name=name, weight=weight, timeout=timeout)
 
-        if timeout == -1:
-            return await run()
         try:
-            return await asyncio.wait_for(run(), timeout=timeout)
-        except asyncio.TimeoutError:
+            if timeout > 0:
+                # wait_for additionally bounds time spent waiting on the async lock.
+                return await asyncio.wait_for(run(), timeout=timeout)
+            return await run()
+        except (asyncio.TimeoutError, TimeoutError):
             return False
 
     async def _handle_async_acquire(
