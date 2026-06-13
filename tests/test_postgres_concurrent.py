@@ -32,6 +32,30 @@ class TestPostgresConcurrent:
         with pg_pool.connection() as conn:
             conn.execute(f"DROP TABLE IF EXISTS ratelimit___{table}")
 
+    def test_table_name_requiring_quoting(self, pg_pool):
+        """A table name that is not a bare SQL identifier (e.g. contains a
+        hyphen or mixed case) must be handled via proper identifier quoting,
+        not raw f-string interpolation (issue #233)."""
+        from pyrate_limiter import id_generator
+
+        raw = f"weird-Name {id_generator()}"
+        bucket = PostgresBucket(pg_pool, raw, [Rate(5, Duration.SECOND)])
+        try:
+            assert bucket.count() == 0
+            ts = bucket.now()
+            assert bucket.put(RateItem("x", ts, weight=1)) is True
+            assert bucket.count() == 1
+            assert bucket.leak(ts + Duration.SECOND * 10) == 1
+            bucket.flush()
+            assert bucket.count() == 0
+        finally:
+            from psycopg import sql
+
+            with pg_pool.connection() as conn:
+                conn.execute(
+                    sql.SQL("DROP TABLE IF EXISTS {}").format(sql.Identifier(bucket._full_tbl))
+                )
+
     def test_concurrent_put(self, pg_pool, clean_table):
         rate_limit = 5
         rates = [Rate(rate_limit, Duration.SECOND)]

@@ -16,6 +16,13 @@ if TYPE_CHECKING:
 
 
 class Queries:
+    """SQL templates composed via ``psycopg.sql``.
+
+    ``{table}`` / ``{index}`` are quoted identifiers filled with
+    ``sql.SQL(...).format(...)``; ``%s`` are bound query parameters supplied at
+    execution time. Neither uses raw string interpolation (issue #233).
+    """
+
     CREATE_BUCKET_TABLE = """
     CREATE TABLE IF NOT EXISTS {table} (
         name VARCHAR,
@@ -32,6 +39,10 @@ class Queries:
     COUNT = """
     SELECT COUNT(*) FROM {table}
     """
+    COUNT_WINDOW = """
+    SELECT COUNT(*) FROM {table}
+    WHERE item_timestamp >= TO_TIMESTAMP(%s) - (%s * INTERVAL '1 milliseconds')
+    """
     PUT = """
     INSERT INTO {table} (name, weight, item_timestamp) VALUES (%s, %s, TO_TIMESTAMP(%s))
     """
@@ -43,13 +54,13 @@ class Queries:
     FROM {table}
     ORDER BY item_timestamp DESC
     LIMIT 1
-    OFFSET {offset}
+    OFFSET %s
     """
     LEAK = """
-    DELETE FROM {table} WHERE item_timestamp < TO_TIMESTAMP({timestamp})
+    DELETE FROM {table} WHERE item_timestamp < TO_TIMESTAMP(%s)
     """
     LEAK_COUNT = """
-    SELECT COUNT(*) FROM {table} WHERE item_timestamp < TO_TIMESTAMP({timestamp})
+    SELECT COUNT(*) FROM {table} WHERE item_timestamp < TO_TIMESTAMP(%s)
     """
 
 
@@ -58,12 +69,32 @@ class PostgresBucket(AbstractBucket):
     pool: ConnectionPool
 
     def __init__(self, pool: ConnectionPool, table: str, rates: List[Rate]):
+        from psycopg import sql
+
         self._clock = PostgresClock(pool)
         self.table = table.lower()
         self.pool = pool
         assert rates
         self.rates = rates
         self._full_tbl = f"ratelimit___{self.table}"
+
+        # Compose all SQL with properly-quoted identifiers and bound
+        # parameters instead of f-string interpolation (issue #233). The table
+        # identifier is fixed per bucket, so the statements are composed once
+        # here; only values vary and are passed as query parameters.
+        tbl = sql.Identifier(self._full_tbl)
+        index_name = sql.Identifier(f"timestampindex_{self.table}")
+        self._q_create_table = sql.SQL(Queries.CREATE_BUCKET_TABLE).format(table=tbl)
+        self._q_create_index = sql.SQL(Queries.CREATE_INDEX_ON_TIMESTAMP).format(index=index_name, table=tbl)
+        self._q_lock = sql.SQL(Queries.LOCK_TABLE).format(table=tbl)
+        self._q_count = sql.SQL(Queries.COUNT).format(table=tbl)
+        self._q_count_window = sql.SQL(Queries.COUNT_WINDOW).format(table=tbl)
+        self._q_put = sql.SQL(Queries.PUT).format(table=tbl)
+        self._q_flush = sql.SQL(Queries.FLUSH).format(table=tbl)
+        self._q_peek = sql.SQL(Queries.PEEK).format(table=tbl)
+        self._q_leak = sql.SQL(Queries.LEAK).format(table=tbl)
+        self._q_leak_count = sql.SQL(Queries.LEAK_COUNT).format(table=tbl)
+
         self._create_table()
 
     @contextmanager
@@ -75,9 +106,8 @@ class PostgresBucket(AbstractBucket):
         with self._get_conn() as conn:
             lock_id = hash(self._full_tbl) & 0x7FFFFFFF
             conn.execute("SELECT pg_advisory_xact_lock(%s)", (lock_id,))
-            conn.execute(Queries.CREATE_BUCKET_TABLE.format(table=self._full_tbl))
-            index_name = f"timestampIndex_{self.table}"
-            conn.execute(Queries.CREATE_INDEX_ON_TIMESTAMP.format(table=self._full_tbl, index=index_name))
+            conn.execute(self._q_create_table)
+            conn.execute(self._q_create_index)
 
     def put(self, item: RateItem) -> Union[bool, Awaitable[bool]]:
         """Put an item (typically the current time) in the bucket
@@ -103,18 +133,14 @@ class PostgresBucket(AbstractBucket):
             # throughput under high contention since only one writer can perform
             # the check-and-put at a time.
             try:
-                conn.execute(Queries.LOCK_TABLE.format(table=self._full_tbl))
+                conn.execute(self._q_lock)
             except LockNotAvailable:
                 logger.debug("LockNotAvailable")
                 self.failing_rate = self.rates[0]
                 return False
 
             for rate in self.rates:
-                cur = conn.execute(
-                    f"SELECT COUNT(*) FROM {self._full_tbl} "  # noqa: S608
-                    f"WHERE item_timestamp >= TO_TIMESTAMP(%s) - (%s * INTERVAL '1 milliseconds')",
-                    (item_ts_seconds, rate.interval),
-                )
+                cur = conn.execute(self._q_count_window, (item_ts_seconds, rate.interval))
                 count = int(cur.fetchone()[0])
                 cur.close()
 
@@ -123,9 +149,8 @@ class PostgresBucket(AbstractBucket):
                     return False
 
             self.failing_rate = None
-            query = Queries.PUT.format(table=self._full_tbl)
             for _ in range(item.weight):
-                conn.execute(query, (item.name, item.weight, item_ts_seconds))
+                conn.execute(self._q_put, (item.name, item.weight, item_ts_seconds))
 
         return True
 
@@ -141,13 +166,14 @@ class PostgresBucket(AbstractBucket):
             return 0
 
         count = 0
+        lower_bound_seconds = lower_bound / 1000
 
         with self._get_conn() as conn:
-            conn = conn.execute(Queries.LEAK_COUNT.format(table=self._full_tbl, timestamp=lower_bound / 1000))
-            result = conn.fetchone()
+            cur = conn.execute(self._q_leak_count, (lower_bound_seconds,))
+            result = cur.fetchone()
 
             if result:
-                conn.execute(Queries.LEAK.format(table=self._full_tbl, timestamp=lower_bound / 1000))
+                conn.execute(self._q_leak, (lower_bound_seconds,))
                 count = int(result[0])
 
         return count
@@ -157,7 +183,7 @@ class PostgresBucket(AbstractBucket):
         - Must remove `failing-rate` after flushing
         """
         with self._get_conn() as conn:
-            conn.execute(Queries.FLUSH.format(table=self._full_tbl))
+            conn.execute(self._q_flush)
             self.failing_rate = None
 
         return None
@@ -166,8 +192,8 @@ class PostgresBucket(AbstractBucket):
         """Count number of items in the bucket"""
         count = 0
         with self._get_conn() as conn:
-            conn = conn.execute(Queries.COUNT.format(table=self._full_tbl))
-            result = conn.fetchone()
+            cur = conn.execute(self._q_count)
+            result = cur.fetchone()
             assert result
             count = int(result[0])
 
@@ -181,8 +207,8 @@ class PostgresBucket(AbstractBucket):
         item = None
 
         with self._get_conn() as conn:
-            conn = conn.execute(Queries.PEEK.format(table=self._full_tbl, offset=index))
-            result = conn.fetchone()
+            cur = conn.execute(self._q_peek, (index,))
+            result = cur.fetchone()
             if result:
                 name, weight, timestamp = result[0], int(result[1]), int(result[2])
                 item = RateItem(name=name, weight=weight, timestamp=timestamp)
