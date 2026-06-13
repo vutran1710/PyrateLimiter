@@ -8,14 +8,39 @@ honestly (the default buffer_ms=50 otherwise masks an off-by-one). Timing
 tolerances are generous to avoid flakiness.
 """
 import time
+from inspect import isawaitable
 
 import pytest
 
-from pyrate_limiter import InMemoryBucket, Limiter, Rate, RateItem
+from pyrate_limiter import BucketAsyncWrapper, InMemoryBucket, Limiter, Rate, RateItem
 
 
 def _limiter(rates=None, buffer_ms=0):
     return Limiter(InMemoryBucket(rates or [Rate(1, 100)]), buffer_ms=buffer_ms)
+
+
+# ------------------------------------------- _plan_delay_step (shared helper)
+
+def test_plan_delay_step_outcomes():
+    """The deadline math shared by both _delay_waiter branches."""
+    from time import monotonic
+
+    from pyrate_limiter.limiter import _plan_delay_step
+
+    # No deadline -> sleep the full delay, never time out.
+    assert _plan_delay_step(None, 200) == (0.2, False)
+
+    # Deadline far in the future (remaining > delay) -> sleep the delay.
+    secs, timed_out = _plan_delay_step(monotonic() + 10, 200)
+    assert abs(secs - 0.2) < 0.02 and timed_out is False
+
+    # Deadline near (remaining < delay) -> sleep the remainder, then time out.
+    secs, timed_out = _plan_delay_step(monotonic() + 0.05, 200)
+    assert 0 < secs <= 0.07 and timed_out is True
+
+    # Deadline already passed -> raise immediately (no sleep).
+    with pytest.raises(TimeoutError):
+        _plan_delay_step(monotonic() - 1, 200)
 
 
 # ------------------------------------------------- waiting() boundary (Bug X)
@@ -134,3 +159,33 @@ async def test_async_blocking_timeout_long_enough_succeeds():
     dt = time.perf_counter() - t0
     assert ok is True
     assert dt < 1.0
+
+
+# --------------------------- async _delay_waiter branch under internal deadline
+
+@pytest.mark.asyncio
+async def test_async_delay_branch_times_out_mid_wait():
+    """An async bucket acquired via *sync* try_acquire(timeout=...) runs the
+    async _delay_waiter branch under the internal deadline (no asyncio.wait_for
+    wrapper). When the required wait exceeds the timeout, it sleeps up to the
+    deadline and resolves to False."""
+    lim = Limiter(BucketAsyncWrapper(InMemoryBucket([Rate(1, 500)])), buffer_ms=0)
+    assert await lim.try_acquire("k") is True  # consume the only slot
+
+    t0 = time.perf_counter()
+    res = lim.try_acquire("k", blocking=True, timeout=0.1)  # ~500ms wait > 0.1s timeout
+    assert isawaitable(res)
+    ok = await res
+    dt = time.perf_counter() - t0
+    assert ok is False
+    assert 0.05 <= dt <= 0.45
+
+
+@pytest.mark.asyncio
+async def test_async_delay_branch_succeeds_after_wait():
+    """Same async branch, but the timeout is generous: it sleeps then re-acquires."""
+    lim = Limiter(BucketAsyncWrapper(InMemoryBucket([Rate(1, 100)])), buffer_ms=0)
+    assert await lim.try_acquire("k") is True
+    res = lim.try_acquire("k", blocking=True, timeout=2)
+    assert isawaitable(res)
+    assert await res is True

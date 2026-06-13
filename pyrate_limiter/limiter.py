@@ -88,6 +88,25 @@ def combined_lock(locks: Union[Iterable[LockLike], RLock], blocking: bool, timeo
                 lock.release()
 
 
+def _plan_delay_step(deadline: Optional[float], delay_ms: Union[int, float]) -> Tuple[float, bool]:
+    """Plan one delay step for `_delay_waiter`.
+
+    Returns ``(seconds_to_sleep, raise_timeout_after_sleep)``. Raises
+    ``TimeoutError`` immediately (no sleep) when the deadline has already
+    passed. This is the deadline math shared verbatim by the sync and async
+    branches of `_delay_waiter`; the caller performs the actual sleep with its
+    own primitive (`time.sleep` vs `asyncio.sleep`) and re-raises afterwards.
+    """
+    if deadline is None:
+        return delay_ms / 1000, False
+    remaining_ms = (deadline - monotonic()) * 1000
+    if remaining_ms <= 0:
+        raise TimeoutError()
+    if remaining_ms < delay_ms:
+        return remaining_ms / 1000, True
+    return delay_ms / 1000, False
+
+
 class Limiter:
     """This class responsibility is to sum up all underlying logic
     and make working with async/sync functions easily
@@ -180,16 +199,10 @@ class Limiter:
                     assert d >= 0
                     d += self.buffer_ms
 
-                    if deadline is not None:
-                        remaining_ms = (deadline - monotonic()) * 1000
-                        if remaining_ms <= 0:
-                            raise TimeoutError()
-                        if remaining_ms < d:
-                            await asyncio.sleep(remaining_ms / 1000)
-                            raise TimeoutError()
-                        await asyncio.sleep(d / 1000)
-                    else:
-                        await asyncio.sleep(d / 1000)
+                    secs, timed_out = _plan_delay_step(deadline, d)
+                    await asyncio.sleep(secs)
+                    if timed_out:
+                        raise TimeoutError()
 
                     item.timestamp += d
                     r = bucket.put(item)
@@ -215,16 +228,10 @@ class Limiter:
                 delay += self.buffer_ms
                 total_delay += delay
 
-                if deadline is not None:
-                    remaining_ms = (deadline - monotonic()) * 1000
-                    if remaining_ms <= 0:
-                        raise TimeoutError()
-                    if remaining_ms < delay:
-                        sleep(remaining_ms / 1000)
-                        raise TimeoutError()
-                    sleep(delay / 1000)
-                else:
-                    sleep(delay / 1000)
+                secs, timed_out = _plan_delay_step(deadline, delay)
+                sleep(secs)
+                if timed_out:
+                    raise TimeoutError()
 
                 item.timestamp += delay
                 re_acquire = bucket.put(item)
