@@ -230,26 +230,11 @@ class Leaker(Thread):
             self.aio_leak_task = asyncio.create_task(self._leak(self.async_buckets))
 
     def run(self) -> None:
-        """Override Thread.run: periodically leak the sync buckets.
-
-        Sync buckets need no event loop, so this is a plain threading loop
-        rather than spinning up `asyncio.run` just to sleep. `_stop_event.wait`
-        makes the interval interruptible, so `close()` stops the thread
-        promptly instead of after up to a full interval. Not meant to be
-        called directly.
+        """Override the original method of Thread
+        Not meant to be called directly
         """
-        while not self._stop_event.is_set() and self.sync_buckets:
-            for _, bucket in tuple(self.sync_buckets.items()):
-                try:
-                    now = bucket.now()
-                    assert isinstance(now, int)
-                    bucket.leak(now)
-                except Exception as e:
-                    # A transient backend error (e.g. during teardown) must not
-                    # kill the daemon thread.
-                    logger.debug("Leak error for bucket %s: %s", id(bucket), e)
-            if self._stop_event.wait(self.leak_interval / 1000):
-                break
+        assert self.sync_buckets
+        asyncio.run(self._leak(self.sync_buckets))
 
     def start(self) -> None:
         """Override the original method of Thread

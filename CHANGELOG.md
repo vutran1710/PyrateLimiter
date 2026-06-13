@@ -15,9 +15,6 @@ Performance and maintenance release. No API or behavior changes.
 - **PostgresBucket**: compute every rate's windowed count in one query
   (`COUNT(*) FILTER`) instead of one round trip per rate — ~2× faster
   multi-rate checks, fewer round trips under the lock. (#297)
-- **Leaker**: leak sync buckets on a plain thread loop instead of spinning up
-  an asyncio event loop; `close()` now stops the leaker promptly instead of
-  lagging up to a full leak interval. (#296)
 - **`SingleBucketFactory.wrap_item`**: inline the sync fast path (no
   per-acquire closures) — ~23% faster item wrapping on the hot path. (#296)
 - Deduplicate the sync/async deadline math in `_delay_waiter` into a single
