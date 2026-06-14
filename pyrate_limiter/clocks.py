@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from time import monotonic_ns
+from time import monotonic_ns, time_ns
 from typing import TYPE_CHECKING, Awaitable, Union
 
 if TYPE_CHECKING:
@@ -24,6 +24,16 @@ class AbstractClock(ABC):
     def _get_monotonic_ms() -> int:
         """Get monotonic time in milliseconds"""
         return monotonic_ns() // 1_000_000
+
+    @staticmethod
+    def _get_wall_ms() -> int:
+        """Get wall-clock (epoch) time in milliseconds.
+
+        Used as the local fallback for clocks whose stored timestamps are
+        wall-clock epoch ms (e.g. PostgresClock); must NOT be monotonic, which
+        is on an unrelated, far smaller scale.
+        """
+        return time_ns() // 1_000_000
 
 
 class MonotonicClock(AbstractClock):
@@ -73,5 +83,9 @@ class PostgresClock(AbstractClock):
         except Exception:
             logger.exception("Postgres time query failed, falling back to local clock")
 
-        # fallback to local monotonic time in milliseconds
-        return self._get_monotonic_ms()
+        # Fall back to local WALL-CLOCK epoch time in milliseconds - NOT
+        # monotonic. Stored item timestamps are wall-clock epoch ms (the bucket
+        # writes TO_TIMESTAMP(now/1000)); monotonic_ns() is seconds-since-boot,
+        # ~5 orders of magnitude smaller, so mixing it with epoch timestamps in
+        # the same bucket would corrupt every window comparison and leak bound.
+        return self._get_wall_ms()

@@ -126,9 +126,10 @@ def test_postgres_clock_fallback_to_local_on_exception(monkeypatch):
 
     expected_ms = 1_234_567_890_000
 
-    # patch the clocks._get_monotonic_ms used in PostgresClock fallback
+    # patch the clocks._get_wall_ms used in PostgresClock fallback (wall-clock
+    # epoch ms, matching the bucket's stored timestamps - not monotonic)
     monkeypatch.setattr(
-        "pyrate_limiter.clocks.AbstractClock._get_monotonic_ms",
+        "pyrate_limiter.clocks.AbstractClock._get_wall_ms",
         staticmethod(lambda: expected_ms),
     )
 
@@ -182,7 +183,7 @@ async def test_monotonic_async_clock_now_non_decreasing():
 
 def test_postgres_clock_no_rows_falls_back(monkeypatch):
     """If the Postgres time query returns no rows, the clock should
-    fall back to the local monotonic time (exercise the row is None branch).
+    fall back to the local wall-clock time (exercise the row is None branch).
     """
 
     class ConnNoRow:
@@ -201,9 +202,9 @@ def test_postgres_clock_no_rows_falls_back(monkeypatch):
 
     expected_ms = 9_000_000_000
 
-    # force the fallback monotonic value so the result is predictable
+    # force the fallback wall-clock value so the result is predictable
     monkeypatch.setattr(
-        "pyrate_limiter.clocks.AbstractClock._get_monotonic_ms",
+        "pyrate_limiter.clocks.AbstractClock._get_wall_ms",
         staticmethod(lambda: expected_ms),
     )
 

@@ -25,6 +25,12 @@ class MultiprocessBucket(InMemoryBucket):
         self.rates = rates  # AbstractBucket.rates setter sorts + validates
         self.items = items
         self.mp_lock = mp_lock
+        # InMemoryBucket.put/peek/count/flush guard `self.items` via self._lock
+        # (issue #300). MultiprocessBucket does NOT call super().__init__(), so
+        # set it here. Aliasing it to the cross-process mp_lock means the
+        # inherited count()/peek()/flush() become process-safe too, and the
+        # reentrant RLock tolerates put()/leak() re-acquiring it via super().
+        self._lock = mp_lock
 
     def put(self, item: RateItem) -> bool:
         with self.mp_lock:
@@ -36,6 +42,13 @@ class MultiprocessBucket(InMemoryBucket):
 
     def limiter_lock(self):
         return self.mp_lock
+
+    def __setstate__(self, state):
+        # Re-alias _lock to the shared cross-process mp_lock rather than the
+        # thread-local RLock InMemoryBucket.__setstate__ would create, so the
+        # inherited count()/peek()/flush() stay tied to mp_lock across processes.
+        self.__dict__.update(state)
+        self._lock = self.mp_lock
 
     @classmethod
     def init(
