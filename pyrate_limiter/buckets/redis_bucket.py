@@ -24,14 +24,10 @@ class LuaScript:
     local item_name = ARGV[3]
     local rates_count = tonumber(ARGV[4])
 
-    local max_interval = 0
     for i=1,rates_count do
         local offset = (i - 1) * 2
         local interval = tonumber(ARGV[5 + offset])
         local limit = tonumber(ARGV[5 + offset + 1])
-        if interval > max_interval then
-            max_interval = interval
-        end
         local count = redis.call('ZCOUNT', bucket, now - interval, now)
         local space_available = limit - tonumber(count)
         if space_available < space_required then
@@ -42,15 +38,6 @@ class LuaScript:
     for i=1,space_required do
         redis.call('ZADD', bucket, now, item_name..i)
     end
-
-    -- Self-expire fully-idle keys: by max_interval after the last write every
-    -- member is outdated anyway. Refreshed on each successful put, so active
-    -- keys never expire prematurely; idle ones no longer linger forever even
-    -- without the background leaker (issue #306).
-    if max_interval > 0 then
-        redis.call('PEXPIRE', bucket, max_interval)
-    end
-
     return -1
     """
 
