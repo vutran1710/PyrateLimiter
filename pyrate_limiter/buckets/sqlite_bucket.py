@@ -62,6 +62,7 @@ class SQLiteBucket(AbstractBucket):
     item's timestamp wont matter here
     """
 
+    is_async = False
     rates: List[Rate]
     failing_rate: Optional[Rate]
     conn: sqlite3.Connection
