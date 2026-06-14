@@ -12,6 +12,8 @@ class BucketAsyncWrapper(AbstractBucket):
     that turns a async/synchronous bucket into an async one
     """
 
+    is_async = True
+
     def __init__(self, bucket: AbstractBucket):
         assert isinstance(bucket, AbstractBucket)
         self.bucket = bucket

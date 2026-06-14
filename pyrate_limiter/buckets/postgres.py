@@ -66,6 +66,7 @@ class Queries:
 
 
 class PostgresBucket(AbstractBucket):
+    is_async = False
     table: str
     pool: ConnectionPool
 

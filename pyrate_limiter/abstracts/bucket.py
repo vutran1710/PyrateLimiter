@@ -26,6 +26,12 @@ class AbstractBucket(ABC):
     _rates: List[Rate]
     failing_rate: Optional[Rate] = None
     _clock: AbstractClock = MonotonicClock()
+    # Whether this bucket's operations return awaitables. ``None`` means
+    # "unknown" - the Leaker then probes once by calling ``leak(0)`` and
+    # checking for a coroutine. Built-in sync/async buckets declare this so no
+    # side-effecting probe is needed; ``RedisBucket`` leaves it ``None`` because
+    # it may wrap either a sync or an async client (issue #305).
+    is_async: Optional[bool] = None
 
     @property
     def rates(self) -> List[Rate]:
@@ -179,15 +185,26 @@ class Leaker:
         self._thread = None
 
     def register(self, bucket: AbstractBucket):
-        """Register a new bucket with its associated clock"""
+        """Register a new bucket, routing it to the sync or async leak loop.
+
+        Prefers the bucket's declared ``is_async``; only falls back to the
+        side-effecting ``leak(0)`` probe when that is ``None`` (issue #305).
+        """
         assert self.sync_buckets is not None
         assert self.async_buckets is not None
 
-        try_leak = bucket.leak(0)
         bucket_id = id(bucket)
+        is_async = bucket.is_async
 
-        if iscoroutine(try_leak):
-            try_leak.close()
+        if is_async is None:
+            try_leak = bucket.leak(0)
+            if iscoroutine(try_leak):
+                try_leak.close()
+                is_async = True
+            else:
+                is_async = False
+
+        if is_async:
             self.async_buckets[bucket_id] = bucket
         else:
             self.sync_buckets[bucket_id] = bucket

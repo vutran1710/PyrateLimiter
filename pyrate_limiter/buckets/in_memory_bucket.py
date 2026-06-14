@@ -23,6 +23,7 @@ class InMemoryBucket(AbstractBucket):
 
     items: List[RateItem]
     failing_rate: Optional[Rate]
+    is_async = False
 
     def __init__(self, rates: List[Rate]):
         super().__init__()
