@@ -27,11 +27,27 @@ class _ExplodingLeakAsync(InMemoryBucket):
         raise AssertionError("leak() must not be probed when is_async is declared")
 
 
-class _ProbedAsync(InMemoryBucket):
-    is_async = None  # force the probe fallback
+class _ProbedAsync(AbstractBucket):
+    """is_async left as the inherited None -> Leaker must fall back to probing
+    leak(0), which returns a coroutine and routes this to async."""
+
+    def __init__(self):
+        self.rates = RATES
+
+    async def put(self, item):
+        return True
 
     async def leak(self, current_timestamp=None):
         return 0
+
+    async def flush(self):
+        return None
+
+    async def count(self):
+        return 0
+
+    async def peek(self, index):
+        return None
 
 
 def test_declared_sync_registers_without_probing():
@@ -52,7 +68,7 @@ def test_declared_async_registers_without_probing():
 
 def test_unknown_falls_back_to_probe():
     leaker = Leaker(10_000)
-    bucket = _ProbedAsync(RATES)
+    bucket = _ProbedAsync()
     assert bucket.is_async is None
     leaker.register(bucket)  # probes leak(0) -> coroutine -> async
     assert id(bucket) in leaker.async_buckets
