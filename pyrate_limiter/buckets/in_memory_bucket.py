@@ -42,6 +42,11 @@ class InMemoryBucket(AbstractBucket):
             return True
 
         with self._lock:
+            # In-memory native implementation of the SlidingWindowLog policy
+            # (see self._algorithm): the admit decision is the same
+            # `limit - count < weight` check, kept inline here so the
+            # `after_length < limit` shortcut can skip the bisect entirely
+            # rather than materialising a full per-rate counts list.
             current_length = len(self.items)
             after_length = item.weight + current_length
 
@@ -73,8 +78,7 @@ class InMemoryBucket(AbstractBucket):
         assert current_timestamp is not None
         with self._lock:
             if self.items:
-                max_interval = self.rates[-1].interval
-                lower_bound = current_timestamp - max_interval
+                lower_bound = self._algorithm.leak_bound(self.rates, current_timestamp)
 
                 if lower_bound > self.items[-1].timestamp:
                     remove_count = len(self.items)

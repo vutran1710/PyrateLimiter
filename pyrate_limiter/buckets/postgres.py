@@ -152,10 +152,10 @@ class PostgresBucket(AbstractBucket):
             counts = cur.fetchone()
             cur.close()
 
-            for rate, count in zip(self.rates, counts, strict=True):
-                if rate.limit - int(count) < item.weight:
-                    self.failing_rate = rate
-                    return False
+            decision = self._algorithm.admit(self.rates, counts, item.weight)
+            if not decision.allowed:
+                self.failing_rate = decision.failing_rate
+                return False
 
             self.failing_rate = None
             # Insert all `weight` unit-rows in a single statement (one round
@@ -170,7 +170,7 @@ class PostgresBucket(AbstractBucket):
     ) -> Union[int, Awaitable[int]]:
         """leaking bucket - removing items that are outdated"""
         assert current_timestamp is not None, "current-time must be passed on for leak"
-        lower_bound = current_timestamp - self.rates[-1].interval
+        lower_bound = self._algorithm.leak_bound(self.rates, current_timestamp)
 
         if lower_bound <= 0:
             return 0

@@ -12,6 +12,7 @@ from typing import Any, Awaitable, Dict, List, Optional, Type, Union
 
 from ..clocks import AbstractClock, MonotonicClock
 from ..utils import enforce_rate_list
+from .algorithm import Algorithm, SlidingWindowLog
 from .rate import Rate, RateItem
 
 logger = logging.getLogger("pyrate_limiter")
@@ -26,6 +27,11 @@ class AbstractBucket(ABC):
     _rates: List[Rate]
     failing_rate: Optional[Rate] = None
     _clock: AbstractClock = MonotonicClock()
+    # The rate-limiting policy this bucket enforces. Internal in v4 (every
+    # bucket uses the sliding-window-log default and delegates its per-rate
+    # admit decision + leak bound to it); v5 makes this a constructor argument
+    # so algorithms (GCRA, sliding-window-counter) become pluggable.
+    _algorithm: Algorithm = SlidingWindowLog()
     # Whether this bucket's operations return awaitables. ``None`` means
     # "unknown" - the Leaker then probes once by calling ``leak(0)`` and
     # checking for a coroutine. Built-in sync/async buckets declare this so no
