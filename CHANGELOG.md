@@ -46,6 +46,10 @@ Bug-fix, scalability, and internal-refactor release. No public API changes
   that long-window / high-volume quotas may want a coarser counter-based backend
   for bounded memory. (#284)
 
+### CI
+- The release workflow now also creates a GitHub Release for the pushed tag and
+  attaches the built `dist/*` artifacts, in addition to publishing to PyPI.
+
 ## [4.3.1]
 
 Performance and maintenance release. No API or behavior changes.
