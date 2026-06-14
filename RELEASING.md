@@ -54,25 +54,16 @@ Pushing a `v*` tag triggers the [build_test.yml](.github/workflows/build_test.ym
 1. **smoke** — lints and runs smoke tests
 2. **check-linux** — runs full test suite on Python 3.10, 3.14, 3.14t with Redis and Postgres services; builds the wheel on the latest Python
 3. **check-others** — runs tests on macOS and PyPy
-4. **publish** — downloads the built artifacts and publishes to PyPI via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
+4. **publish** — downloads the built artifacts, publishes to PyPI via [Trusted Publishing](https://docs.pypi.org/trusted-publishers/), **and** creates a GitHub Release for the tag with auto-generated notes and the build artifacts attached.
 
-### 5. Create a GitHub Release
+### 5. (Optional) Verify / edit the GitHub Release
 
-After CI completes, create a GitHub Release and attach the build artifacts:
-
-```shell
-# Create release with auto-generated notes
-gh release create v<VERSION> --title "v<VERSION>" --generate-notes
-
-# Download CI-built artifacts and attach them
-gh run download <RUN_ID> --name dist --dir /tmp/pyrate-dist
-gh release upload v<VERSION> /tmp/pyrate-dist/*
-```
-
-To find the `<RUN_ID>`:
+CI creates the GitHub Release and attaches the `dist/*` artifacts automatically.
+Edit the auto-generated notes if you want a curated summary:
 
 ```shell
-gh run list --limit 5
+gh release view v<VERSION>
+gh release edit v<VERSION> --notes-file <path>   # optional
 ```
 
 ### 6. Update CHANGELOG.md
