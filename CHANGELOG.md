@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [4.4.0]
+
+Bug-fix, scalability, and internal-refactor release. No public API changes
+(the new `AbstractBucket.is_async` attribute is additive).
+
+### Fixed
+- **InMemoryBucket**: guard the internal item list with a lock so the
+  background `Leaker` thread can no longer race `put`/`peek`/`leak`. This was a
+  data race in the default configuration (in-memory bucket + scheduled leak).
+  `MultiprocessBucket` aliases this lock to its shared cross-process lock. (#302)
+- **PostgresClock**: when the DB time query fails, fall back to local
+  **wall-clock** epoch time instead of monotonic time. The monotonic fallback
+  was ~5 orders of magnitude smaller than the stored epoch-ms timestamps and
+  would corrupt every window comparison and leak bound. (#302)
+- **Leaker**: make the background sync-leak worker restartable. Re-registering a
+  bucket after every bucket had been disposed previously raised
+  `RuntimeError: threads can only be started once`. (#302)
+- Keep `Limiter` picklable after the `InMemoryBucket` lock addition. (#302)
+
+### Performance & Scalability
+- **Limiter**: release the limiter lock during the synchronous blocking wait, so
+  a long wait on one key no longer serializes acquisitions for every other key
+  sharing the limiter. (#304)
+- **RedisBucket**: batch weighted `ZADD`s in bounded chunks inside the atomic
+  Lua script, lowering latency for high-weight puts. (#284)
+
+### Internal / Refactor
+- Unify the limiter's sync/async acquire plumbing into a single coroutine and
+  share the delay-step decision across the sync and async branches. (#303)
+- Add a declarative `is_async` bucket attribute so the `Leaker` no longer detects
+  async by executing a side-effecting `leak(0)` probe. `RedisBucket` still probes
+  because it may wrap either a sync or an async client. (#305)
+- Introduce an internal `Algorithm`/`Decision` seam (`SlidingWindowLog`) that the
+  built-in buckets delegate their per-rate admit decision and leak bound to —
+  the foundation for pluggable algorithms (e.g. GCRA, sliding-window-counter) in
+  a future release. (#307)
+
+### Documentation
+- Document that `RedisBucket` keeps one sorted-set member per consumed unit, and
+  that long-window / high-volume quotas may want a coarser counter-based backend
+  for bounded memory. (#284)
+
 ## [4.3.1]
 
 Performance and maintenance release. No API or behavior changes.
