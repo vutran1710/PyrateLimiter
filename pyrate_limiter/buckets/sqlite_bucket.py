@@ -37,7 +37,7 @@ class Queries:
     DELETE FROM "{table}" WHERE rowid IN (
     SELECT rowid FROM "{table}" ORDER BY item_timestamp ASC LIMIT {count});
     """.strip()
-    COUNT_BEFORE_LEAK = """SELECT COUNT(*) FROM '{table}' WHERE item_timestamp < {current_timestamp} - {interval}"""
+    COUNT_BEFORE_LEAK = """SELECT COUNT(*) FROM '{table}' WHERE item_timestamp < {lower_bound}"""
     FLUSH = """DELETE FROM '{table}'"""
     # The below sqls are for testing only
     DROP_TABLE = "DROP TABLE IF EXISTS '{table}'"
@@ -113,15 +113,18 @@ class SQLiteBucket(AbstractBucket):
             rate_limit_counts = cur.fetchall()
             cur.close()
 
-            for idx, result in enumerate(rate_limit_counts):
-                interval, count = result
-                rate = self.rates[idx]
+            # Each row is (interval, count); the UNION-of-COUNTs query returns
+            # them in ascending-interval order, matching self.rates. Verify that
+            # alignment, then defer the admit decision to the algorithm.
+            counts = []
+            for (interval, count), rate in zip(rate_limit_counts, self.rates, strict=True):
                 assert interval == rate.interval
-                space_available = rate.limit - count
+                counts.append(count)
 
-                if space_available < item.weight:
-                    self.failing_rate = rate
-                    return False
+            decision = self._algorithm.admit(self.rates, counts, item.weight)
+            if not decision.allowed:
+                self.failing_rate = decision.failing_rate
+                return False
 
             # Bind name + timestamp as parameters; never interpolate the
             # user-supplied name into SQL (injection / quote-crash).
@@ -142,8 +145,7 @@ class SQLiteBucket(AbstractBucket):
             assert current_timestamp is not None
             query = Queries.COUNT_BEFORE_LEAK.format(
                 table=self.table,
-                interval=self.rates[-1].interval,
-                current_timestamp=current_timestamp,
+                lower_bound=self._algorithm.leak_bound(self.rates, current_timestamp),
             )
             cur = self.conn.execute(query)
             count = cur.fetchone()[0]

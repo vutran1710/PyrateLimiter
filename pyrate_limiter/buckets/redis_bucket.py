@@ -156,7 +156,7 @@ class RedisBucket(AbstractBucket):
         return self.redis.zremrangebyscore(
             self.bucket_key,
             0,
-            current_timestamp - self.rates[-1].interval,
+            self._algorithm.leak_bound(self.rates, current_timestamp),
         )
 
     def flush(self):
