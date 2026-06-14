@@ -177,6 +177,22 @@ class Limiter:
 
         return argument
 
+    def _delay_to_sleep_ms(self, delay: int) -> Optional[int]:
+        """Translate a ``bucket.waiting()`` result into milliseconds to sleep
+        before re-attempting the put.
+
+        Returns ``None`` when the item can never fit (``waiting() == -1``: the
+        weight exceeds the rate limit). Shared by both branches of
+        ``_delay_waiter`` so the ``-1`` / negative / ``+buffer_ms`` handling is
+        identical - previously the async branch asserted ``d >= 0`` while the
+        sync branch clamped negatives to 0.
+        """
+        if delay == -1:
+            return None
+        if delay < 0:
+            delay = 0
+        return delay + self.buffer_ms
+
     def _delay_waiter(
         self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None
     ) -> Union[bool, Awaitable[bool]]:
@@ -199,10 +215,10 @@ class Limiter:
 
                     d = await self._handle_async_result(delay, deadline=deadline) if isawaitable(delay) else delay
                     assert isinstance(d, int)
-                    if d == -1:
+                    sleep_ms = self._delay_to_sleep_ms(d)
+                    if sleep_ms is None:
                         return False
-                    assert d >= 0
-                    d += self.buffer_ms
+                    d = sleep_ms
 
                     secs, timed_out = _plan_delay_step(deadline, d)
                     await asyncio.sleep(secs)
@@ -224,13 +240,10 @@ class Limiter:
                 assert not isawaitable(delay)
                 logger.debug("delay=%d, total_delay=%s", delay, total_delay)
 
-                if delay == -1:
+                sleep_ms = self._delay_to_sleep_ms(delay)
+                if sleep_ms is None:
                     return False
-
-                if delay < 0:
-                    delay = 0
-
-                delay += self.buffer_ms
+                delay = sleep_ms
                 total_delay += delay
 
                 secs, timed_out = _plan_delay_step(deadline, delay)
