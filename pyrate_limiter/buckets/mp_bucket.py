@@ -30,7 +30,7 @@ class MultiprocessBucket(InMemoryBucket):
         # set it here. Aliasing it to the cross-process mp_lock means the
         # inherited count()/peek()/flush() become process-safe too, and the
         # reentrant RLock tolerates put()/leak() re-acquiring it via super().
-        self._lock = mp_lock
+        self._lock = mp_lock  # type: ignore[assignment]
 
     def put(self, item: RateItem) -> bool:
         with self.mp_lock:
@@ -48,7 +48,7 @@ class MultiprocessBucket(InMemoryBucket):
         # thread-local RLock InMemoryBucket.__setstate__ would create, so the
         # inherited count()/peek()/flush() stay tied to mp_lock across processes.
         self.__dict__.update(state)
-        self._lock = self.mp_lock
+        self._lock = self.mp_lock  # type: ignore[assignment]
 
     @classmethod
     def init(
