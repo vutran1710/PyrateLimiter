@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 ItemMapping = Callable[[Any], Tuple[str, int]]
 DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
 
+# Sentinel: "no bucket obtained yet" for _acquire_co (None is a valid arg).
+_UNSET: Any = object()
+
 
 class LockLike(Protocol):
     def acquire(self, blocking: bool = ..., timeout: Union[float, int, None] = ...) -> bool: ...
@@ -174,6 +177,22 @@ class Limiter:
 
         return argument
 
+    def _delay_to_sleep_ms(self, delay: int) -> Optional[int]:
+        """Translate a ``bucket.waiting()`` result into milliseconds to sleep
+        before re-attempting the put.
+
+        Returns ``None`` when the item can never fit (``waiting() == -1``: the
+        weight exceeds the rate limit). Shared by both branches of
+        ``_delay_waiter`` so the ``-1`` / negative / ``+buffer_ms`` handling is
+        identical - previously the async branch asserted ``d >= 0`` while the
+        sync branch clamped negatives to 0.
+        """
+        if delay == -1:
+            return None
+        if delay < 0:
+            delay = 0
+        return delay + self.buffer_ms
+
     def _delay_waiter(
         self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None
     ) -> Union[bool, Awaitable[bool]]:
@@ -196,10 +215,10 @@ class Limiter:
 
                     d = await self._handle_async_result(delay, deadline=deadline) if isawaitable(delay) else delay
                     assert isinstance(d, int)
-                    if d == -1:
+                    sleep_ms = self._delay_to_sleep_ms(d)
+                    if sleep_ms is None:
                         return False
-                    assert d >= 0
-                    d += self.buffer_ms
+                    d = sleep_ms
 
                     secs, timed_out = _plan_delay_step(deadline, d)
                     await asyncio.sleep(secs)
@@ -221,13 +240,10 @@ class Limiter:
                 assert not isawaitable(delay)
                 logger.debug("delay=%d, total_delay=%s", delay, total_delay)
 
-                if delay == -1:
+                sleep_ms = self._delay_to_sleep_ms(delay)
+                if sleep_ms is None:
                     return False
-
-                if delay < 0:
-                    delay = 0
-
-                delay += self.buffer_ms
+                delay = sleep_ms
                 total_delay += delay
 
                 secs, timed_out = _plan_delay_step(deadline, delay)
@@ -412,35 +428,35 @@ class Limiter:
         except (asyncio.TimeoutError, TimeoutError):
             return False
 
-    async def _handle_async_acquire(
+    async def _acquire_co(
         self,
-        item: Awaitable[RateItem],
+        item,
+        bucket: Any = _UNSET,
+        *,
         blocking: bool,
         _force_async: bool = False,
         deadline: Optional[float] = None,
     ):
+        """Async tail shared by every path where wrap_item()/get()/put() turned
+        out to be awaitable.
+
+        Resolves the (maybe-awaitable) ``item``, routes to a bucket if one was
+        not already obtained, then drives the put - awaiting at each stage via
+        the single normalizer ``_handle_async_result``. ``_handle_async_result``
+        is a no-op on already-resolved values, so the same coroutine serves both
+        "wrap_item was async" (bucket _UNSET, get() done here) and "wrap_item was
+        sync but get() was async" (resolved item + awaitable bucket passed in).
+        Replaces the former _handle_async_acquire / _handle_async_bucket pair.
+        """
         this_item = await self._handle_async_result(item, deadline=deadline)
         assert isinstance(this_item, RateItem)
-        bucket = self.bucket_factory.get(this_item)
-        if isawaitable(bucket):
-            bucket = await self._handle_async_result(bucket, deadline=deadline)
+
+        if bucket is _UNSET:
+            bucket = self.bucket_factory.get(this_item)
+        bucket = await self._handle_async_result(bucket, deadline=deadline)
         assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {this_item.name}"
+
         result = self.handle_bucket_put(bucket, this_item, blocking=blocking, _force_async=_force_async, deadline=deadline)
-
-        return await self._handle_async_result(result, deadline=deadline)
-
-    async def _handle_async_bucket(
-        self,
-        bucket: Awaitable[AbstractBucket],
-        item: RateItem,
-        blocking: bool,
-        _force_async: bool = False,
-        deadline: Optional[float] = None,
-    ):
-        this_bucket = await self._handle_async_result(bucket, deadline=deadline)
-        assert isinstance(this_bucket, AbstractBucket), f"Invalid bucket: item: {item.name}"
-        result = self.handle_bucket_put(this_bucket, item, blocking=blocking, _force_async=_force_async, deadline=deadline)
-
         return await self._handle_async_result(result, deadline=deadline)
 
     async def _handle_async_result(self, result, deadline: Optional[float] = None):
@@ -523,7 +539,7 @@ class Limiter:
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(item)
                     raise RuntimeError("Can't use async bucket with sync decorator")
-                return self._handle_async_acquire(item, blocking=blocking, _force_async=_force_async, deadline=deadline)
+                return self._acquire_co(item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             assert isinstance(item, RateItem)
 
@@ -532,7 +548,7 @@ class Limiter:
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(bucket)
                     raise RuntimeError("Can't use async bucket with sync decorator")
-                return self._handle_async_bucket(bucket=bucket, item=item, blocking=blocking, _force_async=_force_async, deadline=deadline)
+                return self._acquire_co(item, bucket, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
 
