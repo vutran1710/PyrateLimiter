@@ -57,12 +57,11 @@ jobs:
           [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
-      - name: Check out PR head
+      - name: Check out benchmark harness
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: refs/pull/${{ inputs.pr_number }}/head
       - name: Set up Python ${{ env.LATEST_PY_VERSION }}
         uses: actions/setup-python@v6
         with:
@@ -78,7 +77,8 @@ jobs:
           HEAD_SHA: ${{ inputs.head_sha }}
           PR_NUMBER: ${{ inputs.pr_number }}
         run: |
-          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
           git cat-file -e "$BASE_SHA^{commit}"
           git worktree add --detach /tmp/pyrate-baseline "$BASE_SHA"
           git worktree add --detach /tmp/pyrate-candidate "$HEAD_SHA"
