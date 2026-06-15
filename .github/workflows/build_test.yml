@@ -149,6 +149,9 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: smoke
     runs-on: ubuntu-latest
+    env:
+      REDIS_CPU_LIMIT: "1"
+      REDIS_MEMORY_LIMIT: "512 MiB"
     services:
       redis:
         image: redis:7
@@ -159,6 +162,9 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
+          --cpuset-cpus 0
+          --memory 512m
+          --memory-swap 512m
     steps:
       - name: Check out PR merge commit
         uses: actions/checkout@v5
@@ -179,7 +185,7 @@ jobs:
           git worktree add --detach /tmp/pyrate-candidate ${{ github.event.pull_request.head.sha }}
       - name: Run Redis pressure benchmark
         run: |
-          uv run --group all python benchmarks/compare_redis_pressure.py \
+          taskset -c 1 uv run --group all python benchmarks/compare_redis_pressure.py \
             --baseline /tmp/pyrate-baseline \
             --candidate /tmp/pyrate-candidate \
             --json-output redis-pressure.json \

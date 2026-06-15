@@ -69,14 +69,19 @@ def read_first(path: Path, prefix: str) -> str:
 
 def runner_resources() -> dict[str, Any]:
     """Describe the machine so benchmark results are reproducible."""
+    affinity = os.sched_getaffinity(0) if hasattr(os, "sched_getaffinity") else set()
     return {
         "os": platform.platform(),
         "runner_image": os.getenv("ImageOS", "local"),
         "runner_image_version": os.getenv("ImageVersion", "unknown"),
         "python": platform.python_version(),
         "cpu_model": read_first(Path("/proc/cpuinfo"), "model name"),
-        "cpu_count": os.cpu_count() or 0,
+        "host_cpu_count": os.cpu_count() or 0,
+        "benchmark_cpu_count": len(affinity) if affinity else os.cpu_count() or 0,
+        "benchmark_cpu_set": ",".join(str(cpu) for cpu in sorted(affinity)) or "unknown",
         "memory_total": read_first(Path("/proc/meminfo"), "MemTotal"),
+        "redis_cpu_limit": os.getenv("REDIS_CPU_LIMIT", "unlimited"),
+        "redis_memory_limit": os.getenv("REDIS_MEMORY_LIMIT", "unlimited"),
     }
 
 
@@ -294,8 +299,10 @@ def render_markdown(results: dict[str, Any]) -> str:
         "| --- | --- |",
         f"| Runner | {resources['runner_image']} {resources['runner_image_version']} |",
         f"| OS | {resources['os']} |",
-        f"| CPU | {resources['cpu_model']} ({resources['cpu_count']} logical CPUs) |",
-        f"| RAM | {resources['memory_total']} |",
+        f"| Host CPU | {resources['cpu_model']} ({resources['host_cpu_count']} logical CPUs) |",
+        f"| Benchmark CPU | {resources['benchmark_cpu_count']} logical CPU; affinity {resources['benchmark_cpu_set']} |",
+        f"| Redis container | {resources['redis_cpu_limit']} CPU; {resources['redis_memory_limit']} memory |",
+        f"| Host RAM | {resources['memory_total']} |",
         f"| Python | {resources['python']} |",
         f"| Redis maxmemory | {results['redis_maxmemory']} bytes ({results['redis_policy']}) |",
         f"| Configuration | {results['rounds']} rounds, {results['steps']} steps, {results['steady_cycles']} steady cycles |",
