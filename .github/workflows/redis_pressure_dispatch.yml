@@ -1,0 +1,60 @@
+name: Dispatch Redis pressure benchmark
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  dispatch:
+    if: >-
+      github.event.issue.pull_request != null &&
+      github.event.comment.body == '/benchmark redis'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authorize and dispatch benchmark
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const username = context.payload.comment.user.login;
+            const { data: permission } =
+              await github.rest.repos.getCollaboratorPermissionLevel({
+                owner,
+                repo,
+                username,
+              });
+            if (!["admin", "write"].includes(permission.permission)) {
+              core.setFailed(`${username} does not have permission to run benchmarks`);
+              return;
+            }
+
+            const pullRequestNumber = context.payload.issue.number;
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: pullRequestNumber,
+            });
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: "redis_pressure.yml",
+              ref: context.payload.repository.default_branch,
+              inputs: {
+                pr_number: String(pullRequestNumber),
+                base_sha: pullRequest.base.sha,
+                head_sha: pullRequest.head.sha,
+              },
+            });
+            await github.rest.reactions.createForIssueComment({
+              owner,
+              repo,
+              comment_id: context.payload.comment.id,
+              content: "rocket",
+            });
