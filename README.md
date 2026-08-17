@@ -409,6 +409,25 @@ async with httpx.AsyncClient(transport=AsyncRateLimiterTransport(limiter=limiter
 </details>
 
 <details>
+<summary><b>HTTPX2</b></summary>
+
+```python
+import httpx2
+from pyrate_limiter import Duration, limiter_factory
+from pyrate_limiter.extras.httpx2_limiter import AsyncRateLimiterTransport, RateLimiterTransport
+
+limiter = limiter_factory.create_inmemory_limiter(rate_per_duration=1, duration=Duration.SECOND)
+
+with httpx2.Client(transport=RateLimiterTransport(limiter=limiter)) as client:
+    client.get("https://example.com")
+
+async with httpx2.AsyncClient(transport=AsyncRateLimiterTransport(limiter=limiter)) as client:
+    await client.get("https://example.com")
+```
+[httpx2_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/httpx2_ratelimiter.py)
+</details>
+
+<details>
 <summary><b>Requests</b></summary>
 
 ```python
@@ -536,6 +555,7 @@ Implement [`pyrate_limiter.AbstractBucket`](https://github.com/vutran1710/Pyrate
 - [asyncio_ratelimit.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_ratelimit.py) — rate-limiting asyncio tasks
 - [asyncio_decorator.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/asyncio_decorator.py) — the decorator with async functions
 - [httpx_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/httpx_ratelimiter.py) — HTTPX, sync / async / multiprocess
+- [httpx2_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/httpx2_ratelimiter.py) — HTTPX2, sync / async / multiprocess
 - [in_memory_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/in_memory_multiprocess.py) — multiprocessing with an in-memory bucket
 - [sqlite_filelock_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/sqlite_filelock_multiprocess.py) — multiprocessing with SQLite + a file lock
 

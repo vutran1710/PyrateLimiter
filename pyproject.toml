@@ -15,6 +15,7 @@ keywords = [
     "ratelimit",
     "ratelimiting",
     "httpx",
+    "httpx2",
     "aiohttp",
     "limiter",
     "rate",
@@ -70,6 +71,7 @@ dev = [
     "pytest-retry>=1.7.0",
     "pytest-randomly>=3.16.0",
     "httpx",
+    "httpx2",
     "aiohttp",
     "requests",
     "psycopg[binary]>=3.2.10; sys_platform == 'win32' or sys_platform == 'darwin'"
