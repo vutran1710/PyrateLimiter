@@ -58,7 +58,7 @@ class RateLimiterTransport(HTTPTransport):
 
 class AsyncRateLimiterTransport(AsyncHTTPTransport):
     """
-    An asynchronous HTTPX transport that enforces a rate limit
+    An asynchronous HTTPX2 transport that enforces a rate limit
     via a provided :class:`~pyrate_limiter.Limiter`.
 
     All requests share the same limiter item key, so the same
