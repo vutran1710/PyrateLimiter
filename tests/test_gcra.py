@@ -74,13 +74,14 @@ def test_step_spends_one_emission_interval_per_unit():
     algo, rates = GCRA(), [Rate(4, 1000)]
     state = algo.initial(rates)
 
+    # State is microseconds: 1000ms / 4 = 250ms = 250_000us per unit.
     state, decision = algo.step(rates, state, now=1000, weight=1)
     assert decision is ADMITTED
-    assert state == (1250.0,)  # 1000ms / 4 = 250ms per unit
+    assert state == (1_250_000,)
 
     state, decision = algo.step(rates, state, now=1000, weight=2)
     assert decision.allowed
-    assert state == (1750.0,)
+    assert state == (1_750_000,)
 
 
 def test_step_denies_and_reports_the_exact_wait():
@@ -139,6 +140,38 @@ def test_weight_over_burst_never_fits():
     assert decision.retry_after_ms is None  # not "wait 0"; it never fits
 
 
+@pytest.mark.parametrize("now", [0, 12_345, 1_000_000, 1_000_000_000, 1_700_000_000_000, 1_787_486_223_173])
+@pytest.mark.parametrize("limit", [1, 2, 3, 7, 97, 1000, 3000])
+def test_a_full_burst_always_admits_exactly_burst(now, limit):
+    """Regression: the TAT must not drift with the timestamp's magnitude.
+
+    Accumulating a fractional emission interval onto an absolute TAT (~1.7e12
+    for epoch ms) loses the low bits, so the accumulated sum of `burst`
+    emissions stops equalling `burst * emission` and the last unit gets
+    rejected by a rounding error. Integer microseconds make it exact - but only
+    a sweep like this catches it, since any single pair of values may round
+    favourably.
+    """
+    algo, rates = GCRA(), [Rate(limit, 1000)]
+    state = algo.initial(rates)
+
+    admitted = 0
+    for _ in range(limit + 2):
+        state, decision = algo.step(rates, state, now=now, weight=1)
+        if decision.allowed:
+            admitted += 1
+
+    assert admitted == limit
+
+
+def test_state_is_integer_microseconds():
+    # Not fractional milliseconds: see the regression test above.
+    algo, rates = GCRA(), [Rate(3, 1000)]
+    state, _ = algo.step(rates, algo.initial(rates), now=1_700_000_000_000, weight=1)
+    assert all(isinstance(value, int) for value in state)
+    assert state == (1_700_000_000_000 * 1000 + 333334,)  # emission rounded up
+
+
 def test_burst_allows_a_bigger_lump_than_limit():
     algo, rates = GCRA(), [Rate(5, 1000, burst=20)]
     state = algo.initial(rates)
@@ -180,7 +213,9 @@ def test_bucket_waiting_re_derives_for_a_different_weight():
 
     # A heavier query has a different answer, and asking must not spend anything.
     assert bucket.waiting(RateItem("a", clock.now(), weight=2)) == 667
-    assert bucket.waiting(RateItem("a", clock.now(), weight=3)) == 1000
+    # 1001, not 1000: 1000ms/3 does not divide evenly and the emission interval
+    # rounds up, so the bucket errs strict rather than admitting marginally fast.
+    assert bucket.waiting(RateItem("a", clock.now(), weight=3)) == 1001
     assert bucket.waiting(light) == 334
 
 

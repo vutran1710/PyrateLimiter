@@ -192,6 +192,10 @@ class StateAlgorithm(Algorithm):
         ``state`` unchanged: a rejected request spends nothing, under any rate.
         """
 
+    def decode(self, values: Sequence[str]) -> State:
+        """Parse persisted strings back into state."""
+        return tuple(float(value) for value in values)
+
     def consumed(self, rates: List[Rate], state: State, now: int) -> int:
         """Units currently owed - the closest analogue to a log's length."""
         return 0
@@ -210,17 +214,34 @@ class GCRA(StateAlgorithm):
     within ``burst`` units of ``now``.
 
     Sustains ``limit`` per ``interval`` while tolerating a burst of
-    ``rate.burst``, using one float per rate instead of an entry per unit.
+    ``rate.burst``, using one number per rate instead of an entry per unit.
+
+    State is integer *microseconds*, not fractional milliseconds. An absolute
+    TAT in epoch ms is ~1.7e12, and accumulating a fractional emission interval
+    onto it loses the low bits - enough that the accumulated sum of `burst`
+    emissions no longer equals `burst * emission`, and the last unit of a full
+    burst gets rejected by a rounding error. Integers make it exact, and stay
+    well inside the 2**53 a Lua double holds.
     """
 
+    @staticmethod
+    def _emission_us(rate: Rate) -> int:
+        """Microseconds per unit.
+
+        Rounded up, so a rate that does not divide evenly errs on the strict
+        side rather than admitting marginally faster than configured.
+        """
+        return max(1, ceil(rate.interval * 1000 / rate.limit))
+
     def initial(self, rates: List[Rate]) -> State:
-        # 0.0 reads as "long past", so step() clamps it up to `now`.
-        return tuple(0.0 for _ in rates)
+        # 0 reads as "long past", so step() clamps it up to `now`.
+        return tuple(0 for _ in rates)
 
     def max_weight(self, rate: Rate) -> int:
         return rate.burst
 
     def step(self, rates: List[Rate], state: State, now: int, weight: int) -> Tuple[State, Decision]:
+        now_us = now * 1000
         advanced = []
 
         for rate, tat in zip(rates, state, strict=True):
@@ -228,12 +249,12 @@ class GCRA(StateAlgorithm):
                 # Never admissible; no wait to report.
                 return state, Decision(failing_rate=rate)
 
-            emission = rate.interval / rate.limit
-            new_tat = max(tat, now) + weight * emission
+            emission = self._emission_us(rate)
+            new_tat = max(int(tat), now_us) + weight * emission
             allow_at = new_tat - rate.burst * emission
 
-            if allow_at > now:
-                return state, Decision(failing_rate=rate, retry_after_ms=ceil(allow_at - now))
+            if allow_at > now_us:
+                return state, Decision(failing_rate=rate, retry_after_ms=ceil((allow_at - now_us) / 1000))
 
             advanced.append(new_tat)
 
@@ -242,13 +263,17 @@ class GCRA(StateAlgorithm):
         return tuple(advanced), ADMITTED
 
     def consumed(self, rates: List[Rate], state: State, now: int) -> int:
+        now_us = now * 1000
         units = 0
 
         for rate, tat in zip(rates, state, strict=True):
-            emission = rate.interval / rate.limit
-            units = max(units, ceil(max(0.0, tat - now) / emission))
+            emission = self._emission_us(rate)
+            units = max(units, ceil(max(0, int(tat) - now_us) / emission))
 
         return units
+
+    def decode(self, values: Sequence[str]) -> State:
+        return tuple(int(value) for value in values)
 
     def redis_script(self) -> Optional[str]:
         return _GCRA_LUA
@@ -266,7 +291,9 @@ class TokenBucket(GCRA):
 
 _GCRA_LUA = """
 local key = KEYS[1]
-local now = tonumber(ARGV[1])
+-- Microseconds throughout, mirroring GCRA.step: integers stay exact in a Lua
+-- double up to 2**53, which epoch-us (~1.7e15) sits comfortably below.
+local now_us = tonumber(ARGV[1]) * 1000
 local weight = tonumber(ARGV[2])
 local ttl = tonumber(ARGV[3])
 local n = tonumber(ARGV[4])
@@ -288,10 +315,10 @@ for i = 1, n do
         return {i - 1, -1}
     end
 
-    local tat = now
+    local tat = now_us
     if stored[i] then
         local parsed = tonumber(stored[i])
-        if parsed and parsed > now then
+        if parsed and parsed > now_us then
             tat = parsed
         end
     end
@@ -299,8 +326,8 @@ for i = 1, n do
     local new_tat = tat + weight * emission
     local allow_at = new_tat - burst * emission
 
-    if allow_at > now then
-        return {i - 1, math.ceil(allow_at - now)}
+    if allow_at > now_us then
+        return {i - 1, math.ceil((allow_at - now_us) / 1000)}
     end
 
     advanced[i] = new_tat
@@ -310,9 +337,9 @@ end
 local write = {}
 for i = 1, n do
     write[#write + 1] = 'tat' .. i
-    -- %.6f, not tostring: Lua's default number formatting is 14 significant
-    -- digits, which loses sub-millisecond precision on epoch-ms timestamps.
-    write[#write + 1] = string.format('%.6f', advanced[i])
+    -- %.0f, not tostring: Lua's default number formatting is 14 significant
+    -- digits, which would mangle an integer this large.
+    write[#write + 1] = string.format('%.0f', advanced[i])
 end
 
 redis.call('HSET', key, unpack(write))

@@ -80,7 +80,8 @@ class RedisStateStore(StateStore):
         args: List[Union[int, float]] = [now, weight, self._ttl_for(rates), len(rates)]
 
         for rate in rates:
-            args.extend((rate.interval / rate.limit, rate.burst))
+            # The algorithm owns the unit; the script just adds and compares.
+            args.extend((algorithm._emission_us(rate), rate.burst))
 
         reply = self._script(algorithm)(keys=[self.key], args=args, client=self.redis)
 
@@ -123,7 +124,8 @@ class RedisStateStore(StateStore):
         if not stored or any(value is None for value in stored):
             return algorithm.initial(rates)
 
-        return tuple(float(value) for value in stored)
+        # The algorithm decodes: it knows whether its numbers are integers.
+        return algorithm.decode([value.decode() if isinstance(value, bytes) else value for value in stored])
 
     def reset(self):
         return self.redis.delete(self.key)
