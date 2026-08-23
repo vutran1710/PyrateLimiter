@@ -482,3 +482,60 @@ def test_leaker_accepts_a_state_bucket():
     sleep(0.05)
     assert limiter.buckets()
     limiter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.asyncredis
+async def test_async_redis_count_and_re_derived_wait():
+    """The async read paths: count(), and waiting() for a mismatched weight."""
+    pytest.importorskip("redis")
+    from redis.asyncio import Redis as AsyncRedis
+
+    from pyrate_limiter import RedisStateStore
+
+    client = AsyncRedis.from_url("redis://localhost:6379")
+    key = f"gcra-async-read/{id_generator()}"
+    await client.delete(key)
+
+    clock = FrozenClock()
+    bucket = StateBucket([Rate(4, 1000)], store=RedisStateStore(client, key), clock=clock)
+
+    for _ in range(4):
+        assert await bucket.put(RateItem("x", clock.now())) is True
+
+    assert await bucket.count() == 4
+
+    light = RateItem("x", clock.now())
+    assert await bucket.put(light) is False
+    assert bucket.waiting(light) == 250  # recorded, no await needed
+
+    # A different weight has to go back to the store, which returns a coroutine.
+    assert await bucket.waiting(RateItem("x", clock.now(), weight=2)) == 500
+
+    clock.advance(500)
+    assert await bucket.count() == 2
+
+    await bucket.flush()
+    assert await bucket.count() == 0
+
+    await client.delete(key)
+    await client.aclose()
+
+
+@pytest.mark.redis
+def test_explicit_ttl_overrides_the_derived_one():
+    pytest.importorskip("redis")
+    from redis import Redis
+
+    from pyrate_limiter import RedisStateStore
+
+    client = Redis.from_url("redis://localhost:6379")
+    key = f"gcra-ttl/{id_generator()}"
+    client.delete(key)
+
+    bucket = StateBucket([Rate(3, 1000)], store=RedisStateStore(client, key, ttl_ms=60_000), clock=FrozenClock())
+    assert bucket.put(RateItem("x", 1_700_000_000_000)) is True
+
+    ttl = client.pttl(key)
+    assert 55_000 < ttl <= 60_000, ttl  # not the ~2s the rate would imply
+    client.delete(key)
