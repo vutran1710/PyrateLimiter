@@ -12,9 +12,14 @@ is not a log (token bucket, GCRA), which compute the wait in closed form.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Final, List, Optional, Sequence
+from math import ceil
+from typing import Callable, Final, List, Optional, Sequence, Tuple
 
 from .rate import Rate
+
+#: Constant-state policies keep a small tuple of floats per key, opaque to the
+#: store that persists it. GCRA uses one theoretical-arrival-time per rate.
+State = Tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -39,23 +44,26 @@ class Decision:
 ADMITTED: Final["Decision"] = Decision()
 
 
-class Algorithm(ABC):
+class Algorithm(ABC):  # noqa: B024 - base of the family; the abstract surface differs per sub-interface
     """A rate-limiting policy, independent of any storage backend.
 
     Implementations must be stateless so one instance can be shared across
-    buckets and threads.
+    buckets and threads. The two sub-interfaces differ in what they need
+    remembered per key: ``LogAlgorithm`` an entry per consumed unit,
+    ``StateAlgorithm`` a fixed handful of numbers.
     """
+
+    def max_weight(self, rate: Rate) -> int:
+        """Largest weight this policy can ever admit under ``rate``."""
+        return rate.limit
+
+
+class LogAlgorithm(Algorithm):
+    """Policy over storage holding one timestamped entry per consumed unit."""
 
     @abstractmethod
     def admit(self, rates: List[Rate], counts: Sequence[int], weight: int) -> Decision:
         """Whether ``weight`` more units fit, given ``counts`` aligned to ``rates``."""
-
-
-class LogAlgorithm(Algorithm):
-    """Policy over storage holding one timestamped entry per consumed unit.
-
-    Constant-state policies (token bucket, GCRA) will not implement this.
-    """
 
     @abstractmethod
     def window_start(self, rate: Rate, now: int) -> int:
@@ -161,3 +169,153 @@ class FixedWindow(LogAlgorithm):
         # The whole window clears at once, so no stored entry is consulted.
         # now < window_start + interval always, so this is never 0.
         return self.window_start(rate, now) + rate.interval - now
+
+
+class StateAlgorithm(Algorithm):
+    """Policy whose state is a fixed-size tuple of numbers, not a log.
+
+    Storage keeps one small value per key however much traffic passes, and the
+    wait comes out in closed form. In exchange the check is *destructive* - it
+    spends what it admits - so ``step()`` must evaluate every rate before
+    committing any of them.
+    """
+
+    @abstractmethod
+    def initial(self, rates: List[Rate]) -> State:
+        """State for a key that has never been used."""
+
+    @abstractmethod
+    def step(self, rates: List[Rate], state: State, now: int, weight: int) -> Tuple[State, Decision]:
+        """Apply an arrival of ``weight`` at ``now``.
+
+        Returns the state to persist and the verdict. On denial it must return
+        ``state`` unchanged: a rejected request spends nothing, under any rate.
+        """
+
+    def consumed(self, rates: List[Rate], state: State, now: int) -> int:
+        """Units currently owed - the closest analogue to a log's length."""
+        return 0
+
+    def redis_script(self) -> Optional[str]:
+        """Lua implementing ``step()`` atomically, if this policy has one."""
+        return None
+
+
+class GCRA(StateAlgorithm):
+    """Generic Cell Rate Algorithm - a leaky bucket kept as one timestamp.
+
+    Tracks a theoretical arrival time (TAT) per rate: the moment the bucket
+    would next be empty. Admitting ``weight`` pushes the TAT forward by
+    ``weight * emission_interval``; the request is allowed while that stays
+    within ``burst`` units of ``now``.
+
+    Sustains ``limit`` per ``interval`` while tolerating a burst of
+    ``rate.burst``, using one float per rate instead of an entry per unit.
+    """
+
+    def initial(self, rates: List[Rate]) -> State:
+        # 0.0 reads as "long past", so step() clamps it up to `now`.
+        return tuple(0.0 for _ in rates)
+
+    def max_weight(self, rate: Rate) -> int:
+        return rate.burst
+
+    def step(self, rates: List[Rate], state: State, now: int, weight: int) -> Tuple[State, Decision]:
+        advanced = []
+
+        for rate, tat in zip(rates, state, strict=True):
+            if weight > rate.burst:
+                # Never admissible; no wait to report.
+                return state, Decision(failing_rate=rate)
+
+            emission = rate.interval / rate.limit
+            new_tat = max(tat, now) + weight * emission
+            allow_at = new_tat - rate.burst * emission
+
+            if allow_at > now:
+                return state, Decision(failing_rate=rate, retry_after_ms=ceil(allow_at - now))
+
+            advanced.append(new_tat)
+
+        # Committed only here, so a rate failing late costs the earlier ones
+        # nothing.
+        return tuple(advanced), ADMITTED
+
+    def consumed(self, rates: List[Rate], state: State, now: int) -> int:
+        units = 0
+
+        for rate, tat in zip(rates, state, strict=True):
+            emission = rate.interval / rate.limit
+            units = max(units, ceil(max(0.0, tat - now) / emission))
+
+        return units
+
+    def redis_script(self) -> Optional[str]:
+        return _GCRA_LUA
+
+
+class TokenBucket(GCRA):
+    """Token bucket, which is GCRA under a more familiar name.
+
+    A bucket of ``rate.burst`` tokens refilling at ``rate.limit / rate.interval``
+    admits exactly what GCRA does with an emission interval of
+    ``interval / limit``. Same implementation, one float of state rather than a
+    token count plus a refill timestamp.
+    """
+
+
+_GCRA_LUA = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local weight = tonumber(ARGV[2])
+local ttl = tonumber(ARGV[3])
+local n = tonumber(ARGV[4])
+
+local fields = {}
+for i = 1, n do
+    fields[i] = 'tat' .. i
+end
+
+local stored = redis.call('HMGET', key, unpack(fields))
+local advanced = {}
+
+for i = 1, n do
+    local offset = (i - 1) * 2
+    local emission = tonumber(ARGV[5 + offset])
+    local burst = tonumber(ARGV[5 + offset + 1])
+
+    if weight > burst then
+        return {i - 1, -1}
+    end
+
+    local tat = now
+    if stored[i] then
+        local parsed = tonumber(stored[i])
+        if parsed and parsed > now then
+            tat = parsed
+        end
+    end
+
+    local new_tat = tat + weight * emission
+    local allow_at = new_tat - burst * emission
+
+    if allow_at > now then
+        return {i - 1, math.ceil(allow_at - now)}
+    end
+
+    advanced[i] = new_tat
+end
+
+-- Reached only when every rate admits, so the write is all-or-nothing.
+local write = {}
+for i = 1, n do
+    write[#write + 1] = 'tat' .. i
+    -- %.6f, not tostring: Lua's default number formatting is 14 significant
+    -- digits, which loses sub-millisecond precision on epoch-ms timestamps.
+    write[#write + 1] = string.format('%.6f', advanced[i])
+end
+
+redis.call('HSET', key, unpack(write))
+redis.call('PEXPIRE', key, ttl)
+return {-1, 0}
+"""

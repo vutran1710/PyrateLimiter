@@ -42,6 +42,18 @@ class MonotonicClock(AbstractClock):
         return self._get_monotonic_ms()
 
 
+class WallClock(AbstractClock):
+    """Wall-clock epoch milliseconds.
+
+    Needed where timestamps are compared across processes or hosts - a
+    monotonic clock is only meaningful within one machine's boot. Use it for
+    any bucket whose state is shared through Redis.
+    """
+
+    def now(self) -> int:
+        return self._get_wall_ms()
+
+
 class MonotonicAsyncClock(AbstractClock):
     """Monotonic Async Clock, meant for testing only"""
 
