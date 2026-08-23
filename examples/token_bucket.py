@@ -1,3 +1,4 @@
+# ruff: noqa: T201
 """Token bucket (GCRA): constant-size state instead of a log per request.
 
 Run: python examples/token_bucket.py
