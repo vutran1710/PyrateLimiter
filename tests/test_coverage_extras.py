@@ -181,7 +181,9 @@ class SlowAsyncBucket(InMemoryBucket):
 
         return _put()
 
-    async def peek(self, index: int):
+    # Deliberately widens InMemoryBucket's narrowed peek() back to the
+    # abstract contract, which allows an awaitable.
+    async def peek(self, index: int):  # type: ignore[override]
         return super().peek(index)
 
 
