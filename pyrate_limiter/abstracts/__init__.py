@@ -1,5 +1,6 @@
 from .algorithm import Algorithm as Algorithm
 from .algorithm import Decision as Decision
+from .algorithm import FixedWindow as FixedWindow
 from .algorithm import LogAlgorithm as LogAlgorithm
 from .algorithm import SlidingWindowLog as SlidingWindowLog
 from .bucket import AbstractBucket as AbstractBucket
@@ -12,6 +13,7 @@ from .wrappers import BucketAsyncWrapper as BucketAsyncWrapper
 __all__ = [
     "Algorithm",
     "Decision",
+    "FixedWindow",
     "LogAlgorithm",
     "SlidingWindowLog",
     "AbstractBucket",

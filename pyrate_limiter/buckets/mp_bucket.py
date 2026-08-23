@@ -8,6 +8,7 @@ from multiprocessing.synchronize import RLock as LockType
 from typing import List, Optional
 
 from ..abstracts import Rate, RateItem
+from ..abstracts.algorithm import LogAlgorithm
 from ..buckets import InMemoryBucket
 from ..clocks import MonotonicClock
 
@@ -16,9 +17,18 @@ class MultiprocessBucket(InMemoryBucket):
     items: List[RateItem]  # ListProxy
     mp_lock: LockType
 
-    def __init__(self, rates: List[Rate], items: List[RateItem], mp_lock: LockType):
+    def __init__(
+        self,
+        rates: List[Rate],
+        items: List[RateItem],
+        mp_lock: LockType,
+        algorithm: Optional[LogAlgorithm] = None,
+    ):
         if not isinstance(items, ListProxy):  # pragma: no cover - guard only
             raise ValueError("items must be a ListProxy")
+
+        if algorithm is not None:
+            self._algorithm = algorithm
 
         self._clock = MonotonicClock()
 
@@ -54,6 +64,7 @@ class MultiprocessBucket(InMemoryBucket):
     def init(
         cls,
         rates: List[Rate],
+        algorithm: Optional[LogAlgorithm] = None,
     ):
         """
         Creates a single ListProxy so that this bucket can be shared across multiple processes.
@@ -62,4 +73,4 @@ class MultiprocessBucket(InMemoryBucket):
 
         mp_lock: LockType = RLock()
 
-        return cls(rates=rates, items=shared_items, mp_lock=mp_lock)
+        return cls(rates=rates, items=shared_items, mp_lock=mp_lock, algorithm=algorithm)

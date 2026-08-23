@@ -6,6 +6,7 @@ from .abstracts import BucketAsyncWrapper as BucketAsyncWrapper
 from .abstracts import BucketFactory as BucketFactory
 from .abstracts import Decision as Decision
 from .abstracts import Duration as Duration
+from .abstracts import FixedWindow as FixedWindow
 from .abstracts import LogAlgorithm as LogAlgorithm
 from .abstracts import Rate as Rate
 from .abstracts import RateItem as RateItem
@@ -37,6 +38,7 @@ __all__ = [
     "BucketFactory",
     "Decision",
     "Duration",
+    "FixedWindow",
     "LogAlgorithm",
     "Rate",
     "RateItem",

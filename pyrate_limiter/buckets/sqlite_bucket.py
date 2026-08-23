@@ -10,6 +10,7 @@ from time import time, time_ns
 from typing import List, Optional, Tuple, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
+from ..abstracts.algorithm import LogAlgorithm
 from ..clocks import AbstractClock
 from ..utils import dedicated_sqlite_clock_connection
 
@@ -28,7 +29,7 @@ class Queries:
     """
     COUNT_BEFORE_INSERT = """
     SELECT :interval{index} as interval, COUNT(*) FROM '{table}'
-    WHERE item_timestamp >= :current_timestamp - :interval{index}
+    WHERE item_timestamp >= :start{index}
     """
     PUT_ITEM = """
     INSERT INTO '{table}' (name, item_timestamp) VALUES (?, ?)
@@ -71,9 +72,20 @@ class SQLiteBucket(AbstractBucket):
     lock: RLock
     use_limiter_lock: bool
 
-    def __init__(self, rates: List[Rate], conn: sqlite3.Connection, table: str, lock=None):
+    def __init__(
+        self,
+        rates: List[Rate],
+        conn: sqlite3.Connection,
+        table: str,
+        lock=None,
+        algorithm: Optional[LogAlgorithm] = None,
+    ):
         self.conn = conn
         self.table = table
+
+        if algorithm is not None:
+            self._algorithm = algorithm
+
         self.rates = rates
 
         if not lock:
@@ -100,6 +112,7 @@ class SQLiteBucket(AbstractBucket):
 
         for index, rate in enumerate(self.rates):
             parameters[f"interval{index}"] = rate.interval
+            parameters[f"start{index}"] = self._algorithm.window_start(rate, current_timestamp)
             query = Queries.COUNT_BEFORE_INSERT.format(table=self.table, index=index)
             full_query.append(query)
 
@@ -210,7 +223,13 @@ class SQLiteBucket(AbstractBucket):
 
     @classmethod
     def init_from_file(
-        cls, rates: List[Rate], table: str = "rate_bucket", db_path: Optional[str] = None, create_new_table: bool = True, use_file_lock: bool = False
+        cls,
+        rates: List[Rate],
+        table: str = "rate_bucket",
+        db_path: Optional[str] = None,
+        create_new_table: bool = True,
+        use_file_lock: bool = False,
+        algorithm: Optional[LogAlgorithm] = None,
     ) -> "SQLiteBucket":
         if db_path is None and use_file_lock:
             raise ValueError("db_path must be specified when using use_file_lock")
@@ -265,7 +284,7 @@ class SQLiteBucket(AbstractBucket):
             cur.close()
             sqlite_connection.commit()
 
-            return cls(rates, sqlite_connection, table=table, lock=file_lock)
+            return cls(rates, sqlite_connection, table=table, lock=file_lock, algorithm=algorithm)
 
 
 class SQLiteClock(AbstractClock):

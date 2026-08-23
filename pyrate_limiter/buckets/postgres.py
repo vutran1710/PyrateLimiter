@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
 from ..abstracts import AbstractBucket, Rate, RateItem
-from ..abstracts.algorithm import ADMITTED, Decision
+from ..abstracts.algorithm import ADMITTED, Decision, LogAlgorithm
 from ..clocks import PostgresClock
 
 logger = logging.getLogger(__name__)
@@ -71,13 +71,17 @@ class PostgresBucket(AbstractBucket):
     table: str
     pool: ConnectionPool
 
-    def __init__(self, pool: ConnectionPool, table: str, rates: List[Rate]):
+    def __init__(self, pool: ConnectionPool, table: str, rates: List[Rate], algorithm: Optional[LogAlgorithm] = None):
         from psycopg import sql
 
         self._clock = PostgresClock(pool)
         self.table = table.lower()
         self.pool = pool
         assert rates
+
+        if algorithm is not None:
+            self._algorithm = algorithm
+
         self.rates = rates
         self._full_tbl = f"ratelimit___{self.table}"
 
@@ -92,10 +96,10 @@ class PostgresBucket(AbstractBucket):
         self._q_lock = sql.SQL(Queries.LOCK_TABLE).format(table=tbl)
         self._q_count = sql.SQL(Queries.COUNT).format(table=tbl)
         # One scan computing every rate's windowed count via COUNT(*) FILTER,
-        # instead of one round trip per rate. Each rate contributes a
-        # (TO_TIMESTAMP(%s), %s) pair, filled in self.rates order at put time.
+        # instead of one round trip per rate. Each rate contributes its window
+        # start, filled in self.rates order at put time by the algorithm.
         # Composed with psycopg.sql (no string interpolation).
-        _filter = sql.SQL("COUNT(*) FILTER (WHERE item_timestamp >= TO_TIMESTAMP(%s) - (%s * INTERVAL '1 milliseconds'))")
+        _filter = sql.SQL("COUNT(*) FILTER (WHERE item_timestamp >= TO_TIMESTAMP(%s))")
         _fields = sql.SQL(", ").join([_filter] * len(self.rates))
         self._q_count_windows = sql.SQL("SELECT {fields} FROM {table}").format(fields=_fields, table=tbl)
         self._q_put = sql.SQL(Queries.PUT).format(table=tbl)
@@ -149,7 +153,7 @@ class PostgresBucket(AbstractBucket):
                 self._record(item, Decision(failing_rate=self.rates[0]))
                 return False
 
-            params = [v for rate in self.rates for v in (item_ts_seconds, rate.interval)]
+            params = [self._algorithm.window_start(rate, item.timestamp) / 1000 for rate in self.rates]
             cur = conn.execute(self._q_count_windows, params)
             counts = cur.fetchone()
             cur.close()

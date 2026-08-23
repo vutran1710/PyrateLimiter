@@ -37,6 +37,7 @@
 - [How it works](#how-it-works)
 - [Core concepts](#core-concepts)
 - [Defining rates & buckets](#defining-rates--buckets)
+- [Algorithms](#algorithms)
 - [Everyday usage](#everyday-usage)
   - [Blocking, non-blocking & timeout](#blocking-non-blocking--timeout)
   - [Weight](#weight)
@@ -192,6 +193,34 @@ limiter.try_acquire("hello world")
 ```
 
 See [Backends](#backends) for Redis, SQLite, Postgres, and multiprocessing.
+
+## Algorithms
+
+Every bucket takes an `algorithm=`. The default is a **sliding window log**:
+exact, but it stores one entry per consumed unit.
+
+```python
+from pyrate_limiter import FixedWindow, InMemoryBucket, Rate, Duration
+
+bucket = InMemoryBucket([Rate(100, Duration.HOUR)], algorithm=FixedWindow())
+```
+
+| Algorithm | Window | Trade-off |
+|---|---|---|
+| **`SlidingWindowLog`** *(default)* | Rolling — the last `interval` from *now* | Exact. Never allows a burst above `limit` in any `interval`. |
+| **`FixedWindow`** | Aligned — resets at every `interval` boundary | Coarser: up to `2 * limit` can pass across a boundary. Waits to the next boundary instead of to an entry's expiry. |
+
+Reach for `FixedWindow` when you are mirroring an upstream API that genuinely
+resets on a boundary — a quota that refreshes on the hour, or at midnight UTC.
+If you want a hard ceiling on any rolling window, keep the default.
+
+The boundary burst is real and worth seeing:
+
+```python
+bucket = InMemoryBucket([Rate(3, Duration.SECOND)], algorithm=FixedWindow())
+# 3 requests just before the boundary, 3 more just after it:
+# 6 requests inside ~100ms, both windows within their limit.
+```
 
 ## Everyday usage
 

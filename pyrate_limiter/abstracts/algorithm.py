@@ -58,17 +58,25 @@ class LogAlgorithm(Algorithm):
     """
 
     @abstractmethod
+    def window_start(self, rate: Rate, now: int) -> int:
+        """Inclusive lower bound of ``rate``'s counting window at ``now``."""
+
+    @abstractmethod
+    def retry_after(self, rate: Rate, now: int, blocking_timestamp: Optional[int]) -> int:
+        """Milliseconds until room exists under ``rate``.
+
+        ``blocking_timestamp`` is the entry named by ``blocking_offset()``, or
+        ``None`` when there is none - or when the policy never asks for one.
+        """
+
+    def blocking_offset(self, rate: Rate, weight: int) -> Optional[int]:
+        """Offset from the newest stored entry (0-based) whose expiry makes room
+        for ``weight``, or ``None`` if the wait does not depend on an entry."""
+        return None
+
     def leak_bound(self, rates: List[Rate], now: int) -> int:
-        """Timestamp below which an item is outside every rate's window."""
-
-    @abstractmethod
-    def blocking_offset(self, rate: Rate, weight: int) -> int:
-        """Offset from the newest stored item (0-based) of the one whose expiry
-        makes room for ``weight``."""
-
-    @abstractmethod
-    def retry_after(self, rate: Rate, blocking_timestamp: int, now: int) -> int:
-        """Milliseconds until ``blocking_timestamp`` leaves ``rate``'s window."""
+        """Timestamp below which an entry is outside every rate's window."""
+        return min(self.window_start(rate, now) for rate in rates)
 
     def decide(
         self,
@@ -80,8 +88,9 @@ class LogAlgorithm(Algorithm):
     ) -> Decision:
         """``admit()``, resolving the retry-after in the same step on denial.
 
-        ``peek_timestamp(offset)`` is only called on the deny path, so backends
-        pay for the lookup only when it is needed.
+        ``peek_timestamp(offset)`` is only called when the policy asks for an
+        entry and the item was rejected, so backends pay for the lookup only
+        when it is needed.
         """
         decision = self.admit(rates, counts, weight)
 
@@ -95,23 +104,17 @@ class LogAlgorithm(Algorithm):
             # Can never fit; waiting() reports -1 and the limiter gives up.
             return decision
 
-        blocking_timestamp = peek_timestamp(self.blocking_offset(rate, weight))
+        offset = self.blocking_offset(rate, weight)
+        blocking = None if offset is None else peek_timestamp(offset)
 
-        if blocking_timestamp is None:
-            return Decision(failing_rate=rate, retry_after_ms=0)
-
-        return Decision(
-            failing_rate=rate,
-            retry_after_ms=self.retry_after(rate, blocking_timestamp, now),
-        )
+        return Decision(failing_rate=rate, retry_after_ms=self.retry_after(rate, now, blocking))
 
 
 class SlidingWindowLog(LogAlgorithm):
-    """Precise sliding-window-log policy: admit while every rate's rolling
-    window stays under its limit.
+    """Precise rolling window: admit while each rate's last ``interval`` stays
+    under its limit.
 
-    Backends may implement it natively for atomicity (Redis Lua, Postgres lock
-    + ``COUNT FILTER``, in-memory bisect) but share these definitions.
+    The default. Exact, at the cost of one stored entry per consumed unit.
     """
 
     def admit(self, rates: List[Rate], counts: Sequence[int], weight: int) -> Decision:
@@ -120,16 +123,41 @@ class SlidingWindowLog(LogAlgorithm):
                 return Decision(failing_rate=rate)
         return ADMITTED
 
-    def leak_bound(self, rates: List[Rate], now: int) -> int:
-        # rates sort ascending by interval, so rates[-1] is the widest window.
-        return now - rates[-1].interval
+    def window_start(self, rate: Rate, now: int) -> int:
+        return now - rate.interval
 
-    def blocking_offset(self, rate: Rate, weight: int) -> int:
-        # Counting from the newest item keeps this independent of both the
+    def blocking_offset(self, rate: Rate, weight: int) -> Optional[int]:
+        # Counting from the newest entry keeps this independent of both the
         # in-window count and any expired-but-unleaked entries still stored.
         return rate.limit - weight
 
-    def retry_after(self, rate: Rate, blocking_timestamp: int, now: int) -> int:
+    def retry_after(self, rate: Rate, now: int, blocking_timestamp: Optional[int]) -> int:
+        if blocking_timestamp is None:
+            return 0
+
         # +1 clears the inclusive lower bound: landing exactly on it leaves the
-        # item still counted, so the re-put fails and the limiter spins at 0.
+        # entry still counted, so the re-put fails and the limiter spins at 0.
         return blocking_timestamp + rate.interval - now + 1
+
+
+class FixedWindow(LogAlgorithm):
+    """Counts within a wall-clock-aligned window that resets every ``interval``.
+
+    Cheaper and coarser than the rolling window: up to ``2 * limit`` can pass
+    across a window boundary. Use it to mirror an upstream API that genuinely
+    resets on the hour rather than rolling.
+    """
+
+    def admit(self, rates: List[Rate], counts: Sequence[int], weight: int) -> Decision:
+        for rate, count in zip(rates, counts, strict=True):
+            if rate.limit - int(count) < weight:
+                return Decision(failing_rate=rate)
+        return ADMITTED
+
+    def window_start(self, rate: Rate, now: int) -> int:
+        return now - now % rate.interval
+
+    def retry_after(self, rate: Rate, now: int, blocking_timestamp: Optional[int]) -> int:
+        # The whole window clears at once, so no stored entry is consulted.
+        # now < window_start + interval always, so this is never 0.
+        return self.window_start(rate, now) + rate.interval - now

@@ -27,8 +27,7 @@ class AbstractBucket(ABC):
     _rates: List[Rate]
     failing_rate: Optional[Rate] = None
     _clock: AbstractClock = MonotonicClock()
-    # Internal in v4; v5 makes this a constructor argument so algorithms
-    # (GCRA, sliding-window-counter) become pluggable.
+    # Default policy; every built-in bucket takes an ``algorithm=`` argument.
     _algorithm: LogAlgorithm = SlidingWindowLog()
     # (weight, absolute timestamp at which that weight fits), from the last
     # put(). Absolute rather than a delay so it survives a later waiting() call.
@@ -161,15 +160,18 @@ class AbstractBucket(ABC):
 
         # Fallback for buckets written against the pre-4.5 contract, which
         # record nothing: derive the wait with an extra lookup.
-        bound_item = self.peek(self._algorithm.blocking_offset(self.failing_rate, item.weight))
+        offset = self._algorithm.blocking_offset(self.failing_rate, item.weight)
 
-        if bound_item is None:
-            # NOTE: No waiting, bucket is immediately ready
-            return 0
+        if offset is None:
+            # Policy's wait does not depend on a stored entry (e.g. FixedWindow).
+            return self._algorithm.retry_after(self.failing_rate, item.timestamp, None)
 
-        def _calc_waiting(inner_bound_item: RateItem) -> int:
+        bound_item = self.peek(offset)
+
+        def _calc_waiting(inner_bound_item: Optional[RateItem]) -> int:
             assert self.failing_rate is not None  # NOTE: silence mypy
-            return self._algorithm.retry_after(self.failing_rate, inner_bound_item.timestamp, item.timestamp)
+            blocking = None if inner_bound_item is None else inner_bound_item.timestamp
+            return self._algorithm.retry_after(self.failing_rate, item.timestamp, blocking)
 
         async def _calc_waiting_async() -> int:
             nonlocal bound_item
@@ -177,17 +179,13 @@ class AbstractBucket(ABC):
             while isawaitable(bound_item):
                 bound_item = await bound_item
 
-            if bound_item is None:
-                # NOTE: No waiting, bucket is immediately ready
-                return 0
-
-            assert isinstance(bound_item, RateItem)
+            assert bound_item is None or isinstance(bound_item, RateItem)
             return _calc_waiting(bound_item)
 
         if isawaitable(bound_item):
             return _calc_waiting_async()
 
-        assert isinstance(bound_item, RateItem)
+        assert bound_item is None or isinstance(bound_item, RateItem)
         return _calc_waiting(bound_item)
 
     def limiter_lock(self) -> Optional[object]:  # type: ignore

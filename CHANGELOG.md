@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Groundwork for pluggable algorithms. Additive — no breaking public API changes.
 
 ### Added
+- **`FixedWindow` algorithm.** Counts within a wall-clock-aligned window that
+  resets every `interval`, rather than a rolling one. Pass it to any built-in
+  bucket: `InMemoryBucket(rates, algorithm=FixedWindow())`. Cheaper and coarser
+  than the default — up to `2 * limit` can pass across a boundary — and the
+  right choice for mirroring an upstream API that genuinely resets on the hour.
+  Works on all five backends.
+- Every built-in bucket now takes an `algorithm=` argument, defaulting to
+  `SlidingWindowLog()`. Existing code is unaffected.
 - `Decision` now carries `retry_after_ms` alongside the verdict, and `put()`
   records it. `AbstractBucket.waiting()` reads that recording instead of
   deriving the wait from storage a second time. Custom buckets that record
