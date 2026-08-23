@@ -321,9 +321,13 @@ async def test_limiter_async():
 # ---------------------------------------------------------- store equivalence
 
 def _stores():
+    # Markers, not just import guards: CI installs every driver everywhere but
+    # only runs the servers on Linux, so non-Linux jobs deselect by marker.
+    # multiprocess needs mpbucket too - the general session runs under xdist
+    # with -m "not mpbucket", and Manager processes belong in the serial one.
     stores = [
-        pytest.param(lambda: InMemoryStateStore(), id="inmemory"),
-        pytest.param(lambda: MultiprocessStateStore.init(), id="multiprocess"),
+        pytest.param(lambda: InMemoryStateStore(), id="inmemory", marks=pytest.mark.inmemory),
+        pytest.param(lambda: MultiprocessStateStore.init(), id="multiprocess", marks=pytest.mark.mpbucket),
     ]
 
     if importlib.util.find_spec("redis") is not None:
@@ -337,7 +341,7 @@ def _stores():
             client.delete(key)
             return RedisStateStore(client, key)
 
-        stores.append(pytest.param(make_redis, id="redis"))
+        stores.append(pytest.param(make_redis, id="redis", marks=pytest.mark.redis))
 
     return stores
 
