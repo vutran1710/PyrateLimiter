@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 Groundwork for pluggable algorithms. Additive — no breaking public API changes.
 
 ### Added
+- **`GCRA` / `TokenBucket` algorithms, and `StateBucket` to run them.** These
+  keep a couple of numbers per key instead of one entry per consumed unit, so
+  storage does not grow with traffic and the wait is exact without any lookup.
+  `TokenBucket` *is* `GCRA` under a familiar name — one implementation, not two.
+
+  ```python
+  from pyrate_limiter import Duration, Limiter, Rate, StateBucket, TokenBucket
+
+  limiter = Limiter(StateBucket([Rate(5, Duration.SECOND, burst=10)], algorithm=TokenBucket()))
+  ```
+
+  Stores: `InMemoryStateStore`, `MultiprocessStateStore`, and `RedisStateStore`
+  (transition runs as a Lua script, so the read-modify-write is atomic across
+  clients; keys carry a TTL and need no `leak()`). For a 1000/minute limit at
+  saturation the Redis state is ~100 bytes against roughly 89 KB of sorted set.
+- **`Rate(..., burst=N)`** — how many units may be spent at once. Read only by
+  the constant-state algorithms; defaults to `limit`, which is classic
+  token-bucket behaviour. `burst=1` is a perfectly smooth drip.
+- **`WallClock`** — epoch-millisecond clock, for state compared across machines
+  where a monotonic clock is meaningless. `RedisStateStore` defaults to it.
+- `limiter_factory.create_token_bucket_limiter()`.
 - **`FixedWindow` algorithm.** Counts within a wall-clock-aligned window that
   resets every `interval`, rather than a rolling one. Pass it to any built-in
   bucket: `InMemoryBucket(rates, algorithm=FixedWindow())`. Cheaper and coarser
@@ -44,7 +65,17 @@ Groundwork for pluggable algorithms. Additive — no breaking public API changes
 - **InMemoryBucket** / **MultiprocessBucket**: the wait falls out of the bisect
   `put()` already performs — no second scan, and no allocation on the admit path.
 
+### Documentation
+- The README and package description no longer describe the library as
+  implementing "the Leaky-Bucket algorithm". The default has always been a
+  sliding-window log; the leaky-bucket meter is now genuinely available as
+  `GCRA`, so the term is reserved for it.
+
 ### Internal / Refactor
+- `Algorithm` now has two sub-interfaces: `LogAlgorithm` (an entry per consumed
+  unit) and `StateAlgorithm` (a fixed tuple of numbers). `StateAlgorithm.step()`
+  must evaluate every rate before committing any of them, so a rate failing late
+  never leaves an earlier one debited.
 - Split `LogAlgorithm` out of `Algorithm` for policies whose state is a log of
   timestamped items. `leak_bound()` and the new `blocking_offset()` /
   `retry_after()` hooks live there; constant-state policies (token bucket, GCRA)

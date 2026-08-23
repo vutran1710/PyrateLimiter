@@ -1,7 +1,7 @@
 """Unit classes that deals with rate, item & duration"""
 
 from enum import Enum
-from typing import Union
+from typing import Optional, Union
 
 
 class Duration(Enum):
@@ -74,23 +74,34 @@ class Rate:
     Args:
         limit: Number of requests allowed within ``interval``
         interval: Time interval, in miliseconds
+        burst: How many units may be spent at once. Only the constant-state
+            algorithms (``GCRA``, ``TokenBucket``) read it; the window
+            algorithms admit up to ``limit`` per window regardless. Defaults to
+            ``limit``, which is classic token-bucket behaviour - a full bucket
+            at rest. ``burst=1`` makes the output perfectly smooth.
     """
 
     limit: int
     interval: int
+    burst: int
 
     def __init__(
         self,
         limit: int,
         interval: Union[int, Duration],
+        burst: Optional[int] = None,
     ):
         self.limit = limit
         self.interval = int(interval)
+        self.burst = limit if burst is None else burst
         assert self.interval
         assert self.limit
+        assert self.burst >= 1, "Rate's burst must be >= 1"
 
     def __str__(self) -> str:
-        return f"limit={self.limit}/{Duration.readable(self.interval)}"
+        suffix = f", burst={self.burst}" if self.burst != self.limit else ""
+        return f"limit={self.limit}/{Duration.readable(self.interval)}{suffix}"  # noqa: E231
 
     def __repr__(self) -> str:
-        return f"limit={self.limit}/{self.interval}"
+        suffix = f", burst={self.burst}" if self.burst != self.limit else ""
+        return f"limit={self.limit}/{self.interval}{suffix}"  # noqa: E231

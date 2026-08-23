@@ -5,7 +5,7 @@
 <h1 align="center">PyrateLimiter</h1>
 
 <p align="center">
-  <em>A fast, async-friendly rate limiter for Python — Leaky-Bucket algorithm with pluggable backends.</em>
+  <em>A fast, async-friendly rate limiter for Python — pluggable algorithms and backends.</em>
 </p>
 
 <p align="center">
@@ -38,6 +38,7 @@
 - [Core concepts](#core-concepts)
 - [Defining rates & buckets](#defining-rates--buckets)
 - [Algorithms](#algorithms)
+  - [GCRA / Token bucket](#gcra--token-bucket)
 - [Everyday usage](#everyday-usage)
   - [Blocking, non-blocking & timeout](#blocking-non-blocking--timeout)
   - [Weight](#weight)
@@ -56,7 +57,7 @@
 
 ## Features
 
-- 🪣 **Leaky-bucket** algorithm — smooth, well-understood rate limiting.
+- 🧮 **Pluggable algorithms** — sliding-window log (exact, the default), fixed window, and GCRA / token bucket (constant memory).
 - ⏱️ **Multiple rates at once** — e.g. *5/second* **and** *1000/hour* on the same key.
 - 🔑 **Per-key limits** — track different services, users, or resources independently.
 - 🧩 **Pluggable backends** — in-memory, SQLite, Redis (sync **and** async), Postgres, and multiprocessing.
@@ -146,11 +147,15 @@ flowchart TB
     classDef ext fill:#ffffff,color:#242A33,stroke:#9AA5B1;
 ```
 
-**The bucket analogy** — this library implements the [Leaky Bucket algorithm](https://en.wikipedia.org/wiki/Leaky_bucket):
+**The bucket analogy** — a bucket represents a fixed capacity (a service, an API
+quota, …). It *fills* as requests arrive and *drains* over time. When the bucket
+is **full**, new requests are delayed (blocking) or rejected (non-blocking).
 
-- A bucket represents a fixed capacity (a service, an API quota, …).
-- The bucket *fills* as requests arrive and *leaks* at a constant rate — the permitted request rate.
-- When the bucket is **full**, new requests are delayed (blocking) or rejected (non-blocking).
+Exactly *how* it drains is the [algorithm](#algorithms)'s business. By default a
+request stops counting once it falls out of a rolling window; with
+[`GCRA`/`TokenBucket`](#gcra--token-bucket) the bucket genuinely leaks at a
+constant rate, which is the [Leaky Bucket algorithm](https://en.wikipedia.org/wiki/Leaky_bucket)
+proper.
 
 ## Core concepts
 
@@ -205,22 +210,80 @@ from pyrate_limiter import FixedWindow, InMemoryBucket, Rate, Duration
 bucket = InMemoryBucket([Rate(100, Duration.HOUR)], algorithm=FixedWindow())
 ```
 
-| Algorithm | Window | Trade-off |
+| Algorithm | Stores | Trade-off |
 |---|---|---|
-| **`SlidingWindowLog`** *(default)* | Rolling — the last `interval` from *now* | Exact. Never allows a burst above `limit` in any `interval`. |
-| **`FixedWindow`** | Aligned — resets at every `interval` boundary | Coarser: up to `2 * limit` can pass across a boundary. Waits to the next boundary instead of to an entry's expiry. |
+| **`SlidingWindowLog`** *(default)* | One entry per consumed unit | Exact. Never allows a burst above `limit` in any rolling `interval`. |
+| **`FixedWindow`** | One entry per consumed unit | Coarser: up to `2 * limit` can pass across a boundary. Cheap to reason about. |
+| **`GCRA`** / **`TokenBucket`** | A couple of numbers, whatever the traffic | Constant memory and a smooth output rate. Needs a `StateBucket`. |
 
 Reach for `FixedWindow` when you are mirroring an upstream API that genuinely
 resets on a boundary — a quota that refreshes on the hour, or at midnight UTC.
-If you want a hard ceiling on any rolling window, keep the default.
-
-The boundary burst is real and worth seeing:
+Its boundary burst is real and worth seeing:
 
 ```python
 bucket = InMemoryBucket([Rate(3, Duration.SECOND)], algorithm=FixedWindow())
 # 3 requests just before the boundary, 3 more just after it:
 # 6 requests inside ~100ms, both windows within their limit.
 ```
+
+### GCRA / Token bucket
+
+The window algorithms keep one stored entry per consumed unit. That is what
+makes them exact, and it is also why a `RedisBucket` sorted set grows without
+bound on long windows. `GCRA` keeps **one number per rate instead** — the moment
+the bucket would next be empty — so storage stays the same size forever.
+
+Use a `StateBucket`:
+
+```python
+from pyrate_limiter import Duration, Limiter, Rate, StateBucket, TokenBucket
+
+# 5 requests/second sustained, up to 10 in one lump
+bucket = StateBucket([Rate(5, Duration.SECOND, burst=10)], algorithm=TokenBucket())
+limiter = Limiter(bucket)
+```
+
+Or the one-liner:
+
+```python
+from pyrate_limiter import limiter_factory
+
+limiter = limiter_factory.create_token_bucket_limiter(rate_per_duration=5, burst=10)
+```
+
+`TokenBucket` **is** `GCRA` — a bucket of `burst` tokens refilling at
+`limit / interval` admits exactly what GCRA does with an emission interval of
+`interval / limit`. Two names, one implementation.
+
+**`burst` controls how bursty you allow the output to be.** It defaults to
+`limit` (classic token bucket: a full bucket at rest). `burst=1` produces a
+perfectly smooth drip with no reserve at all.
+
+For Redis, use a `RedisStateStore`:
+
+```python
+from redis import Redis
+from pyrate_limiter import Rate, RedisStateStore, StateBucket, Duration
+
+redis = Redis.from_url("redis://localhost:6379")
+store = RedisStateStore(redis, "my-key")          # sync or async client
+bucket = StateBucket([Rate(1000, Duration.MINUTE)], store=store)
+```
+
+The transition runs as a Lua script, so the read-modify-write is atomic across
+clients, and the key carries a TTL so idle keys clean themselves up. For a
+1000/minute limit at saturation this is **one hash field of ~100 bytes** against
+roughly 89 KB of sorted set — and no `leak()` to schedule.
+
+> [!NOTE]
+> A `StateBucket` keeps no per-item log, so `peek()` returns `None` and `leak()`
+> is a no-op. `count()` reports how many units are currently *owed* — an
+> estimate that drains with time, not a log length.
+
+**Clocks matter more here.** GCRA measures elapsed time, so state shared between
+machines needs a shared clock. `RedisStateStore` defaults the bucket to
+`WallClock` (epoch ms) for exactly this reason; local stores default to
+`MonotonicClock`.
 
 ## Everyday usage
 
@@ -587,6 +650,7 @@ Implement [`pyrate_limiter.AbstractBucket`](https://github.com/vutran1710/Pyrate
 - [httpx2_ratelimiter.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/httpx2_ratelimiter.py) — HTTPX2, sync / async / multiprocess
 - [in_memory_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/in_memory_multiprocess.py) — multiprocessing with an in-memory bucket
 - [sqlite_filelock_multiprocess.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/sqlite_filelock_multiprocess.py) — multiprocessing with SQLite + a file lock
+- [token_bucket.py](https://github.com/vutran1710/PyrateLimiter/blob/master/examples/token_bucket.py) — GCRA / token bucket: burst, then a steady drip
 
 ---
 

@@ -5,7 +5,7 @@ A collection of common use cases and patterns for pyrate_limiter
 import logging
 from typing import List, Optional, Union
 
-from pyrate_limiter import AbstractBucket, Duration, InMemoryBucket, Limiter, Rate, SQLiteBucket
+from pyrate_limiter import AbstractBucket, Duration, InMemoryBucket, Limiter, Rate, SQLiteBucket, StateBucket, TokenBucket
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,35 @@ def create_inmemory_limiter(
     limiter = Limiter(bucket, buffer_ms=buffer_ms)
 
     return limiter
+
+
+def create_token_bucket_limiter(
+    rate_per_duration: int = 3,
+    duration: Union[int, Duration] = Duration.SECOND,
+    burst: Optional[int] = None,
+    buffer_ms: int = 50,
+) -> Limiter:
+    """
+    Create a token-bucket (GCRA) limiter backed by constant-size local state.
+
+    Unlike the window algorithms this stores a couple of numbers per key rather
+    than one entry per request, so memory does not grow with traffic.
+
+    Args:
+        rate_per_duration: Sustained number of allowed requests per duration.
+        duration: Time window for the rate limit.
+        burst: How many requests may be spent at once. Defaults to
+            `rate_per_duration` (a full bucket at rest); `burst=1` is perfectly
+            smooth.
+        buffer_ms: Extra wait time in milliseconds to account for clock drift.
+
+    Returns:
+        Limiter: Configured token-bucket limiter instance.
+    """
+    rate = Rate(rate_per_duration, duration, burst=burst)
+    bucket = StateBucket([rate], algorithm=TokenBucket())
+
+    return Limiter(bucket, buffer_ms=buffer_ms)
 
 
 def init_global_limiter(
