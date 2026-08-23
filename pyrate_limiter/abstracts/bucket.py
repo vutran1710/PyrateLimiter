@@ -150,7 +150,7 @@ class AbstractBucket(ABC):
 
         assert item.weight > 0, "Item's weight must > 0"
 
-        if item.weight > self.failing_rate.limit:
+        if item.weight > self._algorithm.max_weight(self.failing_rate):
             return -1
 
         recorded = self._recorded_wait(item)

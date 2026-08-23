@@ -108,7 +108,7 @@ class LogAlgorithm(Algorithm):
         rate = decision.failing_rate
         assert rate is not None
 
-        if weight > rate.limit:
+        if weight > self.max_weight(rate):
             # Can never fit; waiting() reports -1 and the limiter gives up.
             return decision
 

@@ -163,3 +163,57 @@ def test_inmemory_put_weight_zero_returns_true():
     bucket = InMemoryBucket([Rate(5, Duration.SECOND)])
     assert bucket.put(RateItem("x", bucket.now(), weight=0)) is True
     assert bucket.count() == 0
+
+
+# --------------------------------------------- async wrapper over an async bucket
+
+class SlowAsyncBucket(InMemoryBucket):
+    """Async enough that waiting() itself comes back awaitable."""
+
+    is_async = True
+
+    def put(self, item: RateItem):
+        admitted = super().put(item)
+        self._last_wait = None  # force the derive-from-storage path
+
+        async def _put():
+            return admitted
+
+        return _put()
+
+    async def peek(self, index: int):
+        return super().peek(index)
+
+
+@pytest.mark.asyncio
+async def test_wrapper_awaits_an_awaitable_waiting():
+    """BucketAsyncWrapper.waiting() must resolve what the inner bucket returns."""
+    wrapped = BucketAsyncWrapper(SlowAsyncBucket([Rate(1, 1000)]))
+
+    assert await wrapped.put(RateItem("a", 1000)) is True
+
+    item = RateItem("a", 1200)
+    assert await wrapped.put(item) is False
+    assert await wrapped.waiting(item) == 1000 + 1000 - 1200 + 1
+
+
+# ------------------------------------------------------ BucketFactory plumbing
+
+def test_leak_interval_round_trips_through_the_leaker():
+    limiter = Limiter(InMemoryBucket([Rate(2, 1000)]))
+    factory = limiter.bucket_factory
+
+    # A leaker exists once a bucket is scheduled, so both accessors go through it.
+    assert factory.leak_interval == 10_000
+    factory.leak_interval = 250
+    assert factory.leak_interval == 250
+
+    limiter.close()
+
+
+def test_dispose_without_a_leaker_is_false():
+    bucket = InMemoryBucket([Rate(2, 1000)])
+    limiter = Limiter(bucket)
+    limiter.close()  # drops the leaker
+
+    assert limiter.dispose(bucket) is False

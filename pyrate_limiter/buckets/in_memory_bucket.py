@@ -85,7 +85,7 @@ class InMemoryBucket(AbstractBucket):
         Mirrors ``LogAlgorithm.decide()``; the bisect above has already located
         everything needed, so no second scan is required.
         """
-        if item.weight > rate.limit:
+        if item.weight > self._algorithm.max_weight(rate):
             return Decision(failing_rate=rate)
 
         offset = self._algorithm.blocking_offset(rate, item.weight)

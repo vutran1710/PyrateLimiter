@@ -9,6 +9,7 @@ import pytest
 from pyrate_limiter import (
     GCRA,
     Duration,
+    InMemoryBucket,
     InMemoryStateStore,
     Limiter,
     MultiprocessStateStore,
@@ -17,8 +18,9 @@ from pyrate_limiter import (
     StateBucket,
     TokenBucket,
     id_generator,
+    limiter_factory,
 )
-from pyrate_limiter.abstracts.algorithm import ADMITTED, LogAlgorithm, StateAlgorithm
+from pyrate_limiter.abstracts.algorithm import ADMITTED, Decision, LogAlgorithm, StateAlgorithm
 from pyrate_limiter.clocks import AbstractClock, WallClock
 
 
@@ -217,6 +219,22 @@ def test_bucket_waiting_re_derives_for_a_different_weight():
     # rounds up, so the bucket errs strict rather than admitting marginally fast.
     assert bucket.waiting(RateItem("a", clock.now(), weight=3)) == 1001
     assert bucket.waiting(light) == 334
+
+
+def test_a_lighter_request_need_not_wait_at_all():
+    """A standing denial for a heavy item must not make a light one wait."""
+    clock = FrozenClock()
+    bucket = StateBucket([Rate(4, 1000)], clock=clock)
+
+    assert bucket.put(RateItem("a", clock.now(), weight=3)) is True
+
+    heavy = RateItem("a", clock.now(), weight=3)
+    assert bucket.put(heavy) is False
+    assert bucket.waiting(heavy) > 0
+
+    # One unit still fits right now, so the re-derivation reports no wait.
+    assert bucket.waiting(RateItem("a", clock.now(), weight=1)) == 0
+    assert bucket.put(RateItem("a", clock.now(), weight=1)) is True
 
 
 def test_bucket_reports_minus_one_for_an_impossible_weight():
@@ -574,3 +592,120 @@ def test_explicit_ttl_overrides_the_derived_one():
     ttl = client.pttl(key)
     assert 55_000 < ttl <= 60_000, ttl  # not the ~2s the rate would imply
     client.delete(key)
+
+
+# ------------------------------------------------------- the extension point
+
+class HalfRate(StateAlgorithm):
+    """A minimal third-party policy, to prove the seam is usable.
+
+    Deliberately implements only the two abstract methods, so the base
+    defaults for decode/consumed/redis_script are the ones under test.
+    """
+
+    def initial(self, rates):
+        return tuple(0.0 for _ in rates)
+
+    def step(self, rates, state, now, weight):
+        used = state[0] + weight
+        if used > rates[0].limit / 2:
+            return state, Decision(failing_rate=rates[0], retry_after_ms=42)
+        return (used,), ADMITTED
+
+
+def test_a_custom_state_algorithm_works_end_to_end():
+    rates = [Rate(10, 1000)]
+    bucket = StateBucket(rates, algorithm=HalfRate(), clock=FrozenClock())
+
+    admitted = sum(1 for _ in range(10) if bucket.put(RateItem("a", 1_700_000_000_000)))
+    assert admitted == 5  # half of 10
+
+    item = RateItem("a", 1_700_000_000_000)
+    assert bucket.put(item) is False
+    assert bucket.waiting(item) == 42
+
+
+def test_state_algorithm_defaults():
+    algo, rates = HalfRate(), [Rate(10, 1000)]
+
+    # consumed() has no meaningful answer for a policy that does not define one.
+    assert algo.consumed(rates, algo.initial(rates), now=0) == 0
+    # No Lua means the store must refuse rather than guess.
+    assert algo.redis_script() is None
+    # The default decode parses floats, which suits a policy that stores them.
+    assert algo.decode(["1.5", "2"]) == (1.5, 2.0)
+
+
+def test_bucket_count_falls_back_to_zero_without_a_consumed_impl():
+    bucket = StateBucket([Rate(10, 1000)], algorithm=HalfRate(), clock=FrozenClock())
+    bucket.put(RateItem("a", 1_700_000_000_000))
+    assert bucket.count() == 0
+
+
+class NoWaitPolicy(HalfRate):
+    """Denies without ever reporting a wait."""
+
+    def step(self, rates, state, now, weight):
+        return state, Decision(failing_rate=rates[0])
+
+
+def test_replay_reports_zero_when_the_policy_gives_no_wait():
+    rates = [Rate(10, 1000)]
+    bucket = StateBucket(rates, algorithm=NoWaitPolicy(), clock=FrozenClock())
+
+    denied = RateItem("a", 1_700_000_000_000, weight=1)
+    assert bucket.put(denied) is False
+
+    # A different weight forces the re-derivation path, which has no wait to
+    # return either - 0 means "retry now", not "never".
+    assert bucket.waiting(RateItem("a", 1_700_000_000_000, weight=2)) == 0
+
+
+# --------------------------------------------------------------- odds and ends
+
+def test_wall_clock_is_epoch_milliseconds():
+    from time import time
+
+    now = WallClock().now()
+    assert isinstance(now, int)
+    assert abs(now - int(time() * 1000)) < 5_000
+
+
+def test_factory_builds_a_token_bucket_limiter():
+    limiter = limiter_factory.create_token_bucket_limiter(rate_per_duration=3, duration=Duration.SECOND, burst=5)
+
+    assert [limiter.try_acquire("k", blocking=False) for _ in range(7)] == [True] * 5 + [False, False]
+    limiter.close()
+
+
+def test_factory_burst_defaults_to_the_rate():
+    limiter = limiter_factory.create_token_bucket_limiter(rate_per_duration=2, duration=Duration.SECOND)
+
+    assert [limiter.try_acquire("k", blocking=False) for _ in range(4)] == [True, True, False, False]
+    limiter.close()
+
+
+@pytest.mark.mpbucket
+def test_multiprocess_bucket_carries_its_algorithm():
+    from pyrate_limiter import FixedWindow, MultiprocessBucket
+
+    bucket = MultiprocessBucket.init([Rate(3, 1000)], algorithm=FixedWindow())
+    assert isinstance(bucket._algorithm, FixedWindow)
+
+    for ts in (1000, 1400, 1900):
+        assert bucket.put(RateItem("a", ts)) is True
+
+    assert bucket.put(RateItem("a", 1950)) is False
+    assert bucket.put(RateItem("a", 2000)) is True  # window reset, not expiry
+
+
+def test_async_wrapper_delegates_the_algorithm():
+    from pyrate_limiter import BucketAsyncWrapper, FixedWindow
+
+    bucket = InMemoryBucket([Rate(3, 1000)], algorithm=FixedWindow())
+    wrapped = BucketAsyncWrapper(bucket)
+
+    # The inherited waiting() reads _algorithm off self; it must see the
+    # wrapped bucket's, not the class default.
+    assert wrapped._algorithm is bucket._algorithm
+    assert isinstance(wrapped._algorithm, FixedWindow)

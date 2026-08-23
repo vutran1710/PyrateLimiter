@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import pytest
 
-from pyrate_limiter import Decision, InMemoryBucket, Rate, RateItem
+from pyrate_limiter import Decision, FixedWindow, InMemoryBucket, Rate, RateItem
 from pyrate_limiter.abstracts.algorithm import ADMITTED, SlidingWindowLog
 
 
@@ -334,3 +334,72 @@ def test_redis_blocking_timestamp_becomes_a_wait():
     item = RateItem("a", 1200, weight=1)
     assert bucket.put(item) is False
     assert bucket.waiting(item) == 700 + 1000 - 1200 + 1
+
+
+# ------------------------------------------------- fallback paths in waiting()
+
+class AsyncLegacyBucket(InMemoryBucket):
+    """Pre-4.5 contract *and* async: records nothing, awaitable peek()."""
+
+    is_async = True
+
+    def put(self, item: RateItem):
+        admitted = super().put(item)
+        self._last_wait = None
+
+        async def _put():
+            return admitted
+
+        return _put()
+
+    async def peek(self, index: int):
+        return super().peek(index)
+
+
+@pytest.mark.asyncio
+async def test_waiting_awaits_an_async_peek_in_the_fallback():
+    """The fallback has to resolve an awaitable peek() before it can measure."""
+    bucket = AsyncLegacyBucket([Rate(2, 1000)])
+    assert await bucket.put(RateItem("a", 1000)) is True
+    assert await bucket.put(RateItem("a", 1100)) is True
+
+    item = RateItem("a", 1200)
+    assert await bucket.put(item) is False
+    assert bucket._last_wait is None
+
+    assert await bucket.waiting(item) == 1000 + 1000 - 1200 + 1
+
+
+@pytest.mark.asyncio
+async def test_async_fallback_handles_an_empty_bucket():
+    bucket = AsyncLegacyBucket([Rate(1, 1000)])
+    bucket.failing_rate = bucket.rates[0]  # denial with nothing stored
+    assert await bucket.waiting(RateItem("a", 1000)) == 0
+
+
+def test_fallback_skips_the_lookup_when_the_policy_wants_no_entry():
+    """FixedWindow waits to a boundary, so the fallback must not peek at all."""
+    bucket = LegacyBucket([Rate(2, 1000)], algorithm=FixedWindow())
+
+    for ts in (1000, 1100):
+        assert bucket.put(RateItem("a", ts)) is True
+
+    item = RateItem("a", 1200)
+    assert bucket.put(item) is False
+    assert bucket._last_wait is None
+
+    def boom(_index):
+        raise AssertionError("FixedWindow's wait does not depend on a stored entry")
+
+    bucket.peek = boom  # type: ignore[method-assign]
+    assert bucket.waiting(item) == 800  # to the 2000 boundary
+
+
+def test_waiting_asks_the_algorithm_for_the_maximum_weight():
+    """The ceiling is the policy's, not blindly rate.limit."""
+    rates = [Rate(3, 1000)]
+    bucket = InMemoryBucket(rates)
+    bucket.failing_rate = rates[0]
+
+    assert bucket.waiting(RateItem("a", 1000, weight=3)) != -1
+    assert bucket.waiting(RateItem("a", 1000, weight=4)) == -1

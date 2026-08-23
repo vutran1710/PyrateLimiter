@@ -165,7 +165,7 @@ class RedisBucket(AbstractBucket):
 
             rate = self.rates[idx]
 
-            if item.weight > rate.limit:
+            if item.weight > self._algorithm.max_weight(rate):
                 # Can never fit; waiting() reports -1 and the limiter gives up.
                 return Decision(failing_rate=rate)
 

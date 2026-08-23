@@ -186,6 +186,21 @@ if importlib.util.find_spec("psycopg_pool") is not None:
 
 
 @pytest.mark.parametrize("make_bucket", backends)
+def test_backends_clear_a_denial_on_a_weightless_put(make_bucket):
+    """Every backend's weight==0 short-circuit must still record the verdict."""
+    rates = [Rate(1, 1000)]
+    bucket = make_bucket(rates)
+
+    assert bucket.put(RateItem("a", 1000)) is True
+    assert bucket.put(RateItem("a", 1000)) is False
+    assert bucket.failing_rate == rates[0]
+
+    assert bucket.put(RateItem("a", 1000, weight=0)) is True
+    assert bucket.failing_rate is None
+    bucket.close()
+
+
+@pytest.mark.parametrize("make_bucket", backends)
 def test_backends_agree_on_fixed_window(make_bucket):
     """Every backend must count over the aligned window and wait to its edge."""
     rates = [Rate(3, 1000)]
