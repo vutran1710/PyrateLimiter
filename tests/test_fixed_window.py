@@ -170,17 +170,19 @@ def _postgres(rates: List[Rate]):
     return PostgresBucket(pool, f"fw_{id_generator()}", rates, algorithm=FixedWindow())
 
 
+# Markers, not just import guards: CI installs every driver everywhere but only
+# runs the servers on Linux, so the non-Linux jobs deselect by marker.
 backends = [
-    pytest.param(_in_memory, id="inmemory"),
-    pytest.param(_sqlite, id="sqlite"),
-    pytest.param(_mp, id="mpbucket"),
+    pytest.param(_in_memory, id="inmemory", marks=pytest.mark.inmemory),
+    pytest.param(_sqlite, id="sqlite", marks=pytest.mark.sqlite),
+    pytest.param(_mp, id="mpbucket", marks=pytest.mark.mpbucket),
 ]
 
 if importlib.util.find_spec("redis") is not None:
-    backends.append(pytest.param(_redis, id="redis"))
+    backends.append(pytest.param(_redis, id="redis", marks=pytest.mark.redis))
 
 if importlib.util.find_spec("psycopg_pool") is not None:
-    backends.append(pytest.param(_postgres, id="postgres"))
+    backends.append(pytest.param(_postgres, id="postgres", marks=pytest.mark.postgres))
 
 
 @pytest.mark.parametrize("make_bucket", backends)
