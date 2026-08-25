@@ -13,7 +13,7 @@ is not a log (token bucket, GCRA), which compute the wait in closed form.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from math import ceil
-from typing import Callable, Final, List, Optional, Sequence, Tuple
+from typing import Callable, Final, List, Optional, Sequence, Tuple, Union
 
 from .rate import Rate
 
@@ -204,6 +204,16 @@ class StateAlgorithm(Algorithm):
         """Lua implementing ``step()`` atomically, if this policy has one."""
         return None
 
+    def redis_args(self, rates: List[Rate]) -> List[Union[int, float]]:
+        """Arguments ``redis_script()`` needs, after the standard header.
+
+        The store passes these through without inspecting them, so a policy's
+        script and its arguments stay a matched pair that only the policy knows
+        the shape of. The header the store supplies first is
+        ``now, weight, ttl_ms, len(rates)``.
+        """
+        return []
+
 
 class GCRA(StateAlgorithm):
     """Generic Cell Rate Algorithm - a leaky bucket kept as one timestamp.
@@ -277,6 +287,9 @@ class GCRA(StateAlgorithm):
 
     def redis_script(self) -> Optional[str]:
         return _GCRA_LUA
+
+    def redis_args(self, rates: List[Rate]) -> List[Union[int, float]]:
+        return [value for rate in rates for value in (self._emission_us(rate), rate.burst)]
 
 
 class TokenBucket(GCRA):

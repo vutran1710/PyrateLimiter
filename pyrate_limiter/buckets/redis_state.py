@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from inspect import isawaitable
 from math import ceil
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Union
 
 from ..abstracts.algorithm import ADMITTED, Decision, State, StateAlgorithm
 from ..abstracts.rate import Rate
@@ -77,11 +77,11 @@ class RedisStateStore(StateStore):
         return max(ceil(2 * rate.burst * rate.interval / rate.limit) for rate in rates)
 
     def check(self, algorithm, rates, now, weight):
+        # Header, then whatever the policy's own script expects. The store never
+        # inspects the tail, so script and arguments stay a matched pair owned
+        # by the algorithm rather than a GCRA-shaped layout baked in here.
         args: List[Union[int, float]] = [now, weight, self._ttl_for(rates), len(rates)]
-
-        for rate in rates:
-            # The algorithm owns the unit; the script just adds and compares.
-            args.extend((algorithm._emission_us(rate), rate.burst))
+        args.extend(algorithm.redis_args(rates))
 
         reply = self._script(algorithm)(keys=[self.key], args=args, client=self.redis)
 
@@ -127,5 +127,15 @@ class RedisStateStore(StateStore):
         # The algorithm decodes: it knows whether its numbers are integers.
         return algorithm.decode([value.decode() if isinstance(value, bytes) else value for value in stored])
 
-    def reset(self):
-        return self.redis.delete(self.key)
+    def reset(self) -> Union[None, Awaitable[None]]:
+        deleted = self.redis.delete(self.key)
+
+        if isawaitable(deleted):
+
+            async def _await_reset() -> None:
+                await deleted
+
+            return _await_reset()
+
+        # StateStore.reset() is contracted to None; don't leak DEL's count.
+        return None

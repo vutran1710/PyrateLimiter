@@ -709,3 +709,93 @@ def test_async_wrapper_delegates_the_algorithm():
     # wrapped bucket's, not the class default.
     assert wrapped._algorithm is bucket._algorithm
     assert isinstance(wrapped._algorithm, FixedWindow)
+
+
+class ScriptedNoArgs(HalfRate):
+    """Has a Lua script but supplies no per-rate arguments.
+
+    The point of the test: this must not blow up on a helper the interface
+    never promised. Its script ignores the tail entirely.
+    """
+
+    def redis_script(self):
+        return """
+        local key = KEYS[1]
+        local now = tonumber(ARGV[1])
+        redis.call('SET', key, now)
+        return {-1, 0}
+        """
+
+
+@pytest.mark.redis
+def test_store_only_uses_the_declared_redis_interface():
+    """A third-party policy needs redis_script() and nothing private."""
+    pytest.importorskip("redis")
+    from redis import Redis
+
+    from pyrate_limiter import RedisStateStore
+
+    client = Redis.from_url("redis://localhost:6379")
+    key = f"gcra-iface/{id_generator()}"
+    client.delete(key)
+
+    rates = [Rate(3, 1000)]
+    store = RedisStateStore(client, key)
+
+    # No AttributeError for a policy that never defines GCRA's private helpers.
+    assert store.check(ScriptedNoArgs(), rates, now=1_700_000_000_000, weight=1).allowed
+    client.delete(key)
+
+
+def test_redis_args_default_is_empty():
+    assert HalfRate().redis_args([Rate(3, 1000)]) == []
+
+
+def test_gcra_redis_args_pair_emission_with_burst():
+    rates = [Rate(4, 1000), Rate(5, 5000, burst=9)]
+    # 1000ms/4 = 250_000us, 5000ms/5 = 1_000_000us
+    assert GCRA().redis_args(rates) == [250_000, 4, 1_000_000, 9]
+
+
+@pytest.mark.redis
+def test_reset_returns_none_not_the_delete_count():
+    pytest.importorskip("redis")
+    from redis import Redis
+
+    from pyrate_limiter import RedisStateStore
+
+    client = Redis.from_url("redis://localhost:6379")
+    key = f"gcra-reset/{id_generator()}"
+    client.delete(key)
+
+    store = RedisStateStore(client, key)
+    bucket = StateBucket([Rate(2, 1000)], store=store, clock=FrozenClock())
+    assert bucket.put(RateItem("a", 1_700_000_000_000)) is True
+
+    # StateStore.reset() and AbstractBucket.flush() are both contracted to None.
+    assert store.reset() is None
+    assert bucket.flush() is None
+    client.delete(key)
+
+
+@pytest.mark.asyncio
+@pytest.mark.asyncredis
+async def test_async_reset_resolves_to_none():
+    pytest.importorskip("redis")
+    from redis.asyncio import Redis as AsyncRedis
+
+    from pyrate_limiter import RedisStateStore
+
+    client = AsyncRedis.from_url("redis://localhost:6379")
+    key = f"gcra-areset/{id_generator()}"
+    await client.delete(key)
+
+    clock = FrozenClock()
+    bucket = StateBucket([Rate(2, 1000)], store=RedisStateStore(client, key), clock=clock)
+    assert await bucket.put(RateItem("a", clock.now())) is True
+
+    assert await bucket.flush() is None
+    assert await bucket.put(RateItem("a", clock.now())) is True  # state really gone
+
+    await client.delete(key)
+    await client.aclose()
