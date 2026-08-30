@@ -78,7 +78,15 @@ conda install --channel conda-forge pyrate-limiter
 Optional backends pull in their own drivers:
 
 ```sh
-pip install "pyrate-limiter[all]"   # redis + psycopg (Postgres) + filelock
+pip install "pyrate-limiter[all]"        # redis + psycopg (Postgres) + filelock
+```
+
+Or just the one you need:
+
+```sh
+pip install "pyrate-limiter[redis]"      # RedisBucket, RedisStateStore
+pip install "pyrate-limiter[postgres]"   # PostgresBucket
+pip install "pyrate-limiter[filelock]"   # multi-process SQLite
 ```
 
 ## Quickstart

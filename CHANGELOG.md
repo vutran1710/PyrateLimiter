@@ -54,6 +54,12 @@ the default behaviour of every existing bucket is unchanged.
   from the package root.
 
 ### Fixed
+- **Packaging**: the optional backends are now real, pip-installable extras.
+  `pip install "pyrate-limiter[all]"` — the command the README has always
+  documented — previously resolved to nothing: the project declared only PEP 735
+  `[dependency-groups]`, which pip cannot reach through extras syntax, so the
+  install emitted `WARNING: does not provide the extra 'all'` and then failed at
+  `import redis`. `redis`, `postgres`, `filelock` and `all` now all work.
 - **SQLiteBucket**: a successful `put()` now clears `failing_rate`. Every other
   backend already did; SQLite left the last denial standing indefinitely.
 
