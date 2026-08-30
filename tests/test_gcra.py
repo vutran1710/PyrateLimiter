@@ -2,6 +2,7 @@
 
 import asyncio
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 from time import monotonic, sleep
 
 import pytest
@@ -21,6 +22,7 @@ from pyrate_limiter import (
     limiter_factory,
 )
 from pyrate_limiter.abstracts.algorithm import ADMITTED, Decision, LogAlgorithm, StateAlgorithm
+from pyrate_limiter.abstracts.store import StateStore
 from pyrate_limiter.clocks import AbstractClock, WallClock
 
 
@@ -799,3 +801,76 @@ async def test_async_reset_resolves_to_none():
 
     await client.delete(key)
     await client.aclose()
+
+
+# ---------------------------------------------------------------- contention
+
+class _RacyStore(StateStore):
+    """A deliberately non-atomic store, used only to prove the assertions below
+    can actually fail. Without it, a passing contention test proves nothing."""
+
+    is_async = False
+
+    def __init__(self):
+        self._state = None
+
+    def check(self, algorithm, rates, now, weight):
+        state = self._state if self._state is not None else algorithm.initial(rates)
+        sleep(0.0005)  # the read-modify-write gap a real store must not have
+        new_state, decision = algorithm.step(rates, state, now, weight)
+        self._state = new_state
+        return decision
+
+    def read(self, algorithm, rates):
+        return self._state if self._state is not None else algorithm.initial(rates)
+
+    def reset(self):
+        self._state = None
+
+
+def _hammer(bucket, threads: int = 120, at: int = 1_700_000_000_000) -> int:
+    """Admissions when `threads` callers race at one frozen instant."""
+    with ThreadPoolExecutor(max_workers=24) as pool:
+        return sum(1 for ok in pool.map(lambda _: bucket.put(RateItem("k", at)), range(threads)) if ok)
+
+
+def test_the_contention_assertion_can_fail():
+    """Guard for the two tests below: a racy store must breach the limit."""
+    admitted = _hammer(StateBucket([Rate(20, 1000)], store=_RacyStore(), clock=FrozenClock()))
+    assert admitted > 20, "the contention tests below would pass vacuously"
+
+
+def test_in_memory_store_holds_the_limit_under_threads():
+    # The clock is frozen, so no drain can occur: at most `burst` may ever pass.
+    bucket = StateBucket([Rate(20, 1000)], store=InMemoryStateStore(), clock=FrozenClock())
+    assert _hammer(bucket) == 20
+
+
+@pytest.mark.redis
+def test_redis_store_holds_the_limit_across_separate_clients():
+    """The reason the transition is a Lua script rather than a Python step()."""
+    pytest.importorskip("redis")
+    from redis import Redis
+
+    from pyrate_limiter import RedisStateStore
+
+    key = f"gcra-race/{id_generator()}"
+    Redis.from_url("redis://localhost:6379").delete(key)
+
+    # Separate clients, i.e. separate connections - the distributed shape, not
+    # one client whose GIL would hide a non-atomic read-modify-write.
+    buckets = [
+        StateBucket(
+            [Rate(20, 1000)],
+            store=RedisStateStore(Redis.from_url("redis://localhost:6379"), key),
+            clock=FrozenClock(),
+        )
+        for _ in range(8)
+    ]
+
+    at = 1_700_000_000_000
+    with ThreadPoolExecutor(max_workers=24) as pool:
+        admitted = sum(1 for ok in pool.map(lambda i: buckets[i % len(buckets)].put(RateItem("k", at)), range(120)) if ok)
+
+    assert admitted == 20
+    Redis.from_url("redis://localhost:6379").delete(key)
