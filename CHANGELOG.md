@@ -4,9 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [4.5.0]
 
-Groundwork for pluggable algorithms. Additive — no breaking public API changes.
+Pluggable rate-limiting algorithms. Additive — no breaking public API changes;
+the default behaviour of every existing bucket is unchanged.
 
 ### Added
 - **`GCRA` / `TokenBucket` algorithms, and `StateBucket` to run them.** These
@@ -24,6 +25,9 @@ Groundwork for pluggable algorithms. Additive — no breaking public API changes
   (transition runs as a Lua script, so the read-modify-write is atomic across
   clients; keys carry a TTL and need no `leak()`). For a 1000/minute limit at
   saturation the Redis state is ~100 bytes against roughly 89 KB of sorted set.
+  GCRA's state is integer microseconds rather than fractional milliseconds:
+  accumulating a fractional emission interval onto an absolute timestamp loses
+  the low bits, which would reject the last unit of a full burst.
 - **`Rate(..., burst=N)`** — how many units may be spent at once. Read only by
   the constant-state algorithms; defaults to `limit`, which is classic
   token-bucket behaviour. `burst=1` is a perfectly smooth drip.
@@ -72,6 +76,11 @@ Groundwork for pluggable algorithms. Additive — no breaking public API changes
   `GCRA`, so the term is reserved for it.
 
 ### Internal / Refactor
+- `StateAlgorithm` declares `redis_args(rates)` so a policy's Lua script and its
+  arguments stay a matched pair it owns. `RedisStateStore` passes them through
+  without inspecting them, rather than assuming GCRA's shape.
+- `Algorithm.max_weight(rate)` is the one place asking whether a weight can ever
+  be admitted — `rate.limit` for the window algorithms, `rate.burst` for GCRA.
 - `Algorithm` now has two sub-interfaces: `LogAlgorithm` (an entry per consumed
   unit) and `StateAlgorithm` (a fixed tuple of numbers). `StateAlgorithm.step()`
   must evaluate every rate before committing any of them, so a rate failing late
