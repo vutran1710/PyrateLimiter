@@ -155,6 +155,33 @@ async def test_try_acquire_async_blocking_unacquirable_weight_returns_false():
     assert (t1 - t0) < 0.05
 
 
+# --- as_decorator: a weight that can never be admitted must deny the call,
+# not run the wrapped function anyway (regression test for the silent-bypass
+# bug where the boolean result of try_acquire()/try_acquire_async() was
+# discarded) ---
+def test_as_decorator_sync_unacquirable_weight_raises():
+    lim = make_limiter()
+
+    @lim.as_decorator(weight=2)
+    def work():
+        return "ran"
+
+    with pytest.raises(RuntimeError, match="can never admit weight=2"):
+        work()
+
+
+@pytest.mark.asyncio
+async def test_as_decorator_async_unacquirable_weight_raises():
+    lim = make_limiter()
+
+    @lim.as_decorator(weight=2)
+    async def work():
+        return "ran"
+
+    with pytest.raises(RuntimeError, match="can never admit weight=2"):
+        await work()
+
+
 @pytest.mark.asyncio
 async def test_try_acquire_timeout_with_awaitable_get_bucket():
     class AsyncGetFactory(BucketFactory):
