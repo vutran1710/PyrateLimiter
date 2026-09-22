@@ -127,8 +127,17 @@ def create_bucket(request):
 
     yield _create_bucket
 
+    close_error = None
     for bucket in reversed(created_buckets):
-        bucket.close()
+        try:
+            bucket.close()
+        except Exception as exc:
+            logger.exception("Failed to close test bucket %r", bucket)
+            if close_error is None:
+                close_error = exc
+
+    if close_error is not None:
+        raise close_error
 
 
 @pytest.fixture(scope="session")
