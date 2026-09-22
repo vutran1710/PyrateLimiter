@@ -1,5 +1,6 @@
 import logging
 import re
+from contextlib import suppress
 from inspect import isawaitable
 from time import time
 
@@ -154,5 +155,10 @@ async def test_sqlite_clock():
         await test_clock(SQLiteClock(bucket.conn))
 
         await test_clock(SQLiteClock(bucket))
+    except Exception:
+        with suppress(Exception):
+            bucket.close()
+        raise
     finally:
-        bucket.close()
+        if bucket.conn is not None:
+            bucket.close()
