@@ -118,7 +118,17 @@ if importlib.util.find_spec("psycopg_pool") is not None:
 @pytest.fixture(params=bucket_factories)
 def create_bucket(request):
     """Parametrization for different bucket."""
-    return request.param
+    created_buckets = []
+
+    async def _create_bucket(*args, **kwargs):
+        bucket = await request.param(*args, **kwargs)
+        created_buckets.append(bucket)
+        return bucket
+
+    yield _create_bucket
+
+    for bucket in reversed(created_buckets):
+        bucket.close()
 
 
 @pytest.fixture(scope="session")

@@ -141,11 +141,18 @@ async def test_clock(clock: AbstractClock | None = None):
 async def test_sqlite_clock():
     """Testing clock backends
     """
-    await test_clock(SQLiteClock.default())
+    default_clock = SQLiteClock.default()
+    try:
+        await test_clock(default_clock)
+    finally:
+        default_clock.conn.close()
 
     from .conftest import create_sqlite_bucket
 
     bucket = await create_sqlite_bucket([Rate(1, Duration.SECOND)])
-    await test_clock(SQLiteClock(bucket.conn))
+    try:
+        await test_clock(SQLiteClock(bucket.conn))
 
-    await test_clock(SQLiteClock(bucket))
+        await test_clock(SQLiteClock(bucket))
+    finally:
+        bucket.close()
