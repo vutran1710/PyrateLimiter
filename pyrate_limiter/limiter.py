@@ -660,6 +660,11 @@ class Limiter:
                     r = await self.try_acquire_async(name=name, weight=weight)
                     while isawaitable(r):
                         r = await r
+                    if not r:
+                        # blocking=True/timeout=-1 (the defaults here) only ever
+                        # return False when `weight` can never be admitted under
+                        # the configured rate(s) - not on a transient delay.
+                        raise RuntimeError(f"Rate limit for {name!r} can never admit weight={weight}; call denied.")
                     return await func(*args, **kwargs)
 
                 return wrapper
@@ -676,6 +681,9 @@ class Limiter:
                             self._cleanup_awaitable(r)
                         finally:
                             raise RuntimeError("Can't use async bucket with sync decorator")
+                    if not r:
+                        # Same reasoning as the async branch above.
+                        raise RuntimeError(f"Rate limit for {name!r} can never admit weight={weight}; call denied.")
                     return func(*args, **kwargs)
 
                 return wrapper
