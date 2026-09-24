@@ -1,0 +1,102 @@
+name: Publish Redis pressure results
+
+on:
+  workflow_run:
+    workflows: ["Redis pressure benchmark"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  comment:
+    if: github.event.workflow_run.event == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download benchmark report
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: redis-pressure-${{ github.event.workflow_run.id }}
+          path: benchmark-result
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+      - name: Update PR benchmark comment
+        if: steps.download.outcome == 'success'
+        uses: actions/github-script@v8
+        env:
+          PR_NUMBER_PATH: benchmark-result/pr-number.txt
+          REPORT_PATH: benchmark-result/redis-pressure.md
+          RESULT_PATH: benchmark-result/redis-pressure.json
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- redis-pressure-benchmark -->";
+            const run = context.payload.workflow_run;
+            const prNumberText = fs.readFileSync(process.env.PR_NUMBER_PATH, "utf8").trim();
+            if (!/^\d+$/.test(prNumberText)) {
+              core.setFailed(`Invalid PR number in benchmark artifact: ${prNumberText}`);
+              return;
+            }
+            const pullRequestNumber = Number.parseInt(prNumberText, 10);
+            const result = JSON.parse(fs.readFileSync(process.env.RESULT_PATH, "utf8"));
+            const report = fs
+              .readFileSync(process.env.REPORT_PATH, "utf8")
+              .trim()
+              .replaceAll("@", "@\u200b");
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullRequestNumber,
+            });
+            if (pullRequest.head.sha !== result.candidate_commit) {
+              core.notice(
+                `Skipping stale result for ${result.candidate_commit}; PR head is ${pullRequest.head.sha}`,
+              );
+              return;
+            }
+            const body = [
+              marker,
+              report,
+              `[Benchmark workflow run](${run.html_url})`,
+            ].join("\n\n");
+
+            if (body.length > 65000) {
+              core.setFailed(`Benchmark comment is too large: ${body.length} characters`);
+              return;
+            }
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequestNumber,
+                per_page: 100,
+              },
+            );
+            const existing = comments.find(
+              (comment) =>
+                comment.user?.type === "Bot" && comment.body?.includes(marker),
+            );
+            const request = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            };
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...request,
+                comment_id: existing.id,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...request,
+                issue_number: pullRequestNumber,
+              });
+            }
