@@ -62,9 +62,9 @@ class BucketAsyncWrapper(AbstractBucket):
         return item
 
     async def waiting(self, item: RateItem) -> int:
-        wait = super().waiting(item)
+        wait = self.bucket.waiting(item)
 
-        if isawaitable(wait):
+        while isawaitable(wait):
             wait = await wait
 
         assert isinstance(wait, int)
@@ -79,8 +79,7 @@ class BucketAsyncWrapper(AbstractBucket):
 
     @property
     def _last_wait(self):
-        # Inherited waiting() reads these off `self`; point them at the wrapped
-        # bucket, which is what actually records on put().
+        # Inherited put_decision() reads the wait recorded by the wrapped bucket.
         return self.bucket._last_wait
 
     @property
