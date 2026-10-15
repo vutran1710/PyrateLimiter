@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **PostgresBucket**: the advisory lock that serialises table creation is now
+  keyed by a CRC-32 of the table name rather than `hash()`, which Python salts
+  per interpreter. Processes sharing a database took different locks, so their
+  concurrent `CREATE TABLE IF NOT EXISTS` could fail with `UniqueViolation` on
+  `pg_type_typname_nsp_index`.
+
 ## [4.5.0]
 
 Pluggable rate-limiting algorithms. Additive — no breaking public API changes;

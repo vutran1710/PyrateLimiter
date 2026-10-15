@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import zlib
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Awaitable, List, Optional, Union
 
@@ -11,6 +12,17 @@ from ..abstracts.algorithm import ADMITTED, Decision, LogAlgorithm
 from ..clocks import PostgresClock
 
 logger = logging.getLogger(__name__)
+
+
+def advisory_lock_id(table: str) -> int:
+    """Advisory lock key for creating ``table``, the same in every process.
+
+    ``hash()`` of a ``str`` is salted per interpreter (``PYTHONHASHSEED``), so
+    processes sharing a database derived different keys, and their concurrent
+    ``CREATE TABLE IF NOT EXISTS`` raced. CRC-32 depends on the bytes alone.
+    """
+    return zlib.crc32(table.encode()) & 0x7FFFFFFF
+
 
 if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool  # type: ignore[import-untyped]
@@ -117,8 +129,7 @@ class PostgresBucket(AbstractBucket):
 
     def _create_table(self):
         with self._get_conn() as conn:
-            lock_id = hash(self._full_tbl) & 0x7FFFFFFF
-            conn.execute("SELECT pg_advisory_xact_lock(%s)", (lock_id,))
+            conn.execute("SELECT pg_advisory_xact_lock(%s)", (advisory_lock_id(self._full_tbl),))
             conn.execute(self._q_create_table)
             conn.execute(self._q_create_index)
 
