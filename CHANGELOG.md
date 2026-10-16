@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **`PostgresBucket.peek` read timestamps as UTC.** The `item_timestamp` column
+  is a `TIMESTAMP` that `TO_TIMESTAMP` fills through the session time zone, but
+  `peek` took its epoch as if it were UTC. Outside UTC every peeked item sat the
+  zone's offset in the future, so a full bucket computed a wait of that many
+  hours and blocking callers slept through it. `peek` now casts the column back
+  through the session zone.
+
 ## [4.5.0]
 
 Pluggable rate-limiting algorithms. Additive — no breaking public API changes;

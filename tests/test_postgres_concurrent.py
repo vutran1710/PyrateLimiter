@@ -205,3 +205,30 @@ class TestPostgresConcurrent:
             assert weight_in_window <= rate_limit, (
                 f"Rate limit exceeded: weight {weight_in_window} in 1-second window ending at {ts}"
             )
+
+
+@pytest.mark.postgres
+def test_peek_timestamp_matches_put_outside_utc():
+    """The column is a TIMESTAMP that ``TO_TIMESTAMP`` fills through the
+    session time zone, so ``peek`` must read it back through the same zone.
+    Read as UTC, it was off by the zone's offset, and the waits computed from
+    it ran that many hours long."""
+    psycopg_pool = pytest.importorskip("psycopg_pool")
+    from pyrate_limiter import id_generator
+
+    with psycopg_pool.ConnectionPool(
+        "postgresql://postgres:postgres@localhost:5432",
+        kwargs={"options": "-c TimeZone=Australia/Brisbane"},
+        open=True,
+    ) as pool:
+        table = f"test_tz_{id_generator()}"
+        bucket = PostgresBucket(pool, table, [Rate(5, Duration.SECOND)])
+        try:
+            item = RateItem("item", bucket.now())
+            assert bucket.put(item)
+            peeked = bucket.peek(0)
+            assert peeked is not None
+            assert abs(peeked.timestamp - item.timestamp) <= 1
+        finally:
+            with pool.connection() as conn:
+                conn.execute(f"DROP TABLE IF EXISTS ratelimit___{table}")
