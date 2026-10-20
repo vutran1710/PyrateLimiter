@@ -7,7 +7,10 @@ buffer_ms=0 is used deliberately so the leaky-bucket boundary math is tested
 honestly (the default buffer_ms=50 otherwise masks an off-by-one). Timing
 tolerances are generous to avoid flakiness.
 """
+import gc
+import sys
 import time
+import warnings
 from inspect import isawaitable
 
 import pytest
@@ -113,6 +116,22 @@ async def test_timeout_zero_async_succeeds_if_available_else_immediate_false():
     dt = time.perf_counter() - t0
     assert ok is False
     assert dt < 0.05
+
+
+@pytest.mark.asyncio
+async def test_timeout_zero_async_does_not_leave_retry_coroutine_unawaited(monkeypatch):
+    lim = _limiter([Rate(5, 100)])
+    unawaited = []
+    monkeypatch.setattr(sys, "unraisablehook", unawaited.append)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        for _ in range(5):
+            assert await lim.try_acquire_async("k", blocking=True, timeout=0) is True
+        assert await lim.try_acquire_async("k", blocking=True, timeout=0) is False
+        gc.collect()
+
+    assert not unawaited
 
 
 # ------------------------- blocking (no timeout) waits then OK, without spin

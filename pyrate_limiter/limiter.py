@@ -218,14 +218,14 @@ class Limiter:
 
         if _force_async or isawaitable(delay):
 
-            async def _handle_async(delay):
+            async def _retry_async(delay):
                 while True:
                     if deadline is not None:
                         remaining_ms = (deadline - monotonic()) * 1000
                         if remaining_ms <= 0:
                             raise TimeoutError()
 
-                    d = await self._handle_async_result(delay, deadline=deadline) if isawaitable(delay) else delay
+                    d = await delay if isawaitable(delay) else delay
                     assert isinstance(d, int)
                     sleep_ms = self._delay_to_sleep_ms(d)
                     if sleep_ms is None:
@@ -237,14 +237,20 @@ class Limiter:
                     if timed_out:
                         raise TimeoutError()
 
-                    item.timestamp += d
+                    refreshed = self.bucket_factory.wrap_item(item.name, item.weight)
+                    refreshed = await refreshed if isawaitable(refreshed) else refreshed
+                    assert isinstance(refreshed, RateItem)
+                    item.timestamp = refreshed.timestamp
                     r = bucket.put(item)
                     r = await r if isawaitable(r) else r
                     if r:
                         return True
                     delay = bucket.waiting(item)
 
-            return _handle_async(delay)
+            async def _run_async_with_deadline():
+                return await self._handle_async_result(_retry_async(delay), deadline=deadline)
+
+            return _run_async_with_deadline()
         else:
             total_delay = 0
 
