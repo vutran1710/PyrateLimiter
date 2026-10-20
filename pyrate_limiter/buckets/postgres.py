@@ -64,7 +64,7 @@ class Queries:
     DELETE FROM {table}
     """
     PEEK = """
-    SELECT name, weight, (extract(epoch FROM item_timestamp) * 1000) as item_timestamp
+    SELECT name, weight, (extract(epoch FROM item_timestamp::TIMESTAMPTZ) * 1000) as item_timestamp
     FROM {table}
     ORDER BY item_timestamp DESC
     LIMIT 1

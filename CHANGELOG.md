@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   per interpreter. Processes sharing a database took different locks, so their
   concurrent `CREATE TABLE IF NOT EXISTS` could fail with `UniqueViolation` on
   `pg_type_typname_nsp_index`.
+- **`PostgresBucket.peek` read timestamps as UTC.** The `item_timestamp` column
+  is a `TIMESTAMP` that `TO_TIMESTAMP` fills through the session time zone, but
+  `peek` took its epoch as if it were UTC. Outside UTC every peeked item sat the
+  zone's offset in the future, so a full bucket computed a wait of that many
+  hours and blocking callers slept through it. `peek` now casts the column back
+  through the session zone.
 
 ## [4.5.0]
 

@@ -8,6 +8,7 @@ from time import monotonic, sleep
 import pytest
 
 from pyrate_limiter import (
+    BucketAsyncWrapper,
     GCRA,
     Duration,
     InMemoryBucket,
@@ -707,10 +708,64 @@ def test_async_wrapper_delegates_the_algorithm():
     bucket = InMemoryBucket([Rate(3, 1000)], algorithm=FixedWindow())
     wrapped = BucketAsyncWrapper(bucket)
 
-    # The inherited waiting() reads _algorithm off self; it must see the
-    # wrapped bucket's, not the class default.
+    # Wrapping preserves the bucket's configured algorithm.
     assert wrapped._algorithm is bucket._algorithm
     assert isinstance(wrapped._algorithm, FixedWindow)
+
+
+@pytest.mark.inmemory
+@pytest.mark.parametrize("algorithm", [GCRA, TokenBucket])
+@pytest.mark.parametrize("denied_weight, query_weight, expected_wait", [(3, 3, 1500), (2, 1, 500), (2, 3, 1500)])
+async def test_async_wrapper_preserves_state_bucket_waiting(algorithm, denied_weight, query_weight, expected_wait):
+    clock = FrozenClock()
+    bucket = StateBucket([Rate(2, 1000, burst=3)], algorithm=algorithm(), clock=clock)
+    wrapped = BucketAsyncWrapper(bucket)
+
+    assert await wrapped.put(RateItem("a", clock.now(), weight=3)) is True
+    assert await wrapped.put(RateItem("a", clock.now(), weight=denied_weight)) is False
+
+    assert await wrapped.waiting(RateItem("a", clock.now(), weight=query_weight)) == expected_wait
+    assert await wrapped.count() == 3
+    clock.advance(expected_wait)
+    assert await wrapped.put(RateItem("a", clock.now(), weight=query_weight)) is True
+
+
+@pytest.mark.inmemory
+@pytest.mark.parametrize("algorithm", [GCRA, TokenBucket])
+async def test_async_wrapper_limiter_waits_for_an_admissible_burst(algorithm):
+    bucket = StateBucket([Rate(1, 100, burst=3)], algorithm=algorithm())
+    limiter = Limiter(BucketAsyncWrapper(bucket))
+    try:
+        assert await limiter.try_acquire_async("a", weight=3, blocking=False) is True
+        assert await limiter.try_acquire_async("a", weight=3, blocking=True, timeout=2) is True
+    finally:
+        limiter.close()
+
+
+@pytest.mark.asyncredis
+@pytest.mark.parametrize("algorithm", [GCRA, TokenBucket])
+async def test_async_wrapper_awaits_state_bucket_wait_replay(algorithm):
+    pytest.importorskip("redis")
+    from redis.asyncio import Redis as AsyncRedis
+
+    from pyrate_limiter import RedisStateStore
+
+    client = AsyncRedis.from_url("redis://localhost:6379")
+    key = f"gcra-async-wrapper/{id_generator()}"
+    clock = FrozenClock()
+    bucket = StateBucket([Rate(3, 1000)], algorithm=algorithm(), store=RedisStateStore(client, key), clock=clock)
+    wrapped = BucketAsyncWrapper(bucket)
+    try:
+        assert await wrapped.put(RateItem("a", clock.now(), weight=3)) is True
+        assert await wrapped.put(RateItem("a", clock.now())) is False
+
+        assert await wrapped.waiting(RateItem("a", clock.now(), weight=2)) == 667
+        assert await wrapped.count() == 3
+        clock.advance(667)
+        assert await wrapped.put(RateItem("a", clock.now(), weight=2)) is True
+    finally:
+        await client.delete(key)
+        await client.aclose()
 
 
 class ScriptedNoArgs(HalfRate):
