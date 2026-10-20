@@ -4,9 +4,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## [4.5.1]
+
+Bug fixes only. One behaviour change to note: a decorated call that the limiter
+can never admit now raises instead of running (see the first entry).
 
 ### Fixed
+- **`as_decorator` ran the wrapped function even when denied.** Both the sync
+  and async wrappers discarded the result of `try_acquire()` and called the
+  function unconditionally. With the default `blocking=True, timeout=-1` that
+  result is only `False` when the weight can never be admitted under the
+  configured rates (e.g. `weight=5` on `Rate(2, Duration.SECOND)`), so the
+  limiter's verdict was silently bypassed. Such calls now raise `RuntimeError`.
+- **`Limiter.close()` never closed its buckets.** `BucketFactory.close()` read
+  the bucket list off the leaker after tearing the leaker down, so it always
+  iterated an empty list: SQLite connections and Postgres connection pools
+  stayed open. It now snapshots the buckets first. `SingleBucketFactory` also
+  closes its bucket when no leak was ever scheduled; factories that hold buckets
+  outside the leaker can extend the new `BucketFactory.owned_buckets()`.
+- **Async wrappers lost `StateBucket` waits.** `BucketAsyncWrapper.waiting()`
+  called the generic log-bucket implementation instead of the wrapped bucket's,
+  so GCRA / `TokenBucket` waits came back as `-1` or `0`. An admissible request
+  could be rejected outright, or a blocking limiter could retry without waiting.
+- **Async blocking retries recorded stale timestamps.** After an async wait the
+  retry loop advanced the item's timestamp by the requested delay only. A late
+  wake-up therefore recorded the acquisition in the past and let later requests
+  through early. The timestamp is now re-read from the bucket factory's clock,
+  and the deadline is enforced around the whole retry loop.
 - **PostgresBucket**: the advisory lock that serialises table creation is now
   keyed by a CRC-32 of the table name rather than `hash()`, which Python salts
   per interpreter. Processes sharing a database took different locks, so their
