@@ -207,6 +207,26 @@ class TestPostgresConcurrent:
             )
 
 
+def test_advisory_lock_id_is_the_same_in_every_process():
+    """Two interpreters with different hash seeds must lock the same key."""
+    import os
+    import subprocess
+    import sys
+
+    code = "from pyrate_limiter.buckets.postgres import advisory_lock_id; print(advisory_lock_id('ratelimit___t'))"
+    keys = {
+        subprocess.run(
+            [sys.executable, "-c", code],
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        for seed in ("1", "2")
+    }
+    assert len(keys) == 1
+    
+    
 @pytest.mark.postgres
 def test_peek_timestamp_matches_put_outside_utc():
     """The column is a TIMESTAMP that ``TO_TIMESTAMP`` fills through the

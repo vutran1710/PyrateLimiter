@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **PostgresBucket**: the advisory lock that serialises table creation is now
+  keyed by a CRC-32 of the table name rather than `hash()`, which Python salts
+  per interpreter. Processes sharing a database took different locks, so their
+  concurrent `CREATE TABLE IF NOT EXISTS` could fail with `UniqueViolation` on
+  `pg_type_typname_nsp_index`.
 - **`PostgresBucket.peek` read timestamps as UTC.** The `item_timestamp` column
   is a `TIMESTAMP` that `TO_TIMESTAMP` fills through the session time zone, but
   `peek` took its epoch as if it were UTC. Outside UTC every peeked item sat the
