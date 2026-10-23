@@ -381,6 +381,12 @@ finally:
     limiter.close()
 ```
 
+Closing waits for the background sync worker to stop before closing its buckets,
+including any leak callback already running. A leak callback may itself close
+the limiter; in that case the worker stops before visiting another bucket.
+Async leak tasks receive a cancellation request on their owning event loop;
+the synchronous `close()` method does not wait for those tasks to finish.
+
 ### asyncio & event loops
 
 Use `try_acquire_async` so waiting uses `asyncio.sleep` instead of blocking the loop. With a sync bucket, wrap it in `BucketAsyncWrapper`:
