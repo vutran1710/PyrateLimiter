@@ -212,26 +212,42 @@ def test_worker_close_stops_remaining_bucket_callbacks():
     assert calls == ["first"]
 
 
-def test_leaker_can_restart_after_close():
+@pytest.mark.asyncio
+@pytest.mark.parametrize("async_worker", [False, True], ids=["sync", "async"])
+async def test_leaker_can_restart_after_close(async_worker):
     leaker = Leaker(60_000)
     calls = []
     leaked = Event()
 
+    async def wait_for_close():
+        await asyncio.Event().wait()
+        return 0
+
     class Bucket(InMemoryBucket):
+        is_async = async_worker
+
         def leak(self, current_timestamp):
             calls.append(id(self))
             leaked.set()
-            return 0
+            return wait_for_close() if async_worker else 0
 
     for _ in range(2):
         leaked.clear()
         bucket = Bucket([Rate(1, Duration.SECOND)])
         leaker.register(bucket)
-        leaker.start()
-        assert leaked.wait(3)
+        if async_worker:
+            leaker.leak_async()
+        else:
+            leaker.start()
+        assert await asyncio.to_thread(leaked.wait, 3)
+        task = leaker.aio_leak_task
         leaker.close()
+        if async_worker:
+            with pytest.raises(asyncio.CancelledError):
+                await task
         assert not leaker.is_alive()
         assert not leaker.sync_buckets
+        assert not leaker.async_buckets
         assert calls[-1] == id(bucket)
     assert len(calls) == 2
 
@@ -270,31 +286,6 @@ async def test_close_requests_async_worker_cancellation(from_thread):
 
 
 @pytest.mark.asyncio
-async def test_async_leaker_can_restart_after_close():
-    leaker = Leaker(60_000)
-    entered = asyncio.Event()
-
-    class Bucket(InMemoryBucket):
-        is_async = True
-
-        async def leak(self, current_timestamp):
-            entered.set()
-            await asyncio.Event().wait()
-            return 0
-
-    for _ in range(2):
-        entered.clear()
-        leaker.register(Bucket([Rate(1, Duration.SECOND)]))
-        leaker.leak_async()
-        task = leaker.aio_leak_task
-        await asyncio.wait_for(entered.wait(), 3)
-        leaker.close()
-        with pytest.raises(asyncio.CancelledError):
-            await task
-        assert not leaker.async_buckets
-
-
-@pytest.mark.asyncio
 async def test_dispose_before_async_start_does_not_leak_replacement_twice():
     calls = []
 
@@ -323,8 +314,8 @@ async def test_dispose_before_async_start_does_not_leak_replacement_twice():
         await asyncio.gather(old_task, new_task, return_exceptions=True)
 
 
-@pytest.mark.parametrize("completed", [False, True])
-def test_close_after_async_loop_has_closed(completed):
+@pytest.mark.parametrize("loop_state", ["closed-pending", "closed-completed", "closing"])
+def test_close_with_unavailable_async_loop(loop_state, monkeypatch):
     loop = asyncio.new_event_loop()
     closed = []
 
@@ -342,53 +333,27 @@ def test_close_after_async_loop_has_closed(completed):
         limiter = Limiter(Bucket([Rate(1, Duration.SECOND)]))
         task = limiter.bucket_factory._leaker.aio_leak_task
         await asyncio.sleep(0)
-        if completed:
+        if loop_state == "closed-completed":
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
         return limiter, task
 
     limiter, task = loop.run_until_complete(setup())
-    loop.close()
+    if loop_state == "closing":
+        schedule = loop.call_soon_threadsafe
+
+        def close_before_schedule(callback):
+            loop.close()
+            return schedule(callback)
+
+        monkeypatch.setattr(loop, "call_soon_threadsafe", close_before_schedule)
+    else:
+        loop.close()
     try:
         limiter.close()
         assert len(closed) == 1
     finally:
         # The deliberately closed loop cannot finalize a pending coroutine.
-        task._log_destroy_pending = False
-        task.get_coro().close()
-
-
-def test_close_when_async_loop_closes_during_cancellation(monkeypatch):
-    loop = asyncio.new_event_loop()
-    closed = []
-
-    class Bucket(InMemoryBucket):
-        is_async = True
-
-        async def leak(self, current_timestamp):
-            await asyncio.Event().wait()
-            return 0
-
-        def close(self):
-            closed.append(self)
-
-    async def setup():
-        limiter = Limiter(Bucket([Rate(1, Duration.SECOND)]))
-        await asyncio.sleep(0)
-        return limiter, limiter.bucket_factory._leaker.aio_leak_task
-
-    limiter, task = loop.run_until_complete(setup())
-    schedule = loop.call_soon_threadsafe
-
-    def close_before_schedule(callback):
-        loop.close()
-        return schedule(callback)
-
-    monkeypatch.setattr(loop, "call_soon_threadsafe", close_before_schedule)
-    try:
-        limiter.close()
-        assert len(closed) == 1
-    finally:
         loop.close()
         task._log_destroy_pending = False
         task.get_coro().close()
