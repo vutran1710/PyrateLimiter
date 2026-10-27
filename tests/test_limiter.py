@@ -140,7 +140,7 @@ async def test_try_acquire_allows_async_bucket_put_result():
 
 
 def test_limited_iter_is_lazy_and_acquires_before_yield():
-    bucket = InMemoryBucket([Rate(2, 10_000)])
+    bucket = InMemoryBucket([Rate(3, 10_000)])
     limiter = Limiter(bucket, buffer_ms=0)
     events = []
 
@@ -154,14 +154,14 @@ def test_limited_iter_is_lazy_and_acquires_before_yield():
 
     assert bucket.count() == 0
     assert next(iterator) == 1
-    assert events == [("pulled", 0)]
+    assert events == [("pulled", 1)]
     assert bucket.count() == 1
     assert next(iterator) == 2
-    assert events == [("pulled", 0), ("pulled", 1)]
+    assert events == [("pulled", 1), ("pulled", 2)]
     assert bucket.count() == 2
     with pytest.raises(StopIteration):
         next(iterator)
-    assert bucket.count() == 2
+    assert bucket.count() == 3
 
 
 @pytest.mark.asyncio
@@ -181,7 +181,7 @@ def test_limited_iter_raises_when_weight_can_never_be_admitted():
 
 @pytest.mark.asyncio
 async def test_limited_async_iter_is_lazy_and_acquires_before_yield():
-    bucket = BucketAsyncWrapper(InMemoryBucket([Rate(2, 10_000)]))
+    bucket = BucketAsyncWrapper(InMemoryBucket([Rate(3, 10_000)]))
     limiter = Limiter(bucket, buffer_ms=0)
     events = []
 
@@ -195,14 +195,14 @@ async def test_limited_async_iter_is_lazy_and_acquires_before_yield():
 
     assert await bucket.count() == 0
     assert await anext(iterator) == 1
-    assert events == [("pulled", 0)]
+    assert events == [("pulled", 1)]
     assert await bucket.count() == 1
     assert await anext(iterator) == 2
-    assert events == [("pulled", 0), ("pulled", 1)]
+    assert events == [("pulled", 1), ("pulled", 2)]
     assert await bucket.count() == 2
     with pytest.raises(StopAsyncIteration):
         await anext(iterator)
-    assert await bucket.count() == 2
+    assert await bucket.count() == 3
 
 
 @pytest.mark.asyncio

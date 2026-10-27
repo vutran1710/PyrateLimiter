@@ -490,12 +490,13 @@ class Limiter:
             return False
 
     def limited_iter(self, iterable: Iterable[T], *, name: str = "ratelimiter", weight: int = 1) -> Iterator[T]:
-        """Yield items lazily, acquiring a permit immediately before each one.
+        """Yield items lazily, acquiring a permit before advancing the source.
 
         This method requires a synchronous bucket. Use ``limited_async_iter``
         with an async iterable and async-safe limiter.
         """
-        for item in iterable:
+        iterator = iter(iterable)
+        while True:
             try:
                 acquired = self._try_acquire(
                     name=name,
@@ -511,16 +512,25 @@ class Limiter:
                 raise RuntimeError("Can't use async bucket with sync iterator")
             if not acquired:
                 raise RuntimeError(f"Rate limit for {name!r} can never admit weight={weight}; item denied.")
+            try:
+                item = next(iterator)
+            except StopIteration:
+                return
             yield item
 
     async def limited_async_iter(
         self, iterable: AsyncIterable[T], *, name: str = "ratelimiter", weight: int = 1
     ) -> AsyncIterator[T]:
-        """Asynchronously yield items lazily, acquiring a permit before each one."""
-        async for item in iterable:
+        """Asynchronously yield items, acquiring a permit before advancing the source."""
+        iterator = aiter(iterable)
+        while True:
             acquired = await self.try_acquire_async(name=name, weight=weight)
             if not acquired:
                 raise RuntimeError(f"Rate limit for {name!r} can never admit weight={weight}; item denied.")
+            try:
+                item = await anext(iterator)
+            except StopAsyncIteration:
+                return
             yield item
 
     async def _acquire_co(
