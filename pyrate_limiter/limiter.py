@@ -7,7 +7,7 @@ from functools import wraps
 from inspect import isawaitable, iscoroutine, iscoroutinefunction
 from threading import RLock, local
 from time import monotonic, sleep
-from typing import Any, Awaitable, Callable, Iterable, List, Optional, Protocol, Tuple, Union
+from typing import Any, AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable, Iterator, List, Optional, Protocol, Tuple, TypeVar, Union
 
 from .abstracts import AbstractBucket, BucketFactory, Rate, RateItem
 from .buckets import InMemoryBucket
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 ItemMapping = Callable[[Any], Tuple[str, int]]
 DecoratorWrapper = Callable[[Callable[[Any], Any]], Callable[[Any], Any]]
+T = TypeVar("T")
 
 # Sentinel: "no bucket obtained yet" for _acquire_co (None is a valid arg).
 _UNSET: Any = object()
@@ -488,6 +489,40 @@ class Limiter:
         except (asyncio.TimeoutError, TimeoutError):
             return False
 
+    def limited_iter(self, iterable: Iterable[T], *, name: str = "ratelimiter", weight: int = 1) -> Iterator[T]:
+        """Yield items lazily, acquiring a permit immediately before each one.
+
+        This method requires a synchronous bucket. Use ``limited_async_iter``
+        with an async iterable and async-safe limiter.
+        """
+        for item in iterable:
+            try:
+                acquired = self._try_acquire(
+                    name=name,
+                    weight=weight,
+                    blocking=True,
+                    _allow_async_result=False,
+                    _sync_context="iterator",
+                )
+            except TimeoutError:
+                acquired = False
+            if isawaitable(acquired):
+                self._cleanup_awaitable(acquired)
+                raise RuntimeError("Can't use async bucket with sync iterator")
+            if not acquired:
+                raise RuntimeError(f"Rate limit for {name!r} can never admit weight={weight}; item denied.")
+            yield item
+
+    async def limited_async_iter(
+        self, iterable: AsyncIterable[T], *, name: str = "ratelimiter", weight: int = 1
+    ) -> AsyncIterator[T]:
+        """Asynchronously yield items lazily, acquiring a permit before each one."""
+        async for item in iterable:
+            acquired = await self.try_acquire_async(name=name, weight=weight)
+            if not acquired:
+                raise RuntimeError(f"Rate limit for {name!r} can never admit weight={weight}; item denied.")
+            yield item
+
     async def _acquire_co(
         self,
         item,
@@ -578,6 +613,7 @@ class Limiter:
         timeout: int | float = -1,
         _force_async: bool = False,
         _allow_async_result: bool = True,
+        _sync_context: str = "decorator",
     ) -> Union[bool, Awaitable[bool]]:
         """Try acquiring an item with name & weight
         Return true on success, false on failure
@@ -598,7 +634,7 @@ class Limiter:
             if isawaitable(item):
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(item)
-                    raise RuntimeError("Can't use async bucket with sync decorator")
+                    raise RuntimeError(f"Can't use async bucket with sync {_sync_context}")
                 return self._acquire_co(item, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             assert isinstance(item, RateItem)
@@ -607,7 +643,7 @@ class Limiter:
             if isawaitable(bucket):
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(bucket)
-                    raise RuntimeError("Can't use async bucket with sync decorator")
+                    raise RuntimeError(f"Can't use async bucket with sync {_sync_context}")
                 return self._acquire_co(item, bucket, blocking=blocking, _force_async=_force_async, deadline=deadline)
 
             assert isinstance(bucket, AbstractBucket), f"Invalid bucket: item: {name}"
@@ -618,14 +654,14 @@ class Limiter:
                 and self.bucket_factory._leaker
                 and id(bucket) in self.bucket_factory._leaker.async_buckets
             ):
-                raise RuntimeError("Can't use async bucket with sync decorator")
+                raise RuntimeError(f"Can't use async bucket with sync {_sync_context}")
 
             acquire = bucket.put(item)
 
             if isawaitable(acquire):
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(acquire)
-                    raise RuntimeError("Can't use async bucket with sync decorator")
+                    raise RuntimeError(f"Can't use async bucket with sync {_sync_context}")
                 return self._handle_async_result(
                     self._wait_after_async_put(bucket, item, acquire, blocking=blocking, deadline=deadline),
                     deadline=deadline,
