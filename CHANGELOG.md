@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **A blocking `try_acquire()` could give up on an item that fits.**
+  `SlidingWindowLog.retry_after` returned `blocking_timestamp + interval - now + 1`,
+  which is negative once the blocking entry is past its window but not yet
+  leaked. When it came to exactly `-1`, `AbstractBucket.waiting()` returned the
+  value the limiter reads as "can never fit", so a blocking call with no timeout
+  returned `False`. A `PostgresBucket` reaches this path whenever another
+  process holds its table lock. The wait is now floored at `0`.
+- **`waiting()` could fail its own assertion.** It read `failing_rate` again
+  after `peek()`, and a `put()` outside the limiter's lock could reset it to
+  `None` in between. requests-ratelimiter makes such puts when it fills a bucket
+  after a 429. `waiting()` now reads the rate once.
+
 ## [4.5.1]
 
 Bug fixes only. One behaviour change to note: a decorated call that the limiter
