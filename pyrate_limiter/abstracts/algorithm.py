@@ -145,7 +145,9 @@ class SlidingWindowLog(LogAlgorithm):
 
         # +1 clears the inclusive lower bound: landing exactly on it leaves the
         # entry still counted, so the re-put fails and the limiter spins at 0.
-        return blocking_timestamp + rate.interval - now + 1
+        # An entry already past its window but not yet leaked owes no wait; the
+        # floor keeps that from reading as waiting()'s -1, "can never fit".
+        return max(0, blocking_timestamp + rate.interval - now + 1)
 
 
 class FixedWindow(LogAlgorithm):

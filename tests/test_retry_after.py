@@ -405,3 +405,27 @@ def test_waiting_asks_the_algorithm_for_the_maximum_weight():
 
     assert bucket.waiting(RateItem("a", 1000, weight=3)) != -1
     assert bucket.waiting(RateItem("a", 1000, weight=4)) == -1
+
+
+def test_sliding_window_wait_for_an_expired_entry_is_zero():
+    """An entry past its window but not yet leaked must not read as -1, "can never fit"."""
+    rate = Rate(3, 1000)
+    algo = SlidingWindowLog()
+
+    assert algo.retry_after(rate, now=1002, blocking_timestamp=0) == 0
+    assert algo.retry_after(rate, now=999, blocking_timestamp=0) == 2
+
+
+def test_waiting_survives_a_put_that_clears_the_failing_rate():
+    """A put outside the limiter's lock, such as a client filling the bucket after
+    a 429, can reset failing_rate while waiting() peeks."""
+    rates = [Rate(3, 1000)]
+    bucket = InMemoryBucket(rates)
+    bucket.failing_rate = rates[0]
+
+    def admitted_meanwhile(_index):
+        bucket.failing_rate = None
+        return RateItem("a", 500)
+
+    bucket.peek = admitted_meanwhile  # type: ignore[method-assign]
+    assert bucket.waiting(RateItem("a", 1000)) == 501

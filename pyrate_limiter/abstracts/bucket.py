@@ -145,12 +145,16 @@ class AbstractBucket(ABC):
 
     def waiting(self, item: RateItem) -> Union[int, Awaitable[int]]:
         """Calculate time until bucket become availabe to consume an item again"""
-        if self.failing_rate is None:
+        # Read once: a put() outside the limiter's lock, such as a client
+        # filling the bucket after a 429, can reset the attribute mid-call.
+        failing_rate = self.failing_rate
+
+        if failing_rate is None:
             return 0
 
         assert item.weight > 0, "Item's weight must > 0"
 
-        if item.weight > self._algorithm.max_weight(self.failing_rate):
+        if item.weight > self._algorithm.max_weight(failing_rate):
             return -1
 
         recorded = self._recorded_wait(item)
@@ -160,18 +164,17 @@ class AbstractBucket(ABC):
 
         # Fallback for buckets written against the pre-4.5 contract, which
         # record nothing: derive the wait with an extra lookup.
-        offset = self._algorithm.blocking_offset(self.failing_rate, item.weight)
+        offset = self._algorithm.blocking_offset(failing_rate, item.weight)
 
         if offset is None:
             # Policy's wait does not depend on a stored entry (e.g. FixedWindow).
-            return self._algorithm.retry_after(self.failing_rate, item.timestamp, None)
+            return self._algorithm.retry_after(failing_rate, item.timestamp, None)
 
         bound_item = self.peek(offset)
 
         def _calc_waiting(inner_bound_item: Optional[RateItem]) -> int:
-            assert self.failing_rate is not None  # NOTE: silence mypy
             blocking = None if inner_bound_item is None else inner_bound_item.timestamp
-            return self._algorithm.retry_after(self.failing_rate, item.timestamp, blocking)
+            return self._algorithm.retry_after(failing_rate, item.timestamp, blocking)
 
         async def _calc_waiting_async() -> int:
             nonlocal bound_item
