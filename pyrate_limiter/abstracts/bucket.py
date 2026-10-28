@@ -7,7 +7,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from inspect import isawaitable, iscoroutine
-from threading import Event, Thread
+from threading import Event, Lock, Thread, current_thread
 from typing import Any, Awaitable, Dict, List, Optional, Tuple, Type, Union
 
 from ..clocks import AbstractClock, MonotonicClock
@@ -234,8 +234,12 @@ class Leaker:
         self.sync_buckets = defaultdict()
         self.async_buckets = defaultdict()
         self.leak_interval = leak_interval
-        self._stop_event = Event()  # <--- add here
+        self._stop_event = Event()
         self._thread = None
+        self._lifecycle_lock = Lock()
+        self._closing = 0
+        self._sync_task: Optional[asyncio.Task] = None
+        self.aio_leak_task = None
 
     def register(self, bucket: AbstractBucket):
         """Register a new bucket, routing it to the sync or async leak loop.
@@ -272,7 +276,7 @@ class Leaker:
             del self.async_buckets[bucket_id]
 
             if not self.async_buckets and self.aio_leak_task:
-                self.aio_leak_task.cancel()
+                self._cancel_task(self.aio_leak_task)
                 self.aio_leak_task = None
 
             return True
@@ -283,11 +287,15 @@ class Leaker:
         while not self._stop_event.is_set() and buckets:
             try:
                 for _, bucket in tuple(buckets.items()):
+                    if self._stop_event.is_set():
+                        return
                     now = bucket.now()
 
                     while isawaitable(now):
                         now = await now
 
+                    if self._stop_event.is_set():
+                        return
                     assert isinstance(now, int)
                     leak = bucket.leak(now)
 
@@ -302,8 +310,10 @@ class Leaker:
                 return
 
     def leak_async(self):
-        if self.async_buckets and not self.aio_leak_task:
-            self.aio_leak_task = asyncio.create_task(self._leak(self.async_buckets))
+        with self._lifecycle_lock:
+            if self.async_buckets and not self.aio_leak_task and not self._closing:
+                self._stop_event.clear()
+                self.aio_leak_task = asyncio.create_task(self._leak(self.async_buckets))
 
     def is_alive(self) -> bool:
         """Whether the sync-leak worker thread is currently running."""
@@ -311,8 +321,42 @@ class Leaker:
 
     def _run(self) -> None:
         """Worker-thread target; not meant to be called directly."""
-        assert self.sync_buckets
-        asyncio.run(self._leak(self.sync_buckets))
+        asyncio.run(self._run_sync())
+
+    async def _run_sync(self) -> None:
+        with self._lifecycle_lock:
+            if self._stop_event.is_set():
+                return
+            self._sync_task = asyncio.current_task()
+
+        try:
+            await self._leak(self.sync_buckets)
+        except asyncio.CancelledError:
+            if not self._stop_event.is_set():
+                raise
+        finally:
+            with self._lifecycle_lock:
+                self._sync_task = None
+
+    @staticmethod
+    def _cancel_task(task: Optional[asyncio.Task]) -> None:
+        if task is None or task.done():
+            return
+        loop = task.get_loop()
+        if not loop.is_closed():
+            try:
+                caller_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                caller_loop = None
+            if caller_loop is loop and asyncio.current_task() is not task:
+                # Cancel before a pending task can start on the next loop turn.
+                task.cancel()
+                return
+            try:
+                loop.call_soon_threadsafe(task.cancel)
+            except RuntimeError:
+                # The loop may have closed between the check and the request.
+                pass
 
     def start(self) -> None:
         """Start (or restart) the daemon thread that leaks sync buckets.
@@ -321,15 +365,37 @@ class Leaker:
         ``Thread`` cannot be restarted, so we create a fresh one here instead of
         re-starting the dead one (which would raise ``RuntimeError``).
         """
-        if self.sync_buckets and not self.is_alive():
-            self._stop_event.clear()
-            self._thread = Thread(target=self._run, name=self.name, daemon=True)
-            self._thread.start()
+        with self._lifecycle_lock:
+            if self.sync_buckets and not self.is_alive() and not self._closing:
+                self._stop_event.clear()
+                self._thread = Thread(target=self._run, name=self.name, daemon=True)
+                self._thread.start()
 
     def close(self):
-        self._stop_event.set()
-        self.sync_buckets.clear()
-        self.async_buckets.clear()
+        """Stop leaking before a factory releases its synchronous buckets.
+
+        An async worker is only asked to cancel: this synchronous API cannot
+        wait for a task on the caller's event loop. A callback in the sync
+        worker can also close its limiter, without joining its own thread.
+        """
+        with self._lifecycle_lock:
+            self._closing += 1
+            self._stop_event.set()
+            worker, sync_task = self._thread, self._sync_task
+            async_task, self.aio_leak_task = self.aio_leak_task, None
+
+        try:
+            self._cancel_task(sync_task)
+            self._cancel_task(async_task)
+            # Never hold the lifecycle lock while waiting: a running callback
+            # may itself call close(), or the worker may be publishing its task.
+            if worker is not None and worker is not current_thread():
+                worker.join()
+        finally:
+            with self._lifecycle_lock:
+                self.sync_buckets.clear()
+                self.async_buckets.clear()
+                self._closing -= 1
 
 
 class BucketFactory(ABC):
