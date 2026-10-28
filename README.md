@@ -41,6 +41,7 @@
   - [GCRA / Token bucket](#gcra--token-bucket)
 - [Everyday usage](#everyday-usage)
   - [Blocking, non-blocking & timeout](#blocking-non-blocking--timeout)
+  - [Iterators](#iterators)
   - [Weight](#weight)
   - [Decorator](#decorator)
   - [Context manager](#context-manager)
@@ -322,6 +323,25 @@ acquired = await limiter.try_acquire_async("item", timeout=5)
 if not acquired:
     print("timed out waiting for a permit")
 ```
+
+### Iterators
+
+`limited_iter` and `limited_async_iter` acquire a permit before advancing the
+source iterator. This is useful when advancing a lazy iterator triggers an API
+request. They consume the input lazily without materializing it:
+
+```python
+for item in limiter.limited_iter(some_iterator(), name="api"):
+    process(item)
+
+async for item in limiter.limited_async_iter(some_async_iterator(), name="api"):
+    await process(item)
+```
+
+Use `limited_iter` with a synchronous bucket and `limited_async_iter` with an
+async iterable and async-safe limiter.
+The permit is acquired for each attempted advance, including the final advance
+that discovers the source is exhausted.
 
 The `buffer_ms` Limiter parameter (default `50`) adds a small slack to absorb clock drift:
 
