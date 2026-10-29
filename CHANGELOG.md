@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Sync blocking retries recorded stale timestamps** after a late wake-up; they now re-read the factory clock like the async loop.
+
 ## [4.5.1]
 
 Bug fixes only. One behaviour change to note: a decorated call that the limiter
