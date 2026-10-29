@@ -269,7 +269,11 @@ class Limiter:
                 if timed_out:
                     raise TimeoutError()
 
-                item.timestamp += delay
+                refreshed = self.bucket_factory.wrap_item(item.name, item.weight)
+                if isawaitable(refreshed):
+                    return self._handle_async_result(self._acquire_co(refreshed, bucket, blocking=blocking, deadline=deadline), deadline=deadline)
+                assert isinstance(refreshed, RateItem)
+                item.timestamp = refreshed.timestamp
                 re_acquire = bucket.put(item)
 
                 if isawaitable(re_acquire):
@@ -350,10 +354,14 @@ class Limiter:
             if timed_out:
                 raise TimeoutError()
 
-            item.timestamp += sleep_ms
             remaining: Union[int, float] = -1 if deadline is None else max(0.0, deadline - monotonic())
 
             with combined_lock(self.lock, blocking=True, timeout=remaining):
+                refreshed = self.bucket_factory.wrap_item(item.name, item.weight)
+                if isawaitable(refreshed):
+                    return self._handle_async_result(self._acquire_co(refreshed, bucket, blocking=blocking, deadline=deadline), deadline=deadline)
+                assert isinstance(refreshed, RateItem)
+                item.timestamp = refreshed.timestamp
                 re_acquire = bucket.put(item)
 
                 if isawaitable(re_acquire):
