@@ -202,7 +202,8 @@ class RedisBucket(AbstractBucket):
         return self.redis.zremrangebyscore(
             self.bucket_key,
             0,
-            self._algorithm.leak_bound(self.rates, current_timestamp),
+            # The counting window includes its lower bound; only older entries expire.
+            f"({self._algorithm.leak_bound(self.rates, current_timestamp)}",
         )
 
     def flush(self):
