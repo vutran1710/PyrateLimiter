@@ -1,6 +1,7 @@
 # tests/test_limiter_blocking_behavior.py
 import asyncio
 import time
+import threading
 from inspect import isawaitable
 import pytest
 from pyrate_limiter import Rate
@@ -246,6 +247,99 @@ def test_try_acquire_sync_timeout():
 
     assert ok is False                        # timed out
     assert 0.08 <= (t1 - t0) <= 0.35         # waited ~timeout, not full 200ms
+
+
+def test_try_acquire_sync_retry_reads_timestamp_after_lock_wait(monkeypatch):
+    class ManualClock:
+        timestamp = 0
+
+        def now(self):
+            return self.timestamp
+
+    clock = ManualClock()
+    bucket = InMemoryBucket([Rate(1, 1000)])
+    bucket._clock = clock
+    limiter = Limiter(SingleBucketFactory(bucket, schedule_leak=False), buffer_ms=0)
+    lock_held = threading.Event()
+
+    def hold_lock():
+        # Another caller holds the limiter lock when the sleeper wakes.
+        with limiter.lock:
+            lock_held.set()
+            time.sleep(0.05)
+            clock.timestamp = 7000
+
+    def wake_late(_seconds):
+        clock.timestamp = 5000
+        threading.Thread(target=hold_lock).start()
+        lock_held.wait()
+
+    monkeypatch.setattr("pyrate_limiter.limiter.sleep", wake_late)
+
+    assert limiter.try_acquire("late-wake") is True
+    assert limiter.try_acquire("late-wake") is True
+    assert bucket.peek(0).timestamp == 7000
+    assert limiter.try_acquire("late-wake", blocking=False) is False
+
+
+@pytest.mark.asyncio
+async def test_sync_retry_after_async_get_uses_factory_timestamp(monkeypatch):
+    class FactoryClock:
+        timestamp = 100
+
+    clock = FactoryClock()
+    bucket = InMemoryBucket([Rate(1, 1000)])
+
+    class AsyncGetFactory(BucketFactory):
+        def wrap_item(self, name: str, weight: int = 1):
+            return RateItem(name, timestamp=clock.timestamp, weight=weight)
+
+        async def get(self, item: RateItem):
+            return bucket
+
+    limiter = Limiter(AsyncGetFactory(), buffer_ms=0)
+
+    def wake_late(_seconds):
+        clock.timestamp = 5100
+
+    monkeypatch.setattr("pyrate_limiter.limiter.sleep", wake_late)
+
+    assert await limiter.try_acquire("late-wake") is True
+    assert await limiter.try_acquire("late-wake") is True
+    assert bucket.peek(0).timestamp == 5100
+
+
+@pytest.mark.asyncio
+async def test_sync_retry_with_async_clock_keeps_planned_advance(monkeypatch):
+    class FactoryClock:
+        timestamp = 100
+
+    clock = FactoryClock()
+    bucket = InMemoryBucket([Rate(1, 1000)])
+
+    class AsyncWrapFactory(BucketFactory):
+        def wrap_item(self, name: str, weight: int = 1):
+            async def wrap_async():
+                return RateItem(name, timestamp=clock.timestamp, weight=weight)
+
+            return wrap_async()
+
+        def get(self, item: RateItem):
+            return bucket
+
+    limiter = Limiter(AsyncWrapFactory(), buffer_ms=0)
+    slept = []
+
+    def wake_late(seconds):
+        slept.append(seconds)
+        assert len(slept) == 1
+        clock.timestamp = 5100
+
+    monkeypatch.setattr("pyrate_limiter.limiter.sleep", wake_late)
+
+    assert await limiter.try_acquire("async-clock") is True
+    assert await limiter.try_acquire("async-clock") is True
+    assert bucket.peek(0).timestamp == 100 + round(slept[0] * 1000)
 
 
 def test_try_acquire_sync_nonblocking_rejects_timeout():

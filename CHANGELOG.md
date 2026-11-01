@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   after `peek()`, and a `put()` outside the limiter's lock could reset it to
   `None` in between. requests-ratelimiter makes such puts when it fills a bucket
   after a 429. `waiting()` now reads the rate once.
+- **Sync blocking retries recorded stale timestamps** after a late wake-up; they now re-read the factory clock like the async loop.
 
 ## [4.5.1]
 

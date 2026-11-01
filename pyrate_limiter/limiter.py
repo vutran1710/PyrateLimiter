@@ -205,6 +205,19 @@ class Limiter:
             delay = 0
         return delay + self.buffer_ms
 
+    def _refresh_timestamp(self, item: RateItem, waited_ms: int) -> None:
+        """Re-read the factory clock before a sync retry, as the async loop does.
+
+        An async clock cannot be read here, so it keeps the planned advance.
+        """
+        refreshed = self.bucket_factory.wrap_item(item.name, item.weight)
+        if isawaitable(refreshed):
+            self._cleanup_awaitable(refreshed)
+            item.timestamp += waited_ms
+            return
+        assert isinstance(refreshed, RateItem)
+        item.timestamp = refreshed.timestamp
+
     def _delay_waiter(
         self, bucket: AbstractBucket, item: RateItem, blocking: bool, _force_async: bool = False, deadline: Optional[float] = None
     ) -> Union[bool, Awaitable[bool]]:
@@ -269,7 +282,7 @@ class Limiter:
                 if timed_out:
                     raise TimeoutError()
 
-                item.timestamp += delay
+                self._refresh_timestamp(item, delay)
                 re_acquire = bucket.put(item)
 
                 if isawaitable(re_acquire):
@@ -350,10 +363,10 @@ class Limiter:
             if timed_out:
                 raise TimeoutError()
 
-            item.timestamp += sleep_ms
             remaining: Union[int, float] = -1 if deadline is None else max(0.0, deadline - monotonic())
 
             with combined_lock(self.lock, blocking=True, timeout=remaining):
+                self._refresh_timestamp(item, sleep_ms)
                 re_acquire = bucket.put(item)
 
                 if isawaitable(re_acquire):

@@ -212,9 +212,10 @@ def test_delay_waiter_clamps_negative_sync_delay_to_zero():
     limiter = Limiter(DEFAULT_RATES[0], buffer_ms=0)
     bucket = NegativeWaitingBucket()
     item = RateItem(name="demo", timestamp=123, weight=1)
+    before = limiter.bucket_factory.wrap_item("demo").timestamp
 
     assert limiter._delay_waiter(bucket, item, blocking=True) is True
-    assert item.timestamp == 123
+    assert item.timestamp >= before
 
 
 @pytest.mark.asyncio
