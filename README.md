@@ -324,6 +324,15 @@ if not acquired:
     print("timed out waiting for a permit")
 ```
 
+The `buffer_ms` Limiter parameter (default `50`) adds a small slack to absorb clock drift:
+
+```python
+from pyrate_limiter import Rate, Duration, InMemoryBucket, Limiter
+
+bucket = InMemoryBucket([Rate(5, Duration.SECOND)])
+limiter = Limiter(bucket, buffer_ms=100)
+```
+
 ### Iterators
 
 `limited_iter` and `limited_async_iter` acquire a permit before advancing the
@@ -342,15 +351,6 @@ Use `limited_iter` with a synchronous bucket and `limited_async_iter` with an
 async iterable and async-safe limiter.
 The permit is acquired for each attempted advance, including the final advance
 that discovers the source is exhausted.
-
-The `buffer_ms` Limiter parameter (default `50`) adds a small slack to absorb clock drift:
-
-```python
-from pyrate_limiter import Rate, Duration, InMemoryBucket, Limiter
-
-bucket = InMemoryBucket([Rate(5, Duration.SECOND)])
-limiter = Limiter(bucket, buffer_ms=100)
-```
 
 ### Weight
 
