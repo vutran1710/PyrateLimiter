@@ -292,20 +292,27 @@ class Leaker:
                 for _, bucket in tuple(buckets.items()):
                     if self._stop_event.is_set():
                         return
-                    now = bucket.now()
+                    try:
+                        now = bucket.now()
 
-                    while isawaitable(now):
-                        now = await now
+                        while isawaitable(now):
+                            now = await now
 
-                    if self._stop_event.is_set():
-                        return
-                    assert isinstance(now, int)
-                    leak = bucket.leak(now)
+                        if self._stop_event.is_set():
+                            return
+                        assert isinstance(now, int)
+                        leak = bucket.leak(now)
 
-                    while isawaitable(leak):
-                        leak = await leak
+                        while isawaitable(leak):
+                            leak = await leak
 
-                    assert isinstance(leak, int)
+                        assert isinstance(leak, int)
+                    except RuntimeError:
+                        raise
+                    except Exception as e:
+                        # A transient backend error (a dropped connection, a locked database)
+                        # must not end the loop: nothing would leak any of its buckets again.
+                        logger.warning("Leak error for bucket %s: %s", id(bucket), e)
 
                 await asyncio.sleep(self.leak_interval / 1000)
             except RuntimeError as e:
