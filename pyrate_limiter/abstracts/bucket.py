@@ -316,7 +316,12 @@ class Leaker:
         with self._lifecycle_lock:
             if self.async_buckets and not self.aio_leak_task and not self._closing:
                 self._stop_event.clear()
-                self.aio_leak_task = asyncio.create_task(self._leak(self.async_buckets))
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError as e:
+                    raise RuntimeError("Async buckets must be initialized inside a running event loop") from e
+
+                self.aio_leak_task = loop.create_task(self._leak(self.async_buckets))
 
     def is_alive(self) -> bool:
         """Whether the sync-leak worker thread is currently running."""
