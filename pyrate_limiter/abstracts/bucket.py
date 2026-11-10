@@ -312,7 +312,7 @@ class Leaker:
                     except Exception as e:
                         # A transient backend error (a dropped connection, a locked database)
                         # must not end the loop: nothing would leak any of its buckets again.
-                        logger.warning("Leak error for bucket %s: %s", id(bucket), e)
+                        logger.warning("Leak error for bucket %s: %s: %s", id(bucket), type(e).__name__, e)
 
                 await asyncio.sleep(self.leak_interval / 1000)
             except RuntimeError as e:

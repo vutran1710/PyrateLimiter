@@ -38,7 +38,7 @@ class AsyncCountingBucket(CountingBucket):
         return CountingBucket.leak(self, current_timestamp)
 
 
-async def wait_for(event, task=None):
+async def wait_until(event, task=None):
     for _ in range(300):
         if event.is_set() or (task is not None and task.done()):
             break
@@ -60,12 +60,12 @@ async def test_leaker_keeps_leaking_after_a_failed_leak(bucket_class, caplog):
         leaker.start()
         task = None
     try:
-        assert await wait_for(failing.leaked_after_failure, task)
-        assert await wait_for(healthy.leaked_after_failure, task)
+        assert await wait_until(failing.leaked_after_failure, task)
+        assert await wait_until(healthy.leaked_after_failure, task)
         assert leaker.is_alive() if task is None else not task.done()
     finally:
         leaker.close()
-    assert "connection dropped" in caplog.text
+    assert "ConnectionError: connection dropped" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -83,5 +83,28 @@ async def test_runtime_error_still_stops_the_leaker():
     try:
         await asyncio.wait_for(task, 3)
         assert task.exception() is None
+    finally:
+        leaker.close()
+
+
+@pytest.mark.asyncio
+async def test_cancelling_the_leaker_during_a_leak_stops_it():
+    """CancelledError is a BaseException, so the per-bucket handler must let it through."""
+    entered = asyncio.Event()
+
+    class BlockingBucket(AsyncCountingBucket):
+        async def leak(self, current_timestamp=None):
+            entered.set()
+            await asyncio.sleep(60)
+
+    leaker = Leaker(10)
+    leaker.register(BlockingBucket())
+    leaker.leak_async()
+    task = leaker.aio_leak_task
+    try:
+        await asyncio.wait_for(entered.wait(), 3)
+        task.cancel()
+        await asyncio.wait({task}, timeout=3)
+        assert task.cancelled()
     finally:
         leaker.close()
