@@ -263,13 +263,13 @@ class GCRA(StateAlgorithm):
             rate = rates[0]
             if weight <= rate.burst:
                 emission = self._emission_us(rate)
-                tat = int(state[0])
-                if tat < now_us:
-                    tat = now_us
+                start = int(state[0])
+                if start < now_us:
+                    start = now_us
                 # Backlog beyond the burst left after `weight`, in microseconds.
-                wait = tat - now_us - (rate.burst - weight) * emission
+                wait = start - now_us - (rate.burst - weight) * emission
                 if wait <= 0:
-                    return (tat + weight * emission,), ADMITTED
+                    return (start + weight * emission,), ADMITTED
                 return state, Decision(failing_rate=rate, retry_after_ms=ceil(wait / 1000))
 
         advanced = []
