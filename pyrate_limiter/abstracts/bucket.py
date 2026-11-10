@@ -319,7 +319,10 @@ class Leaker:
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError as e:
-                    raise RuntimeError("Async buckets must be initialized inside a running event loop") from e
+                    raise RuntimeError(
+                        "Cannot schedule background leaking for an async bucket without a running event loop. "
+                        "Create the Limiter while the event loop is running."
+                    ) from e
 
                 self.aio_leak_task = loop.create_task(self._leak(self.async_buckets))
 
@@ -462,9 +465,17 @@ class BucketFactory(ABC):
         if not self._leaker:
             self._leaker = Leaker(self.leak_interval)
 
-        self._leaker.register(new_bucket)
-        self._leaker.start()
-        self._leaker.leak_async()
+        leaker = self._leaker
+        bucket_id = id(new_bucket)
+        already_registered = bucket_id in leaker.sync_buckets or bucket_id in leaker.async_buckets
+        leaker.register(new_bucket)
+        leaker.start()
+        try:
+            leaker.leak_async()
+        except RuntimeError:
+            if not already_registered:
+                leaker.deregister(bucket_id)
+            raise
 
     def get_buckets(self) -> List[AbstractBucket]:
         """Iterator over all buckets in the factory"""
