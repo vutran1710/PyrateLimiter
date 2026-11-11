@@ -159,11 +159,13 @@ class SQLiteBucket(AbstractBucket):
         Called from inside put()'s lock hold, so the Leaker cannot delete rows
         between the verdict and the wait.
         """
-        cur = self.conn.execute(Queries.PEEK.format(table=self.table, count=offset))
+        # Select only the indexed column to avoid table lookups for skipped rows.
+        query = 'SELECT item_timestamp FROM "{table}" ORDER BY item_timestamp DESC LIMIT 1 OFFSET {count}'
+        cur = self.conn.execute(query.format(table=self.table, count=offset))
         row = cur.fetchone()
         cur.close()
 
-        return None if row is None else int(row[1])
+        return None if row is None else int(row[0])
 
     def leak(self, current_timestamp: Optional[int] = None) -> int:
         """Leaking/clean up bucket"""
