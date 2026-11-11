@@ -389,13 +389,23 @@ the synchronous `close()` method does not wait for those tasks to finish.
 
 ### asyncio & event loops
 
-Use `try_acquire_async` so waiting uses `asyncio.sleep` instead of blocking the loop. With a sync bucket, wrap it in `BucketAsyncWrapper`:
+Use `try_acquire_async` so waiting uses `asyncio.sleep` instead of blocking the
+loop. Async bucket construction schedules a background leak task, so create the
+limiter while an event loop is running. With a sync bucket, wrap it in
+`BucketAsyncWrapper`:
 
 ```python
+import asyncio
 from pyrate_limiter import BucketAsyncWrapper, InMemoryBucket, Rate, Duration, Limiter
 
-limiter = Limiter(BucketAsyncWrapper(InMemoryBucket([Rate(5, Duration.SECOND)])))
-await limiter.try_acquire_async("item")
+async def main():
+    limiter = Limiter(BucketAsyncWrapper(InMemoryBucket([Rate(5, Duration.SECOND)])))
+    try:
+        await limiter.try_acquire_async("item")
+    finally:
+        limiter.close()
+
+asyncio.run(main())
 ```
 
 ## Backends
