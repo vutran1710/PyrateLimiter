@@ -161,7 +161,7 @@ class SQLiteBucket(AbstractBucket):
         """
         # Select only the indexed column to avoid table lookups for skipped rows.
         query = 'SELECT item_timestamp FROM "{table}" ORDER BY item_timestamp DESC LIMIT 1 OFFSET ?'
-        cur = self.conn.execute(query.format(table=self.table), (offset,))
+        cur = self.conn.execute(query.format(table=self.table.replace('"', '""')), (offset,))
         row = cur.fetchone()
         cur.close()
 
