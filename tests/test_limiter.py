@@ -139,6 +139,84 @@ async def test_try_acquire_allows_async_bucket_put_result():
     assert await acquired
 
 
+def test_limited_iter_is_lazy_and_acquires_before_yield():
+    bucket = InMemoryBucket([Rate(3, 10_000)])
+    limiter = Limiter(bucket, buffer_ms=0)
+    events = []
+
+    def items():
+        events.append(("pulled", bucket.count()))
+        yield 1
+        events.append(("pulled", bucket.count()))
+        yield 2
+
+    iterator = limiter.limited_iter(items(), name="api")
+
+    assert bucket.count() == 0
+    assert next(iterator) == 1
+    assert events == [("pulled", 1)]
+    assert bucket.count() == 1
+    assert next(iterator) == 2
+    assert events == [("pulled", 1), ("pulled", 2)]
+    assert bucket.count() == 2
+    with pytest.raises(StopIteration):
+        next(iterator)
+    assert bucket.count() == 3
+
+
+@pytest.mark.asyncio
+async def test_limited_iter_rejects_async_bucket():
+    bucket = BucketAsyncWrapper(InMemoryBucket([Rate(2, 10_000)]))
+    limiter = Limiter(bucket)
+    with pytest.raises(RuntimeError, match="async bucket with sync iterator"):
+        next(limiter.limited_iter([1]))
+
+
+def test_limited_iter_raises_when_weight_can_never_be_admitted():
+    limiter = Limiter(InMemoryBucket([Rate(1, 10_000)]), buffer_ms=0)
+
+    with pytest.raises(RuntimeError, match="can never admit weight=2"):
+        next(limiter.limited_iter([1], weight=2))
+
+
+@pytest.mark.asyncio
+async def test_limited_async_iter_is_lazy_and_acquires_before_yield():
+    bucket = BucketAsyncWrapper(InMemoryBucket([Rate(3, 10_000)]))
+    limiter = Limiter(bucket, buffer_ms=0)
+    events = []
+
+    async def items():
+        events.append(("pulled", await bucket.count()))
+        yield 1
+        events.append(("pulled", await bucket.count()))
+        yield 2
+
+    iterator = limiter.limited_async_iter(items(), name="api")
+
+    assert await bucket.count() == 0
+    assert await anext(iterator) == 1
+    assert events == [("pulled", 1)]
+    assert await bucket.count() == 1
+    assert await anext(iterator) == 2
+    assert events == [("pulled", 1), ("pulled", 2)]
+    assert await bucket.count() == 2
+    with pytest.raises(StopAsyncIteration):
+        await anext(iterator)
+    assert await bucket.count() == 3
+
+
+@pytest.mark.asyncio
+async def test_limited_async_iter_raises_when_weight_can_never_be_admitted():
+    bucket = BucketAsyncWrapper(InMemoryBucket([Rate(1, 10_000)]))
+    limiter = Limiter(bucket, buffer_ms=0)
+
+    async def items():
+        yield 1
+
+    with pytest.raises(RuntimeError, match="can never admit weight=2"):
+        await anext(limiter.limited_async_iter(items(), weight=2))
+
+
 @pytest.mark.asyncio
 async def test_handle_async_result_cancels_pending_task_on_timeout():
     limiter = Limiter(DEFAULT_RATES[0])
