@@ -46,3 +46,22 @@ def test_sqlite_leak_after_close_is_safe():
 
     # Previously raised AttributeError: 'NoneType' object has no attribute 'execute'
     assert bucket.leak(bucket.now() + Duration.SECOND * 10) == 0
+
+
+@pytest.mark.sqlite
+@pytest.mark.parametrize("table", ['quoted"bucket', 'bucket" ORDER BY item_timestamp ASC --'])
+def test_sqlite_peek_timestamp_quoted_table(tmp_path, table):
+    bucket = SQLiteBucket.init_from_file(
+        [Rate(2, Duration.SECOND)], table=table, db_path=str(tmp_path / "bucket.sqlite")
+    )
+    try:
+        assert bucket._peek_timestamp(0) is None
+        assert bucket.put(RateItem("first", 1000))
+        assert bucket.put(RateItem("second", 1100))
+        assert bucket._peek_timestamp(0) == 1100
+        assert bucket._peek_timestamp(1) == 1000
+        assert bucket._peek_timestamp(2) is None
+        assert not bucket.put(RateItem("denied", 1200))
+        assert bucket.count() == 2
+    finally:
+        bucket.close()
