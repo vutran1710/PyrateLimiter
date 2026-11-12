@@ -495,8 +495,9 @@ class Limiter:
         This method requires a synchronous bucket. Use ``limited_async_iter``
         with an async iterable and async-safe limiter.
         """
+        if weight < 0:
+            raise ValueError("weight must be >= 0")
         iterator = iter(iterable)
-        while True:
             try:
                 acquired = self._try_acquire(
                     name=name,
