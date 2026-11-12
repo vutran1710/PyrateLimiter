@@ -497,7 +497,10 @@ class Limiter:
         """
         if weight < 0:
             raise ValueError("weight must be >= 0")
-        iterator = iter(iterable)
+
+        while True:
+            iterator = iter(iterable)
+
             try:
                 acquired = self._try_acquire(
                     name=name,
