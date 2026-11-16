@@ -489,7 +489,7 @@ class Limiter:
         except (asyncio.TimeoutError, TimeoutError):
             return False
 
-    def limited_iter(self, iterable: Iterable[T], *, name: str = "ratelimiter", weight: int = 1) -> Iterator[T]:
+def limited_iter(self, iterable: Iterable[T], *, name: str = "pyrate", weight: int = 1) -> Iterator[T]:
         """Yield items lazily, acquiring a permit before advancing the source.
 
         This method requires a synchronous bucket. Use ``limited_async_iter``
