@@ -164,12 +164,76 @@ def test_limited_iter_is_lazy_and_acquires_before_yield():
     assert bucket.count() == 3
 
 
+def test_limited_iter_advances_non_generator_iterables():
+    limiter = Limiter(InMemoryBucket([Rate(3, 10_000)]), buffer_ms=0)
+
+    assert list(limiter.limited_iter([1, 2])) == [1, 2]
+
+
+def test_limited_iter_rejects_negative_weight():
+    limiter = Limiter(InMemoryBucket([Rate(3, 10_000)]))
+
+    with pytest.raises(ValueError, match="weight must be >= 0"):
+        next(limiter.limited_iter([1], weight=-1))
+
+
+def test_limited_iter_handles_acquisition_timeout(monkeypatch):
+    limiter = Limiter(InMemoryBucket([Rate(3, 10_000)]))
+
+    def timeout(**kwargs):
+        raise TimeoutError
+
+    monkeypatch.setattr(limiter, "_try_acquire", timeout)
+    with pytest.raises(RuntimeError, match="can never admit weight=1"):
+        next(limiter.limited_iter([1]))
+
+
+def test_limited_iter_rejects_awaitable_acquisition(monkeypatch):
+    limiter = Limiter(InMemoryBucket([Rate(3, 10_000)]))
+
+    async def acquire(**kwargs):
+        return True
+
+    monkeypatch.setattr(limiter, "_try_acquire", acquire)
+    with pytest.raises(RuntimeError, match="async bucket with sync iterator"):
+        next(limiter.limited_iter([1]))
+
+
 @pytest.mark.asyncio
 async def test_limited_iter_rejects_async_bucket():
     bucket = BucketAsyncWrapper(InMemoryBucket([Rate(2, 10_000)]))
     limiter = Limiter(bucket)
     with pytest.raises(RuntimeError, match="async bucket with sync iterator"):
         next(limiter.limited_iter([1]))
+
+
+@pytest.mark.parametrize("async_stage", ["wrap_item", "get", "put"])
+def test_limited_iter_rejects_async_factory_methods(monkeypatch, async_stage):
+    bucket = InMemoryBucket([Rate(2, 10_000)])
+    limiter = Limiter(bucket)
+    factory = limiter.bucket_factory
+
+    async def async_wrap_item(name, weight=1):
+        return RateItem(name, bucket.now(), weight)
+
+    async def async_get(item):
+        return bucket
+
+    async def async_put(item):
+        return True
+
+    if async_stage == "wrap_item":
+        monkeypatch.setattr(factory, "wrap_item", async_wrap_item)
+    elif async_stage == "get":
+        monkeypatch.setattr(factory, "get", async_get)
+    else:
+        monkeypatch.setattr(bucket, "put", async_put)
+
+    try:
+        with pytest.raises(RuntimeError, match="async bucket with sync iterator"):
+            next(limiter.limited_iter([1]))
+    finally:
+        limiter.close()
 
 
 def test_limited_iter_raises_when_weight_can_never_be_admitted():
@@ -215,6 +279,17 @@ async def test_limited_async_iter_raises_when_weight_can_never_be_admitted():
 
     with pytest.raises(RuntimeError, match="can never admit weight=2"):
         await anext(limiter.limited_async_iter(items(), weight=2))
+
+
+@pytest.mark.asyncio
+async def test_limited_async_iter_rejects_negative_weight():
+    limiter = Limiter(BucketAsyncWrapper(InMemoryBucket([Rate(3, 10_000)])))
+
+    async def items():
+        yield 1
+
+    with pytest.raises(ValueError, match="weight must be >= 0"):
+        await anext(limiter.limited_async_iter(items(), weight=-1))
 
 
 @pytest.mark.asyncio

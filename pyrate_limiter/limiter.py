@@ -498,9 +498,8 @@ class Limiter:
         if weight < 0:
             raise ValueError("weight must be >= 0")
 
+        iterator = iter(iterable)
         while True:
-            iterator = iter(iterable)
-
             try:
                 acquired = self._try_acquire(
                     name=name,
@@ -524,6 +523,9 @@ class Limiter:
 
     async def limited_async_iter(self, iterable: AsyncIterable[T], *, name: str = "ratelimiter", weight: int = 1) -> AsyncIterator[T]:
         """Asynchronously yield items, acquiring a permit before advancing the source."""
+        if weight < 0:
+            raise ValueError("weight must be >= 0")
+
         iterator = aiter(iterable)
         while True:
             acquired = await self.try_acquire_async(name=name, weight=weight)
