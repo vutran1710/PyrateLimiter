@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   piled up in the buckets it served. The error is now logged as a warning and
   the loop moves on to the next bucket and the next interval, as it did in the
   sync worker before #299.
+- **`Duration` could not be hashed.** It defines `__eq__` (a member equals the
+  `int` of its milliseconds) without `__hash__`, so Python made every member
+  unhashable: `{Duration.SECOND: 5}`, `set(Duration)` and a `functools.cache`
+  function called with a `Duration` raised `TypeError`. A member hashes like its
+  value now, so it hashes like the `int` it is equal to.
 
 ## [4.5.1]
 

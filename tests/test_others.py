@@ -33,6 +33,18 @@ def test_duration():
     assert Duration.MINUTE + 30000 == 30000 + Duration.MINUTE == 90000
 
 
+def test_duration_is_hashable():
+    # A member equals the int of its milliseconds, so it has to hash like it
+    assert hash(Duration.SECOND) == hash(1000)
+
+    limits = {Duration.SECOND: 5, Duration.MINUTE: 100}
+    assert limits[Duration.SECOND] == limits[1000] == 5
+    assert limits[Duration.MINUTE] == limits[60_000] == 100
+
+    assert len({Duration.SECOND, Duration.MINUTE, Duration.SECOND, 1000}) == 2
+    assert len(set(Duration)) == len(Duration)
+
+
 def test_readable_duration():
     assert Duration.readable(300) == "300ms"
 
