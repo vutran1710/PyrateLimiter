@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   after `peek()`, and a `put()` outside the limiter's lock could reset it to
   `None` in between. requests-ratelimiter makes such puts when it fills a bucket
   after a 429. `waiting()` now reads the rate once.
+- **`RedisBucket` did not count items newer than the one being put.** The Lua
+  script counted the window with `ZCOUNT bucket window_start now`, so an item
+  that reached Redis after a newer one (from another process, for example) left
+  the newer ones out and could be admitted over the limit. It now counts up to
+  `+inf`, like `InMemoryBucket` and the SQLite and Postgres buckets.
 
 ## [4.5.1]
 
