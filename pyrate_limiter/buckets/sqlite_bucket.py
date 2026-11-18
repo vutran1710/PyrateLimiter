@@ -153,6 +153,11 @@ class SQLiteBucket(AbstractBucket):
             self.conn.commit()
             return True
 
+    @property
+    def _escaped_table(self) -> str:
+        """Table name for use inside a double-quoted SQLite identifier."""
+        return self.table.replace('"', '""')
+
     def _peek_timestamp(self, offset: int) -> Optional[int]:
         """Timestamp ``offset`` places from the newest item, or ``None``.
 
@@ -161,7 +166,7 @@ class SQLiteBucket(AbstractBucket):
         """
         # Select only the indexed column to avoid table lookups for skipped rows.
         query = 'SELECT item_timestamp FROM "{table}" ORDER BY item_timestamp DESC LIMIT 1 OFFSET ?'
-        cur = self.conn.execute(query.format(table=self.table.replace('"', '""')), (offset,))
+        cur = self.conn.execute(query.format(table=self._escaped_table), (offset,))
         row = cur.fetchone()
         cur.close()
 
@@ -182,7 +187,7 @@ class SQLiteBucket(AbstractBucket):
             )
             cur = self.conn.execute(query)
             count = cur.fetchone()[0]
-            query = Queries.LEAK.format(table=self.table, count=count)
+            query = Queries.LEAK.format(table=self._escaped_table, count=count)
             cur.execute(query)
             cur.close()
             self.conn.commit()
@@ -204,7 +209,7 @@ class SQLiteBucket(AbstractBucket):
 
     def peek(self, index: int) -> Optional[RateItem]:
         with self.lock:
-            query = Queries.PEEK.format(table=self.table, count=index)
+            query = Queries.PEEK.format(table=self._escaped_table, count=index)
             cur = self.conn.execute(query)
             item = cur.fetchone()
             cur.close()

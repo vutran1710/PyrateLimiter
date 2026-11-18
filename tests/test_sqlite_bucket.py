@@ -50,7 +50,7 @@ def test_sqlite_leak_after_close_is_safe():
 
 @pytest.mark.sqlite
 @pytest.mark.parametrize("table", ['quoted"bucket', 'bucket" ORDER BY item_timestamp ASC --'])
-def test_sqlite_peek_timestamp_quoted_table(tmp_path, table):
+def test_sqlite_quoted_table(tmp_path, table):
     bucket = SQLiteBucket.init_from_file(
         [Rate(2, Duration.SECOND)], table=table, db_path=str(tmp_path / "bucket.sqlite")
     )
@@ -63,5 +63,10 @@ def test_sqlite_peek_timestamp_quoted_table(tmp_path, table):
         assert bucket._peek_timestamp(2) is None
         assert not bucket.put(RateItem("denied", 1200))
         assert bucket.count() == 2
+        assert bucket.leak(2050) == 1
+        remaining = bucket.peek(0)
+        assert remaining is not None
+        assert (remaining.name, remaining.timestamp) == ("second", 1100)
+        assert bucket.peek(1) is None
     finally:
         bucket.close()
