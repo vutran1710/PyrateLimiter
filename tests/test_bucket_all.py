@@ -286,3 +286,15 @@ async def test_bucket_performance(create_bucket):
     elapsed = after - before
     assert await bucket.count() == 10_000
     logger.info("Bucket: %s \nPerformance test: insert 10k items %s(secs)", bucket.bucket, elapsed)
+
+
+@pytest.mark.asyncio
+async def test_bucket_counts_newer_items(create_bucket):
+    """An item that arrives after a newer one, e.g. from another process,
+    still counts that newer item against the window"""
+    bucket = BucketAsyncWrapper(await create_bucket([Rate(1, 1000)]))
+    now = bucket.now()
+
+    assert await bucket.put(RateItem("item", now + 1)) is True
+    assert await bucket.put(RateItem("item", now)) is False
+    assert await bucket.count() == 1

@@ -33,7 +33,7 @@ class LuaScript:
         local window_start = tonumber(ARGV[5 + offset])
         local limit = tonumber(ARGV[5 + offset + 1])
         local blocking_rank = tonumber(ARGV[5 + offset + 2])
-        local count = redis.call('ZCOUNT', bucket, window_start, now)
+        local count = redis.call('ZCOUNT', bucket, window_start, '+inf')
         local space_available = limit - tonumber(count)
         if space_available < space_required then
             local blocking_timestamp = -1
