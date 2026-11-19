@@ -34,6 +34,10 @@ class Duration(Enum):
 
         return self.value == int(duration)
 
+    def __hash__(self) -> int:
+        # Equal to its value in milliseconds (see __eq__), so it hashes like it
+        return hash(self.value)
+
     @staticmethod
     def readable(value: int) -> str:
         notes = [
