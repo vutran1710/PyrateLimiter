@@ -48,9 +48,15 @@ class Duration(Enum):
             (Duration.SECOND, "s"),
         ]
 
-        for note, shorten in notes:
+        for index, (note, shorten) in enumerate(notes):
             if value >= note.value:
                 decimal_value = value / note.value
+
+                # Rounded to one decimal, 59,999 ms is 60.0s, which is 1.0m
+                if index and float(f"{decimal_value:0.1f}") >= notes[index - 1][0].value / note.value:
+                    note, shorten = notes[index - 1]
+                    decimal_value = value / note.value
+
                 return f"{decimal_value:0.1f}{shorten}"  # noqa: E231
 
         return f"{value}ms"
