@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   after `peek()`, and a `put()` outside the limiter's lock could reset it to
   `None` in between. requests-ratelimiter makes such puts when it fills a bucket
   after a 429. `waiting()` now reads the rate once.
+- **One failed leak stopped the leaker.** The leak loop only caught
+  `RuntimeError`, so any other exception from a bucket's `now()` or `leak()`
+  (a dropped Redis connection, a locked SQLite database) ended it. The sync
+  worker thread exited until another bucket was scheduled, and the async leak
+  task finished with the exception and was never replaced, so expired items
+  piled up in the buckets it served. The error is now logged as a warning and
+  the loop moves on to the next bucket and the next interval, as it did in the
+  sync worker before #299.
 
 ## [4.5.1]
 
