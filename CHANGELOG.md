@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   unhashable: `{Duration.SECOND: 5}`, `set(Duration)` and a `functools.cache`
   function called with a `Duration` raised `TypeError`. A member hashes like its
   value now, so it hashes like the `int` it is equal to.
+- **`Duration.readable()` printed a whole next unit.** A value just under a
+  minute, an hour, a day or a week rounds to one decimal as `60.0s`, `60.0m`,
+  `24.0h` or `7.0d`, so `str(Rate(...))` showed `limit=5/60.0s` for an interval
+  of 59,999 ms. It steps up to `1.0m`, `1.0h`, `1.0d` or `1.0w` now.
 
 ## [4.5.1]
 
