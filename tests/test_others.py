@@ -62,6 +62,27 @@ def test_readable_duration():
     assert Duration.readable(Duration.WEEK * 3.5) == "3.5w"
 
 
+def test_readable_duration_steps_up_when_it_rounds_to_the_next_unit():
+    # 59,999 ms is 59.999 seconds, which rounds to 60.0s: that is 1.0m
+    assert Duration.readable(59_949) == "59.9s"
+    assert Duration.readable(59_950) == "1.0m"
+    assert Duration.readable(59_999) == "1.0m"
+    assert Duration.readable(Duration.MINUTE * 59.95) == "1.0h"
+    assert Duration.readable(Duration.HOUR.value - 1) == "1.0h"
+    assert Duration.readable(Duration.DAY.value - 1) == "1.0d"
+    assert Duration.readable(Duration.WEEK.value - 1) == "1.0w"
+
+    # No value prints as a whole next unit, whatever is just below it
+    for boundary, whole in [
+        (Duration.MINUTE, "60.0s"),
+        (Duration.HOUR, "60.0m"),
+        (Duration.DAY, "24.0h"),
+        (Duration.WEEK, "7.0d"),
+    ]:
+        for value in range(max(0, boundary.value - 4_400_000), boundary.value, 61):
+            assert Duration.readable(value) != whole, value
+
+
 def test_rate():
     rate = Rate(1000, Duration.SECOND)
     assert str(rate) == "limit=1000/1.0s"
