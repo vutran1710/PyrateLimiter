@@ -41,6 +41,7 @@
   - [GCRA / Token bucket](#gcra--token-bucket)
 - [Everyday usage](#everyday-usage)
   - [Blocking, non-blocking & timeout](#blocking-non-blocking--timeout)
+  - [Iterators](#iterators)
   - [Weight](#weight)
   - [Decorator](#decorator)
   - [Context manager](#context-manager)
@@ -331,6 +332,25 @@ from pyrate_limiter import Rate, Duration, InMemoryBucket, Limiter
 bucket = InMemoryBucket([Rate(5, Duration.SECOND)])
 limiter = Limiter(bucket, buffer_ms=100)
 ```
+
+### Iterators
+
+`limited_iter` and `limited_async_iter` acquire a permit before advancing the
+source iterator. This is useful when advancing a lazy iterator triggers an API
+request. They consume the input lazily without materializing it:
+
+```python
+for item in limiter.limited_iter(some_iterator(), name="api"):
+    process(item)
+
+async for item in limiter.limited_async_iter(some_async_iterator(), name="api"):
+    await process(item)
+```
+
+Use `limited_iter` with a synchronous bucket and `limited_async_iter` with an
+async iterable and async-safe limiter.
+The permit is acquired for each attempted advance, including the final advance
+that discovers the source is exhausted.
 
 ### Weight
 
