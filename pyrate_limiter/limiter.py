@@ -521,7 +521,7 @@ class Limiter:
                 return
             yield item
 
-    async def limited_async_iter(self, iterable: AsyncIterable[T], *, name: str = "ratelimiter", weight: int = 1) -> AsyncIterator[T]:
+    async def limited_async_iter(self, iterable: AsyncIterable[T], *, name: str = "pyrate", weight: int = 1) -> AsyncIterator[T]:
         """Asynchronously yield items, acquiring a permit before advancing the source."""
         if weight < 0:
             raise ValueError("weight must be >= 0")

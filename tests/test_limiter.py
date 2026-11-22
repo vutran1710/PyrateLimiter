@@ -255,12 +255,15 @@ async def test_limited_async_iter_is_lazy_and_acquires_before_yield():
         events.append(("pulled", await bucket.count()))
         yield 2
 
-    iterator = limiter.limited_async_iter(items(), name="api")
+    iterator = limiter.limited_async_iter(items())
 
     assert await bucket.count() == 0
     assert await anext(iterator) == 1
     assert events == [("pulled", 1)]
     assert await bucket.count() == 1
+    item = await bucket.peek(0)
+    assert item is not None
+    assert item.name == "pyrate"
     assert await anext(iterator) == 2
     assert events == [("pulled", 1), ("pulled", 2)]
     assert await bucket.count() == 2
