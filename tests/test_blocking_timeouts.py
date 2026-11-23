@@ -272,7 +272,7 @@ def test_try_acquire_sync_retry_reads_timestamp_after_lock_wait(monkeypatch):
     def wake_late(_seconds):
         clock.timestamp = 5000
         threading.Thread(target=hold_lock).start()
-        lock_held.wait()
+        assert lock_held.wait(timeout=5)
 
     monkeypatch.setattr("pyrate_limiter.limiter.sleep", wake_late)
 
