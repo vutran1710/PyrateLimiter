@@ -27,6 +27,11 @@ class LockLike(Protocol):
     def release(self) -> None: ...
 
 
+async def _wrap_item_async(name: str, now: Awaitable[int], weight: int) -> RateItem:
+    """`SingleBucketFactory.wrap_item` for an async clock, without a closure per call."""
+    return RateItem(name, await now, weight=weight)
+
+
 class SingleBucketFactory(BucketFactory):
     """Single-bucket factory for quick use with Limiter"""
 
@@ -46,12 +51,8 @@ class SingleBucketFactory(BucketFactory):
     def wrap_item(self, name: str, weight: int = 1):
         now = self.bucket.now()
 
-        if isawaitable(now):
-
-            async def wrap_async():
-                return RateItem(name, await now, weight=weight)
-
-            return wrap_async()
+        if not isinstance(now, int) and isawaitable(now):
+            return _wrap_item_async(name, now, weight)
 
         # Sync fast path (every blocking-free acquire): no closures allocated.
         return RateItem(name, now, weight=weight)
@@ -421,7 +422,7 @@ class Limiter:
             logger.debug("Acquisition TimeoutError")
             return False
 
-        if not isawaitable(result):
+        if isinstance(result, bool) or not isawaitable(result):
             return result
 
         async def _resolve_result(async_result: Awaitable[bool]) -> bool:
@@ -645,7 +646,9 @@ class Limiter:
 
             item = self.bucket_factory.wrap_item(name, weight)
 
-            if isawaitable(item):
+            # The isinstance() checks before isawaitable() keep the sync path cheap:
+            # isawaitable() does an ABC check, which is slow for plain values.
+            if not isinstance(item, RateItem) and isawaitable(item):
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(item)
                     raise RuntimeError(f"Can't use async bucket with sync {_sync_context}")
@@ -654,7 +657,7 @@ class Limiter:
             assert isinstance(item, RateItem)
 
             bucket = self.bucket_factory.get(item)
-            if isawaitable(bucket):
+            if not isinstance(bucket, AbstractBucket) and isawaitable(bucket):
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(bucket)
                     raise RuntimeError(f"Can't use async bucket with sync {_sync_context}")
@@ -672,7 +675,7 @@ class Limiter:
 
             acquire = bucket.put(item)
 
-            if isawaitable(acquire):
+            if not isinstance(acquire, bool) and isawaitable(acquire):
                 if not _force_async and not _allow_async_result:
                     self._cleanup_awaitable(acquire)
                     raise RuntimeError(f"Can't use async bucket with sync {_sync_context}")
@@ -732,7 +735,7 @@ class Limiter:
                         r = self._try_acquire(name=name, weight=weight, blocking=True, _allow_async_result=False)
                     except TimeoutError:
                         r = False
-                    if isawaitable(r):
+                    if not isinstance(r, bool) and isawaitable(r):
                         try:
                             self._cleanup_awaitable(r)
                         finally:
