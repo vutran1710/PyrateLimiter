@@ -34,22 +34,31 @@ class Duration(Enum):
 
         return self.value == int(duration)
 
+    def __hash__(self) -> int:
+        # Equal to its value in milliseconds (see __eq__), so it hashes like it
+        return hash(self.value)
+
     @staticmethod
     def readable(value: int) -> str:
+        if value < Duration.SECOND.value:
+            return f"{value}ms"
+
+        # Each unit, its suffix and the unit above it
         notes = [
-            (Duration.WEEK, "w"),
-            (Duration.DAY, "d"),
-            (Duration.HOUR, "h"),
-            (Duration.MINUTE, "m"),
-            (Duration.SECOND, "s"),
+            (Duration.SECOND, "s", Duration.MINUTE),
+            (Duration.MINUTE, "m", Duration.HOUR),
+            (Duration.HOUR, "h", Duration.DAY),
+            (Duration.DAY, "d", Duration.WEEK),
         ]
 
-        for note, shorten in notes:
-            if value >= note.value:
-                decimal_value = value / note.value
+        for note, shorten, larger in notes:
+            decimal_value = value / note.value
+
+            # Rounded to one decimal, 59,999 ms is 60.0s, a whole minute: it is read in the unit above
+            if round(decimal_value, 1) < larger.value / note.value:
                 return f"{decimal_value:0.1f}{shorten}"  # noqa: E231
 
-        return f"{value}ms"
+        return f"{value / Duration.WEEK.value:0.1f}w"  # noqa: E231
 
 
 class RateItem:

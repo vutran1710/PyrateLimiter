@@ -33,6 +33,18 @@ def test_duration():
     assert Duration.MINUTE + 30000 == 30000 + Duration.MINUTE == 90000
 
 
+def test_duration_is_hashable():
+    # A member equals the int of its milliseconds, so it has to hash like it
+    assert hash(Duration.SECOND) == hash(1000)
+
+    limits = {Duration.SECOND: 5, Duration.MINUTE: 100}
+    assert limits[Duration.SECOND] == limits[1000] == 5
+    assert limits[Duration.MINUTE] == limits[60_000] == 100
+
+    assert len({Duration.SECOND, Duration.MINUTE, Duration.SECOND, 1000}) == 2
+    assert len(set(Duration)) == len(Duration)
+
+
 def test_readable_duration():
     assert Duration.readable(300) == "300ms"
 
@@ -48,6 +60,27 @@ def test_readable_duration():
     assert Duration.readable(Duration.HOUR * 3.5) == "3.5h"
     assert Duration.readable(Duration.DAY * 3.5) == "3.5d"
     assert Duration.readable(Duration.WEEK * 3.5) == "3.5w"
+
+
+def test_readable_duration_steps_up_when_it_rounds_to_the_next_unit():
+    # 59,999 ms is 59.999 seconds, which rounds to 60.0s: that is 1.0m
+    assert Duration.readable(59_949) == "59.9s"
+    assert Duration.readable(59_950) == "1.0m"
+    assert Duration.readable(59_999) == "1.0m"
+    assert Duration.readable(Duration.MINUTE * 59.95) == "1.0h"
+    assert Duration.readable(Duration.HOUR.value - 1) == "1.0h"
+    assert Duration.readable(Duration.DAY.value - 1) == "1.0d"
+    assert Duration.readable(Duration.WEEK.value - 1) == "1.0w"
+
+    # No value prints as a whole next unit, whatever is just below it
+    for boundary, whole in [
+        (Duration.MINUTE, "60.0s"),
+        (Duration.HOUR, "60.0m"),
+        (Duration.DAY, "24.0h"),
+        (Duration.WEEK, "7.0d"),
+    ]:
+        for value in range(max(0, boundary.value - 4_400_000), boundary.value, 61):
+            assert Duration.readable(value) != whole, value
 
 
 def test_rate():

@@ -18,6 +18,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   after `peek()`, and a `put()` outside the limiter's lock could reset it to
   `None` in between. requests-ratelimiter makes such puts when it fills a bucket
   after a 429. `waiting()` now reads the rate once.
+- **One failed leak stopped the leaker.** The leak loop only caught
+  `RuntimeError`, so any other exception from a bucket's `now()` or `leak()`
+  (a dropped Redis connection, a locked SQLite database) ended it. The sync
+  worker thread exited until another bucket was scheduled, and the async leak
+  task finished with the exception and was never replaced, so expired items
+  piled up in the buckets it served. The error is now logged as a warning and
+  the loop moves on to the next bucket and the next interval, as it did in the
+  sync worker before #299.
+- **`Duration` could not be hashed.** It defines `__eq__` (a member equals the
+  `int` of its milliseconds) without `__hash__`, so Python made every member
+  unhashable: `{Duration.SECOND: 5}`, `set(Duration)` and a `functools.cache`
+  function called with a `Duration` raised `TypeError`. A member hashes like its
+  value now, so it hashes like the `int` it is equal to.
+- **`Duration.readable()` printed a whole next unit.** A value just under a
+  minute, an hour, a day or a week rounds to one decimal as `60.0s`, `60.0m`,
+  `24.0h` or `7.0d`, so `str(Rate(...))` showed `limit=5/60.0s` for an interval
+  of 59,999 ms. It steps up to `1.0m`, `1.0h`, `1.0d` or `1.0w` now.
 - **`RedisBucket` did not count items newer than the one being put.** The Lua
   script counted the window with `ZCOUNT bucket window_start now`, so an item
   that reached Redis after a newer one (from another process, for example) left
