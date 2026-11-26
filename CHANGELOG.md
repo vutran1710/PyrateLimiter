@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **`RedisBucket` did not count items newer than the one being put.** The Lua
+  script counted the window with `ZCOUNT bucket window_start now`, so an item
+  that reached Redis after a newer one (from another process, for example) left
+  the newer ones out and could be admitted over the limit. It now counts up to
+  `+inf`, like `InMemoryBucket` and the SQLite and Postgres buckets.
+
+## [4.6.0]
+
+Rate-limited iterators, a batch of fixes, and a faster sync acquire path.
+Additive: no public API is removed or changed.
+
+### Added
+- **`Limiter.limited_iter()` and `Limiter.limited_async_iter()`.** They acquire
+  a permit before each advance of the source iterator, so a lazy iterator that
+  makes an API request per step is rate limited without being materialized.
+
+  ```python
+  for item in limiter.limited_iter(fetch_pages(), name="api"):
+      process(item)
+  ```
+
+  The final advance, the one that finds the source exhausted, also takes a
+  permit. A weight the rates can never admit raises `RuntimeError`, as the
+  decorator does. `limited_iter` needs a synchronous bucket.
+
+### Fixed
+- **Closing a limiter could race its leak worker.** `Leaker.close()` cleared
+  the bucket registry without stopping the sync worker thread. A worker that had
+  not started its first pass failed an assertion on the empty registry, and a
+  leak already in progress could reach a bucket whose connection had just been
+  closed. `close()` now stops and joins the sync worker before the factory
+  closes its buckets, and no worker can be restarted while it runs. Async leak
+  tasks are asked to cancel on their own event loop; the synchronous `close()`
+  does not wait for them.
+- **An async bucket created outside an event loop left a stale registration.**
+  Scheduling its leak task raised asyncio's bare `no running event loop` after
+  the bucket was already registered with a shared factory's leaker. The error
+  now says to create the limiter while the event loop is running, and the
+  bucket that failed to schedule is deregistered.
 - **A blocking `try_acquire()` could give up on an item that fits.**
   `SlidingWindowLog.retry_after` returned `blocking_timestamp + interval - now + 1`,
   which is negative once the blocking entry is past its window but not yet
@@ -35,11 +74,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   minute, an hour, a day or a week rounds to one decimal as `60.0s`, `60.0m`,
   `24.0h` or `7.0d`, so `str(Rate(...))` showed `limit=5/60.0s` for an interval
   of 59,999 ms. It steps up to `1.0m`, `1.0h`, `1.0d` or `1.0w` now.
-- **`RedisBucket` did not count items newer than the one being put.** The Lua
-  script counted the window with `ZCOUNT bucket window_start now`, so an item
-  that reached Redis after a newer one (from another process, for example) left
-  the newer ones out and could be admitted over the limit. It now counts up to
-  `+inf`, like `InMemoryBucket` and the SQLite and Postgres buckets.
+- **Sync blocking retries recorded stale timestamps** after a late wake-up; they now re-read the factory clock like the async loop.
+
+### Performance
+- **Sync `try_acquire()` is about 28% faster.** The limiter checks for a plain
+  `bool`, `RateItem` or bucket before calling `inspect.isawaitable()`, whose ABC
+  check was a large share of the uncontended path.
+- **Single-rate `GCRA` / `TokenBucket` decisions are about 1.7x faster.**
+  `GCRA.step()` decides one rate directly, without building per-rate lists, and
+  the emission interval uses integer division instead of a float round trip.
+- **`SQLiteBucket` finds the blocking timestamp 68.6% faster.** The lookup
+  selects only the indexed `item_timestamp` column, so SQLite reads it from the
+  index instead of fetching every skipped row from the table.
 
 ## [4.5.1]
 
