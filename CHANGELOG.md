@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **`RedisBucket` did not count items newer than the one being put.** The Lua
+  script counted the window with `ZCOUNT bucket window_start now`, so an item
+  that reached Redis after a newer one (from another process, for example) left
+  the newer ones out and could be admitted over the limit. It now counts up to
+  `+inf`, like `InMemoryBucket` and the SQLite and Postgres buckets.
+
 ## [4.6.0]
 
 Rate-limited iterators, a batch of fixes, and a faster sync acquire path.
