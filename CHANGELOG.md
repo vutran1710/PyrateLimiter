@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   minute, an hour, a day or a week rounds to one decimal as `60.0s`, `60.0m`,
   `24.0h` or `7.0d`, so `str(Rate(...))` showed `limit=5/60.0s` for an interval
   of 59,999 ms. It steps up to `1.0m`, `1.0h`, `1.0d` or `1.0w` now.
+- **Sync blocking retries recorded stale timestamps** after a late wake-up; they now re-read the factory clock like the async loop.
 
 ## [4.5.1]
 
